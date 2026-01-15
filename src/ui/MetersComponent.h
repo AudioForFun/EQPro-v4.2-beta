@@ -30,6 +30,7 @@ private:
     float leftPeak = -120.0f;
     float rightRms = -120.0f;
     float rightPeak = -120.0f;
+    float phaseValue = 0.0f;
     bool dualMode = true;
     ThemeColors theme = makeDarkTheme();
 };

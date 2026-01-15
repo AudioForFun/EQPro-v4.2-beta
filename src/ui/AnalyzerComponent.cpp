@@ -1,5 +1,6 @@
 #include "AnalyzerComponent.h"
 #include <complex>
+#include <cmath>
 #include <algorithm>
 #include <functional>
 #include "../PluginProcessor.h"
@@ -16,8 +17,8 @@ constexpr float kAnalyzerMinDb = -90.0f;
 constexpr float kAnalyzerMaxDb = 6.0f;
 constexpr float kPhaseMin = -2.0f * juce::MathConstants<float>::pi;
 constexpr float kPhaseMax = 2.0f * juce::MathConstants<float>::pi;
-constexpr float kPointRadius = 5.0f;
-constexpr float kHitRadius = 12.0f;
+constexpr float kPointRadius = 6.5f;
+constexpr float kHitRadius = 14.0f;
 constexpr float kSmoothingCoeff = 0.2f;
 
 const juce::String kParamFreqSuffix = "freq";
@@ -26,6 +27,20 @@ const juce::String kParamQSuffix = "q";
 const juce::String kParamTypeSuffix = "type";
 const juce::String kParamBypassSuffix = "bypass";
 const juce::String kParamSlopeSuffix = "slope";
+const juce::String kParamMsSuffix = "ms";
+const juce::String kParamSoloSuffix = "solo";
+const juce::StringArray kFilterTypeLabels {
+    "Bell",
+    "Low Shelf",
+    "High Shelf",
+    "Low Pass",
+    "High Pass",
+    "Notch",
+    "Band Pass",
+    "All Pass",
+    "Tilt",
+    "Flat Tilt"
+};
 } // namespace
 
 AnalyzerComponent::AnalyzerComponent(EQProAudioProcessor& processor)
@@ -69,11 +84,18 @@ void AnalyzerComponent::setTheme(const ThemeColors& newTheme)
     repaint();
 }
 
+void AnalyzerComponent::setUiScale(float scale)
+{
+    uiScale = juce::jlimit(0.75f, 2.5f, scale);
+    repaint();
+}
+
 void AnalyzerComponent::paint(juce::Graphics& g)
 {
     auto plotArea = getPlotArea();
     auto magnitudeArea = getMagnitudeArea();
     auto phaseArea = getPhaseArea();
+    const float scale = uiScale;
     juce::ColourGradient grad(theme.analyzerBg, plotArea.getTopLeft().toFloat(),
                               theme.panel, plotArea.getBottomLeft().toFloat(), false);
     g.setGradientFill(grad);
@@ -83,9 +105,9 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     g.drawRect(plotArea);
 
     g.setColour(theme.grid);
-    for (int i = 1; i < 4; ++i)
+    for (int i = 1; i < 6; ++i)
     {
-        const int y = magnitudeArea.getY() + magnitudeArea.getHeight() * i / 4;
+        const int y = magnitudeArea.getY() + magnitudeArea.getHeight() * i / 6;
         g.drawHorizontalLine(y, static_cast<float>(plotArea.getX()),
                              static_cast<float>(plotArea.getRight()));
     }
@@ -136,11 +158,22 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         }
     }
 
-    g.setColour(theme.accent.withAlpha(0.6f));
-    g.strokePath(prePath, juce::PathStrokeType(1.2f));
+    const int viewMode = getAnalyzerView();
+    if (viewMode == 0 || viewMode == 1)
+    {
+    g.setColour(theme.accent.withAlpha(0.2f));
+    g.strokePath(prePath, juce::PathStrokeType(3.0f * scale));
+    g.setColour(theme.accent.withAlpha(0.75f));
+    g.strokePath(prePath, juce::PathStrokeType(1.4f * scale));
+    }
 
-    g.setColour(theme.accentAlt.withAlpha(0.7f));
-    g.strokePath(postPath, juce::PathStrokeType(1.2f));
+    if (viewMode == 0 || viewMode == 2)
+    {
+    g.setColour(theme.accentAlt.withAlpha(0.25f));
+    g.strokePath(postPath, juce::PathStrokeType(3.0f * scale));
+    g.setColour(theme.accentAlt.withAlpha(0.85f));
+    g.strokePath(postPath, juce::PathStrokeType(1.5f * scale));
+    }
 
     const bool showExternal = parameters.getRawParameterValue(ParamIDs::analyzerExternal) != nullptr
         && parameters.getRawParameterValue(ParamIDs::analyzerExternal)->load() > 0.5f;
@@ -152,7 +185,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
             extPath.lineTo(plotArea.getX() + x,
                            gainToY(externalMagnitudes[static_cast<size_t>(x)]));
         g.setColour(theme.accentAlt.withAlpha(0.4f));
-        g.strokePath(extPath, juce::PathStrokeType(1.0f));
+        g.strokePath(extPath, juce::PathStrokeType(1.0f * scale));
     }
 
     if (! eqCurveDb.empty())
@@ -165,8 +198,10 @@ void AnalyzerComponent::paint(juce::Graphics& g)
             eqPath.lineTo(plotArea.getX() + x,
                           gainToY(eqCurveDb[static_cast<size_t>(x)]));
 
-        g.setColour(theme.text.withAlpha(0.8f));
-        g.strokePath(eqPath, juce::PathStrokeType(2.0f));
+        g.setColour(theme.text.withAlpha(0.35f));
+        g.strokePath(eqPath, juce::PathStrokeType(3.0f * scale));
+        g.setColour(theme.text.withAlpha(0.9f));
+        g.strokePath(eqPath, juce::PathStrokeType(1.6f * scale));
     }
 
     if (! selectedBandCurveDb.empty())
@@ -185,6 +220,9 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
     bandPoints.clear();
     bandPoints.reserve(ParamIDs::kBandsPerChannel);
+    bypassIcons.clear();
+    bypassIcons.reserve(ParamIDs::kBandsPerChannel);
+    hasQHandles = false;
 
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
     {
@@ -201,17 +239,20 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         if (bypassed)
             colour = colour.withAlpha(0.25f);
 
-        g.setColour(colour);
         const bool isSelected = std::find(selectedBands.begin(), selectedBands.end(), band)
             != selectedBands.end();
-        const float radius = isSelected ? kPointRadius + 2.0f : kPointRadius;
+        const float radius = (isSelected ? kPointRadius + 2.5f : kPointRadius) * scale;
+        g.setColour(colour.withAlpha(0.35f));
+        g.fillEllipse(point.x - radius - 3.0f * scale, point.y - radius - 3.0f * scale,
+                      (radius + 3.0f * scale) * 2.0f, (radius + 3.0f * scale) * 2.0f);
+        g.setColour(colour);
         g.fillEllipse(point.x - radius, point.y - radius, radius * 2.0f, radius * 2.0f);
 
         if (isSelected)
         {
-            g.setColour(theme.text.withAlpha(0.6f));
-            g.drawEllipse(point.x - radius - 2.0f, point.y - radius - 2.0f,
-                          (radius + 2.0f) * 2.0f, (radius + 2.0f) * 2.0f, 1.0f);
+        g.setColour(theme.text.withAlpha(0.7f));
+        g.drawEllipse(point.x - radius - 2.0f * scale, point.y - radius - 2.0f * scale,
+                      (radius + 2.0f * scale) * 2.0f, (radius + 2.0f * scale) * 2.0f, 1.0f * scale);
         }
 
         if (getBandType(band) == static_cast<int>(eqdsp::FilterType::tilt)
@@ -222,13 +263,73 @@ void AnalyzerComponent::paint(juce::Graphics& g)
                        point.x + radius * 0.7f, point.y - radius * 0.7f, 1.2f);
         }
 
+        const float iconSize = 12.0f * uiScale;
+        const juce::Rectangle<float> iconRect(point.x - iconSize * 0.5f,
+                                              point.y + radius + 4.0f * uiScale,
+                                              iconSize, iconSize);
+        bypassIcons.push_back(iconRect);
+        const auto iconColour = bypassed ? theme.textMuted.withAlpha(0.5f)
+                                         : colour.withAlpha(0.9f);
+        g.setColour(iconColour);
+        g.drawEllipse(iconRect, 1.2f * uiScale);
+        g.drawLine(iconRect.getCentreX(),
+                   iconRect.getY() + 2.0f * uiScale,
+                   iconRect.getCentreX(),
+                   iconRect.getCentreY(),
+                   1.2f * uiScale);
+
+        if (band == selectedBand && ! bypassed)
+        {
+            const int type = getBandType(band);
+            const bool supportsQ = type == static_cast<int>(eqdsp::FilterType::bell)
+                || type == static_cast<int>(eqdsp::FilterType::notch)
+                || type == static_cast<int>(eqdsp::FilterType::bandPass)
+                || type == static_cast<int>(eqdsp::FilterType::lowShelf)
+                || type == static_cast<int>(eqdsp::FilterType::highShelf);
+
+            if (supportsQ)
+            {
+                const float q = std::max(0.11f, getBandParameter(band, kParamQSuffix));
+                const float ratio = std::pow(2.0f, 1.0f / (2.0f * q));
+                const float leftFreq = freq / ratio;
+                const float rightFreq = freq * ratio;
+                const float leftX = frequencyToX(leftFreq);
+                const float rightX = frequencyToX(rightFreq);
+                const float handleSize = 8.0f * uiScale;
+                qHandleRects[0] = juce::Rectangle<float>(leftX - handleSize * 0.5f,
+                                                         point.y - handleSize * 0.5f,
+                                                         handleSize, handleSize);
+                qHandleRects[1] = juce::Rectangle<float>(rightX - handleSize * 0.5f,
+                                                         point.y - handleSize * 0.5f,
+                                                         handleSize, handleSize);
+                hasQHandles = true;
+                g.setColour(colour.withAlpha(0.9f));
+                g.fillEllipse(qHandleRects[0]);
+                g.fillEllipse(qHandleRects[1]);
+            }
+        }
+
         g.setColour(theme.textMuted);
-        g.setFont(10.0f);
+        g.setFont(12.0f * scale);
         g.drawFittedText(juce::String(band + 1),
-                         juce::Rectangle<int>(static_cast<int>(point.x + radius + 2.0f),
-                                              static_cast<int>(point.y - 7.0f),
-                                              20, 14),
+                         juce::Rectangle<int>(static_cast<int>(point.x + radius + 2.0f * scale),
+                                              static_cast<int>(point.y - 7.0f * scale),
+                                              static_cast<int>(20 * scale),
+                                              static_cast<int>(14 * scale)),
                          juce::Justification::left, 1);
+    }
+    auto legendArea = plotArea.removeFromTop(static_cast<int>(18 * scale))
+        .removeFromRight(static_cast<int>(160 * scale));
+    g.setFont(12.0f * scale);
+    if (viewMode == 0 || viewMode == 1)
+    {
+        g.setColour(theme.accent.withAlpha(0.9f));
+        g.drawFittedText("PRE", legendArea.removeFromLeft(60), juce::Justification::centredLeft, 1);
+    }
+    if (viewMode == 0 || viewMode == 2)
+    {
+        g.setColour(theme.accentAlt.withAlpha(0.9f));
+        g.drawFittedText("POST", legendArea, juce::Justification::centredLeft, 1);
     }
     if (showPhase && ! phaseCurve.empty())
     {
@@ -240,7 +341,41 @@ void AnalyzerComponent::paint(juce::Graphics& g)
                              phaseToY(phaseCurve[static_cast<size_t>(x)]));
 
         g.setColour(theme.accent.withAlpha(0.6f));
-        g.strokePath(phasePath, juce::PathStrokeType(1.0f));
+        g.strokePath(phasePath, juce::PathStrokeType(1.0f * scale));
+    }
+
+    if (hoverBand >= 0 && hoverBand < ParamIDs::kBandsPerChannel)
+    {
+        const float hoverFreq = getBandParameter(hoverBand, kParamFreqSuffix);
+        const float hoverGain = getBandParameter(hoverBand, kParamGainSuffix);
+        const float hoverQ = getBandParameter(hoverBand, kParamQSuffix);
+        const int typeIndex = getBandType(hoverBand);
+        const juce::String typeLabel = (typeIndex >= 0 && typeIndex < kFilterTypeLabels.size())
+            ? kFilterTypeLabels[typeIndex]
+            : "Filter";
+        const juce::String text = typeLabel + "  "
+            + (hoverFreq >= 1000.0f ? juce::String(hoverFreq / 1000.0f, 2) + "kHz"
+                                    : juce::String(hoverFreq, 0) + "Hz")
+            + "  " + juce::String(hoverGain, 1) + "dB"
+            + "  Q " + juce::String(hoverQ, 2);
+
+        const int pad = static_cast<int>(6 * uiScale);
+        g.setFont(12.0f * uiScale);
+        const int textW = static_cast<int>(g.getCurrentFont().getStringWidthFloat(text) + pad * 2);
+        const int textH = static_cast<int>(18 * uiScale);
+        juce::Rectangle<int> hudRect(static_cast<int>(hoverPos.x) + pad,
+                                     static_cast<int>(hoverPos.y) - textH - pad,
+                                     textW, textH);
+        if (! getLocalBounds().contains(hudRect))
+            hudRect.setPosition(static_cast<int>(hoverPos.x) - textW - pad,
+                                static_cast<int>(hoverPos.y) - textH - pad);
+
+        g.setColour(theme.panel.darker(0.2f).withAlpha(0.9f));
+        g.fillRoundedRectangle(hudRect.toFloat(), 6.0f * uiScale);
+        g.setColour(theme.panelOutline.withAlpha(0.8f));
+        g.drawRoundedRectangle(hudRect.toFloat(), 6.0f * uiScale, 1.0f);
+        g.setColour(theme.text);
+        g.drawFittedText(text, hudRect, juce::Justification::centredLeft, 1);
     }
 }
 
@@ -252,11 +387,32 @@ void AnalyzerComponent::resized()
 void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
 {
     draggingBand = -1;
+    draggingQ = false;
     const auto plotArea = getMagnitudeArea().toFloat();
     if (! plotArea.contains(event.position))
         return;
 
-    float closest = kHitRadius;
+    if (event.mods.isAltDown() && event.mods.isLeftButtonDown())
+    {
+        startAltSolo(event.position);
+        return;
+    }
+
+    for (int i = 0; i < static_cast<int>(bypassIcons.size()); ++i)
+    {
+        if (bypassIcons[static_cast<size_t>(i)].contains(event.position))
+        {
+            const bool bypassed = getBandBypassed(i);
+            setBandParameter(i, kParamBypassSuffix, bypassed ? 0.0f : 1.0f);
+            setSelectedBand(i);
+            if (onBandSelected)
+                onBandSelected(i);
+            repaint();
+            return;
+        }
+    }
+
+    float closest = kHitRadius * uiScale;
     int closestBand = -1;
     for (int i = 0; i < static_cast<int>(bandPoints.size()); ++i)
     {
@@ -270,6 +426,52 @@ void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
 
     if (closestBand >= 0)
     {
+        if (hasQHandles)
+        {
+            for (int i = 0; i < 2; ++i)
+            {
+                if (qHandleRects[static_cast<size_t>(i)].contains(event.position))
+                {
+                    draggingQ = true;
+                    qDragSide = i;
+                    qDragStart = getBandParameter(selectedBand, kParamQSuffix);
+                    return;
+                }
+            }
+        }
+
+        if (event.mods.isRightButtonDown())
+        {
+            juce::PopupMenu menu;
+            menu.addItem("Reset to Default", [this, closestBand]()
+            {
+                resetBandToDefaults(closestBand, false);
+                setSelectedBand(closestBand);
+                if (onBandSelected)
+                    onBandSelected(closestBand);
+            });
+            menu.addItem("Delete Band", [this, closestBand]()
+            {
+                resetBandToDefaults(closestBand, true);
+                setSelectedBand(closestBand);
+                if (onBandSelected)
+                    onBandSelected(closestBand);
+            });
+            menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(*this));
+            return;
+        }
+
+        if (event.mods.isAltDown() && event.mods.isLeftButtonDown())
+        {
+            tempSoloBand = closestBand;
+            const auto soloId = ParamIDs::bandParamId(selectedChannel, tempSoloBand, kParamSoloSuffix);
+            if (auto* soloParam = parameters.getParameter(soloId))
+            {
+                tempSoloWasEnabled = soloParam->getValue() > 0.5f;
+                soloParam->setValueNotifyingHost(1.0f);
+            }
+        }
+
         draggingBand = closestBand;
         if (event.mods.isShiftDown())
         {
@@ -298,10 +500,34 @@ void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
         if (onBandSelected)
             onBandSelected(closestBand);
     }
+    else if (event.mods.isLeftButtonDown())
+    {
+        createBandAtPosition(event.position);
+    }
 }
 
 void AnalyzerComponent::mouseDrag(const juce::MouseEvent& event)
 {
+    if (isAltSoloing)
+    {
+        updateAltSolo(event.position);
+        return;
+    }
+
+    if (draggingQ)
+    {
+        const float centerFreq = getBandParameter(selectedBand, kParamFreqSuffix);
+        const float sideFreq = xToFrequency(event.position.x);
+        const float ratio = (qDragSide == 0)
+            ? (centerFreq / std::max(20.0f, sideFreq))
+            : (std::max(sideFreq, 20.0f) / centerFreq);
+        const float safeRatio = juce::jlimit(1.001f, 64.0f, ratio);
+        const float qValue = 1.0f / (safeRatio - 1.0f / safeRatio);
+        setBandParameter(selectedBand, kParamQSuffix, juce::jlimit(0.1f, 18.0f, qValue));
+        repaint();
+        return;
+    }
+
     if (draggingBand < 0)
         return;
 
@@ -340,6 +566,17 @@ void AnalyzerComponent::mouseDrag(const juce::MouseEvent& event)
 void AnalyzerComponent::mouseUp(const juce::MouseEvent& event)
 {
     juce::ignoreUnused(event);
+    if (isAltSoloing)
+        stopAltSolo();
+    draggingQ = false;
+    if (tempSoloBand >= 0)
+    {
+        const auto soloId = ParamIDs::bandParamId(selectedChannel, tempSoloBand, kParamSoloSuffix);
+        if (auto* soloParam = parameters.getParameter(soloId))
+            soloParam->setValueNotifyingHost(tempSoloWasEnabled ? 1.0f : 0.0f);
+        tempSoloBand = -1;
+        tempSoloWasEnabled = false;
+    }
     draggingBand = -1;
     dragBands.clear();
 }
@@ -349,6 +586,63 @@ void AnalyzerComponent::mouseDoubleClick(const juce::MouseEvent& event)
     const auto plotArea = getMagnitudeArea().toFloat();
     if (! plotArea.contains(event.position))
         return;
+    createBandAtPosition(event.position);
+}
+
+void AnalyzerComponent::mouseMove(const juce::MouseEvent& event)
+{
+    hoverPos = event.position;
+    const auto plotArea = getMagnitudeArea().toFloat();
+    if (! plotArea.contains(event.position))
+    {
+        hoverBand = -1;
+        repaint();
+        return;
+    }
+
+    float closest = kHitRadius * uiScale;
+    int closestBand = -1;
+    for (int i = 0; i < static_cast<int>(bandPoints.size()); ++i)
+    {
+        const float distance = bandPoints[static_cast<size_t>(i)].getDistanceFrom(event.position);
+        if (distance < closest)
+        {
+            closest = distance;
+            closestBand = i;
+        }
+    }
+    hoverBand = closestBand;
+    repaint();
+}
+
+void AnalyzerComponent::mouseExit(const juce::MouseEvent& event)
+{
+    juce::ignoreUnused(event);
+    hoverBand = -1;
+    repaint();
+}
+
+void AnalyzerComponent::mouseWheelMove(const juce::MouseEvent& event,
+                                       const juce::MouseWheelDetails& wheel)
+{
+    juce::ignoreUnused(event);
+    const float delta = wheel.deltaY != 0.0f ? wheel.deltaY : wheel.deltaX;
+    if (delta == 0.0f)
+        return;
+
+    const auto qId = ParamIDs::bandParamId(selectedChannel, selectedBand, kParamQSuffix);
+    if (auto* qParam = parameters.getParameter(qId))
+    {
+        const float current = qParam->getValue();
+        const float step = 0.04f;
+        qParam->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, current + delta * step));
+    }
+}
+
+void AnalyzerComponent::createBandAtPosition(const juce::Point<float>& position)
+{
+    const float freq = xToFrequency(position.x);
+    const float gain = yToGain(position.y);
 
     int targetBand = -1;
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
@@ -359,20 +653,120 @@ void AnalyzerComponent::mouseDoubleClick(const juce::MouseEvent& event)
             break;
         }
     }
-
     if (targetBand < 0)
         targetBand = selectedBand;
-
-    const float freq = xToFrequency(event.position.x);
-    const float gain = yToGain(event.position.y);
 
     setBandParameter(targetBand, kParamFreqSuffix, freq);
     setBandParameter(targetBand, kParamGainSuffix, gain);
     setBandParameter(targetBand, kParamBypassSuffix, 0.0f);
-
     setSelectedBand(targetBand);
     if (onBandSelected)
         onBandSelected(targetBand);
+}
+
+void AnalyzerComponent::resetBandToDefaults(int bandIndex, bool shouldBypass)
+{
+    auto resetParam = [this, bandIndex](const juce::String& suffix)
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, bandIndex, suffix)))
+            param->setValueNotifyingHost(param->getDefaultValue());
+    };
+
+    resetParam(kParamFreqSuffix);
+    resetParam(kParamGainSuffix);
+    resetParam(kParamQSuffix);
+    resetParam(kParamTypeSuffix);
+    resetParam(kParamMsSuffix);
+    resetParam(kParamSlopeSuffix);
+    resetParam(kParamSoloSuffix);
+    resetParam("dynEnable");
+    resetParam("dynMode");
+    resetParam("dynThresh");
+    resetParam("dynAttack");
+    resetParam("dynRelease");
+    resetParam("dynMix");
+    resetParam("dynSource");
+    resetParam("dynFilter");
+
+    if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, bandIndex, kParamBypassSuffix)))
+        bypassParam->setValueNotifyingHost(shouldBypass ? 1.0f : 0.0f);
+}
+
+void AnalyzerComponent::startAltSolo(const juce::Point<float>& position)
+{
+    if (isAltSoloing)
+        return;
+
+    altSoloBand = selectedBand;
+    auto storeParam = [this](const juce::String& suffix, float& dest)
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, altSoloBand, suffix)))
+            dest = param->getValue();
+    };
+    storeParam(kParamFreqSuffix, altSoloState.freqNorm);
+    storeParam(kParamGainSuffix, altSoloState.gainNorm);
+    storeParam(kParamQSuffix, altSoloState.qNorm);
+    storeParam(kParamTypeSuffix, altSoloState.typeNorm);
+    storeParam(kParamBypassSuffix, altSoloState.bypassNorm);
+    storeParam(kParamSoloSuffix, altSoloState.soloNorm);
+
+    auto setParamValue = [this](const juce::String& suffix, float value)
+    {
+        if (auto* param = dynamic_cast<juce::RangedAudioParameter*>(
+                parameters.getParameter(ParamIDs::bandParamId(selectedChannel, altSoloBand, suffix))))
+        {
+            param->setValueNotifyingHost(param->convertTo0to1(value));
+        }
+    };
+
+    const float freq = xToFrequency(position.x);
+    setParamValue(kParamFreqSuffix, freq);
+    setParamValue(kParamGainSuffix, 0.0f);
+    setParamValue(kParamQSuffix, 6.0f);
+    setParamValue(kParamTypeSuffix, 6.0f);
+    setParamValue(kParamBypassSuffix, 0.0f);
+    setParamValue(kParamSoloSuffix, 1.0f);
+    isAltSoloing = true;
+}
+
+void AnalyzerComponent::updateAltSolo(const juce::Point<float>& position)
+{
+    if (! isAltSoloing)
+        return;
+
+    const float freq = xToFrequency(position.x);
+    if (auto* param = dynamic_cast<juce::RangedAudioParameter*>(
+            parameters.getParameter(ParamIDs::bandParamId(selectedChannel, altSoloBand, kParamFreqSuffix))))
+    {
+        param->setValueNotifyingHost(param->convertTo0to1(freq));
+    }
+}
+
+void AnalyzerComponent::stopAltSolo()
+{
+    if (! isAltSoloing)
+        return;
+
+    auto restoreParam = [this](const juce::String& suffix, float value)
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, altSoloBand, suffix)))
+            param->setValueNotifyingHost(value);
+    };
+    restoreParam(kParamFreqSuffix, altSoloState.freqNorm);
+    restoreParam(kParamGainSuffix, altSoloState.gainNorm);
+    restoreParam(kParamQSuffix, altSoloState.qNorm);
+    restoreParam(kParamTypeSuffix, altSoloState.typeNorm);
+    restoreParam(kParamBypassSuffix, altSoloState.bypassNorm);
+    restoreParam(kParamSoloSuffix, altSoloState.soloNorm);
+
+    isAltSoloing = false;
+    altSoloBand = -1;
+}
+
+int AnalyzerComponent::getAnalyzerView() const
+{
+    const auto* value = parameters.getRawParameterValue(ParamIDs::analyzerView);
+    return value != nullptr ? static_cast<int>(value->load()) : 0;
 }
 
 void AnalyzerComponent::timerCallback()
@@ -549,46 +943,110 @@ void AnalyzerComponent::updateCurves()
 void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>& area)
 {
     g.setColour(theme.textMuted);
-    g.setFont(10.0f);
+    const float scale = uiScale;
+    g.setFont(12.5f * scale);
+
+    const int leftGutter = static_cast<int>(44 * scale);
+    const int rightGutter = static_cast<int>(44 * scale);
+    const int bottomGutter = static_cast<int>(18 * scale);
+    const auto labelArea = area.withTrimmedLeft(leftGutter).withTrimmedRight(rightGutter)
+        .withTrimmedBottom(bottomGutter);
+
+    const float spectrumMinDb = kAnalyzerMinDb;
+    const float spectrumMaxDb = kAnalyzerMaxDb;
+    const float spectrumStep = 12.0f;
+    for (float db = spectrumMinDb; db <= spectrumMaxDb + 0.01f; db += spectrumStep)
+    {
+        const float y = juce::jmap(db, spectrumMinDb, spectrumMaxDb,
+                                   static_cast<float>(labelArea.getBottom()),
+                                   static_cast<float>(labelArea.getY()));
+        g.setColour(theme.grid.withAlpha(0.25f));
+        g.drawLine(static_cast<float>(area.getX()), y,
+                   static_cast<float>(area.getX() + 6 * scale), y, 1.0f);
+        g.setColour(theme.textMuted.withAlpha(0.7f));
+        g.drawFittedText(juce::String(db, 0),
+                         juce::Rectangle<int>(static_cast<int>(area.getX() + 2 * scale),
+                                              static_cast<int>(y - 7 * scale),
+                                              static_cast<int>(36 * scale),
+                                              static_cast<int>(14 * scale)),
+                         juce::Justification::left, 1);
+    }
 
     const float maxFreq = std::min(20000.0f, lastSampleRate * 0.5f);
-    const float freqs[] { 20.0f, 50.0f, 100.0f, 200.0f, 500.0f, 1000.0f, 2000.0f,
-                          5000.0f, 10000.0f, 20000.0f };
+    const float freqs[] { 20.0f, 30.0f, 40.0f, 50.0f, 60.0f, 80.0f, 100.0f, 200.0f, 300.0f,
+                          400.0f, 500.0f, 600.0f, 800.0f, 1000.0f, 2000.0f, 3000.0f, 4000.0f,
+                          5000.0f, 6000.0f, 8000.0f, 10000.0f, 12000.0f, 16000.0f, 20000.0f };
     for (float f : freqs)
     {
         if (f < kMinFreq || f > maxFreq)
             continue;
         const float x = frequencyToX(f);
+        const bool major = (f == 20.0f || f == 50.0f || f == 100.0f || f == 200.0f || f == 500.0f
+            || f == 1000.0f || f == 2000.0f || f == 5000.0f || f == 10000.0f || f == 20000.0f);
+        g.setColour(major ? theme.grid.withAlpha(0.6f) : theme.grid.withAlpha(0.25f));
         g.drawVerticalLine(static_cast<int>(x), static_cast<float>(area.getY()),
                            static_cast<float>(area.getBottom()));
-        const juce::String text = f >= 1000.0f ? juce::String(f / 1000.0f, 1) + "k" : juce::String(f, 0);
-        g.drawFittedText(text,
-                         juce::Rectangle<int>(static_cast<int>(x + 2.0f), area.getBottom() - 14,
-                                              40, 12),
-                         juce::Justification::left, 1);
+        if (major)
+        {
+            g.setColour(theme.textMuted);
+            const juce::String text = f >= 1000.0f ? juce::String(f / 1000.0f, 1) + "k" : juce::String(f, 0);
+            g.drawFittedText(text,
+                             juce::Rectangle<int>(static_cast<int>(x + 3.0f * scale),
+                                                  static_cast<int>(area.getBottom() - bottomGutter),
+                                                  static_cast<int>(44 * scale),
+                                                  static_cast<int>(14 * scale)),
+                             juce::Justification::left, 1);
+        }
     }
 
-    const float dbMarks[] { -24.0f, -12.0f, 0.0f, 6.0f };
-    for (float db : dbMarks)
+    const float rangeDb = maxDb - minDb;
+    const float step = rangeDb <= 6.0f ? 1.0f : (rangeDb <= 12.0f ? 2.0f : 3.0f);
+    for (float db = minDb; db <= maxDb + 0.001f; db += step)
     {
         const int y = static_cast<int>(gainToY(db));
+        const bool major = (std::abs(std::fmod(db, 6.0f)) < 0.01f) || (std::abs(db) < 0.01f);
+        g.setColour((major ? theme.grid.withAlpha(0.6f) : theme.grid.withAlpha(0.25f)));
         g.drawHorizontalLine(y, static_cast<float>(area.getX()), static_cast<float>(area.getRight()));
-        g.drawFittedText(juce::String(db, 0) + " dB",
-                         juce::Rectangle<int>(area.getX() + 4, y - 8, 50, 12),
-                         juce::Justification::left, 1);
+        if (major)
+        {
+            g.setColour(theme.textMuted);
+            g.drawFittedText(juce::String(db, 0) + " dB",
+                             juce::Rectangle<int>(static_cast<int>(area.getRight() - rightGutter + 4 * scale),
+                                                  static_cast<int>(y - 9 * scale),
+                                                  static_cast<int>(rightGutter - 6 * scale),
+                                                  static_cast<int>(14 * scale)),
+                             juce::Justification::left, 1);
+        }
     }
+
+    g.setColour(theme.textMuted.withAlpha(0.6f));
+    g.drawFittedText("EQ",
+                     juce::Rectangle<int>(area.getRight() - static_cast<int>(rightGutter),
+                                          area.getY() + static_cast<int>(2 * scale),
+                                          static_cast<int>(rightGutter - 4 * scale),
+                                          static_cast<int>(12 * scale)),
+                     juce::Justification::right, 1);
+    g.drawFittedText("SP",
+                     juce::Rectangle<int>(area.getX() + static_cast<int>(2 * scale),
+                                          area.getY() + static_cast<int>(2 * scale),
+                                          static_cast<int>(leftGutter - 4 * scale),
+                                          static_cast<int>(12 * scale)),
+                     juce::Justification::left, 1);
 }
 
 juce::Rectangle<int> AnalyzerComponent::getPlotArea() const
 {
-    return getLocalBounds().reduced(16, 20);
+    const int marginX = static_cast<int>(16 * uiScale);
+    const int marginY = static_cast<int>(20 * uiScale);
+    return getLocalBounds().reduced(marginX, marginY);
 }
 
 juce::Rectangle<int> AnalyzerComponent::getMagnitudeArea() const
 {
     auto area = getPlotArea();
     const int phaseHeight = area.getHeight() / 4;
-    return showPhase ? area.withTrimmedBottom(phaseHeight + 8) : area;
+    const int gap = static_cast<int>(8 * uiScale);
+    return showPhase ? area.withTrimmedBottom(phaseHeight + gap) : area;
 }
 
 juce::Rectangle<int> AnalyzerComponent::getPhaseArea() const

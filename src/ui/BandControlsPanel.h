@@ -16,8 +16,6 @@ public:
     void setSelectedBand(int channelIndex, int bandIndex);
     void setTheme(const ThemeColors& newTheme);
     void setMsEnabled(bool enabled);
-    void setLinkPairs(const juce::StringArray& names,
-                      const std::vector<std::pair<int, int>>& pairs);
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -56,30 +54,44 @@ private:
     int selectedBand = 0;
 
     juce::Label titleLabel;
+    juce::TextButton resetButton;
+    juce::TextButton deleteButton;
+    juce::Label freqLabel;
+    juce::Label gainLabel;
+    juce::Label qLabel;
     juce::Slider freqSlider;
     juce::Slider gainSlider;
     juce::Slider qSlider;
+    juce::Label qModeLabel;
+    juce::ComboBox qModeBox;
+    juce::Label qAmountLabel;
+    juce::Slider qAmountSlider;
+    juce::Label typeLabel;
     juce::ComboBox typeBox;
+    juce::Label msLabel;
     juce::ComboBox msBox;
+    juce::Label slopeLabel;
     juce::Slider slopeSlider;
     juce::ToggleButton bypassButton;
     juce::TextButton copyButton;
     juce::TextButton pasteButton;
-    juce::ToggleButton linkButton;
-    juce::Label linkPairLabel;
-    juce::ComboBox linkPairBox;
     juce::ToggleButton soloButton;
     juce::ToggleButton dynEnableButton;
+    juce::Label dynModeLabel;
     juce::ComboBox dynModeBox;
+    juce::Label dynSourceLabel;
     juce::ComboBox dynSourceBox;
+    juce::Label dynFilterLabel;
     juce::ToggleButton dynFilterButton;
+    juce::Label thresholdLabel;
     juce::Slider thresholdSlider;
+    juce::Label attackLabel;
     juce::Slider attackSlider;
+    juce::Label releaseLabel;
     juce::Slider releaseSlider;
+    juce::Label dynMixLabel;
     juce::Slider dynMixSlider;
     float dynMeterDb = 0.0f;
-    juce::StringArray linkPairNames;
-    std::vector<std::pair<int, int>> linkPairIndices;
 
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
@@ -101,9 +113,12 @@ private:
     std::unique_ptr<SliderAttachment> attackAttachment;
     std::unique_ptr<SliderAttachment> releaseAttachment;
     std::unique_ptr<SliderAttachment> dynMixAttachment;
+    std::unique_ptr<ComboBoxAttachment> qModeAttachment;
+    std::unique_ptr<SliderAttachment> qAmountAttachment;
 
     ThemeColors theme = makeDarkTheme();
     bool msEnabled = true;
-    bool linkEnabled = false;
     std::optional<BandState> clipboard;
+
+    void resetSelectedBand(bool shouldBypass);
 };

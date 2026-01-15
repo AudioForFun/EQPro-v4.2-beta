@@ -53,30 +53,39 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     pasteButton.onClick = [this] { pasteBandState(); };
     addAndMakeVisible(pasteButton);
 
-    linkButton.setButtonText("Link");
-    linkButton.onClick = [this]
-    {
-        linkEnabled = linkButton.getToggleState();
-        if (linkEnabled && linkPairBox.getSelectedItemIndex() == 0 && linkPairBox.getNumItems() > 1)
-            linkPairBox.setSelectedItemIndex(1, juce::dontSendNotification);
-    };
-    addAndMakeVisible(linkButton);
+    resetButton.setButtonText("Reset");
+    resetButton.onClick = [this] { resetSelectedBand(false); };
+    addAndMakeVisible(resetButton);
 
-    linkPairLabel.setText("Link Pair", juce::dontSendNotification);
-    linkPairLabel.setJustificationType(juce::Justification::centredLeft);
-    linkPairLabel.setColour(juce::Label::textColourId, theme.textMuted);
-    addAndMakeVisible(linkPairLabel);
+    deleteButton.setButtonText("Delete");
+    deleteButton.onClick = [this] { resetSelectedBand(true); };
+    addAndMakeVisible(deleteButton);
 
-    linkPairBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
-    linkPairBox.setColour(juce::ComboBox::textColourId, theme.text);
-    linkPairBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    addAndMakeVisible(linkPairBox);
-    linkPairBox.onChange = [this]
+
+    auto initLabel = [this](juce::Label& label, const juce::String& text)
     {
-        const bool enabled = linkPairBox.getSelectedItemIndex() > 0;
-        linkEnabled = enabled;
-        linkButton.setToggleState(enabled, juce::dontSendNotification);
+        label.setText(text, juce::dontSendNotification);
+        label.setJustificationType(juce::Justification::centred);
+        label.setColour(juce::Label::textColourId, theme.textMuted);
+        label.setFont(11.0f);
+        addAndMakeVisible(label);
     };
+
+    initLabel(freqLabel, "Freq");
+    initLabel(gainLabel, "Gain");
+    initLabel(qLabel, "Q");
+    initLabel(qModeLabel, "Q Mode");
+    initLabel(qAmountLabel, "Q Amt");
+    initLabel(typeLabel, "Type");
+    initLabel(msLabel, "Mode");
+    initLabel(slopeLabel, "Slope");
+    initLabel(dynModeLabel, "Dyn");
+    initLabel(dynSourceLabel, "Src");
+    initLabel(dynFilterLabel, "Det");
+    initLabel(thresholdLabel, "Thresh");
+    initLabel(attackLabel, "Attack");
+    initLabel(releaseLabel, "Release");
+    initLabel(dynMixLabel, "Mix");
 
     freqSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     freqSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 20);
@@ -107,6 +116,18 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         mirrorToLinkedChannel("q", static_cast<float>(qSlider.getValue()));
     };
     addAndMakeVisible(qSlider);
+
+    qModeBox.addItemList(juce::StringArray("Constant", "Proportional"), 1);
+    qModeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
+    qModeBox.setColour(juce::ComboBox::textColourId, theme.text);
+    qModeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
+    addAndMakeVisible(qModeBox);
+
+    qAmountSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    qAmountSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+    qAmountSlider.setTextBoxIsEditable(true);
+    qAmountSlider.setTextValueSuffix(" %");
+    addAndMakeVisible(qAmountSlider);
 
     typeBox.addItemList(kFilterTypeChoices, 1);
     typeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
@@ -263,6 +284,21 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
 {
     theme = newTheme;
     titleLabel.setColour(juce::Label::textColourId, ColorUtils::bandColour(selectedBand));
+    freqLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    gainLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    qLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    qModeLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    qAmountLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    typeLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    msLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    slopeLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    dynModeLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    dynSourceLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    dynFilterLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    thresholdLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    attackLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    releaseLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    dynMixLabel.setColour(juce::Label::textColourId, theme.textMuted);
     typeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     typeBox.setColour(juce::ComboBox::textColourId, theme.text);
     typeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
@@ -275,7 +311,8 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     bypassButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     copyButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     pasteButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
-    linkButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
+    resetButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
+    deleteButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     soloButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     dynEnableButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     dynModeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
@@ -285,33 +322,22 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     dynSourceBox.setColour(juce::ComboBox::textColourId, theme.text);
     dynSourceBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
     dynFilterButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
-    linkPairLabel.setColour(juce::Label::textColourId, theme.textMuted);
-    linkPairBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
-    linkPairBox.setColour(juce::ComboBox::textColourId, theme.text);
-    linkPairBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
+    qModeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
+    qModeBox.setColour(juce::ComboBox::textColourId, theme.text);
+    qModeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
+    qAmountSlider.setColour(juce::Slider::trackColourId, theme.accent);
+    qAmountSlider.setColour(juce::Slider::textBoxTextColourId, theme.text);
+    qAmountSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
     repaint();
 }
 
 void BandControlsPanel::setMsEnabled(bool enabled)
 {
     msEnabled = enabled;
-    msBox.setEnabled(msEnabled);
-    msBox.setAlpha(msEnabled ? 1.0f : 0.5f);
+    msBox.setEnabled(true);
+    msBox.setAlpha(1.0f);
 }
 
-void BandControlsPanel::setLinkPairs(const juce::StringArray& names,
-                                     const std::vector<std::pair<int, int>>& pairs)
-{
-    linkPairNames = names;
-    linkPairIndices = pairs;
-    linkPairBox.clear();
-    linkPairBox.addItem("Off", 1);
-    linkPairBox.addItemList(linkPairNames, 2);
-    linkPairBox.setSelectedItemIndex(0, juce::dontSendNotification);
-    const bool hasPairs = ! linkPairIndices.empty();
-    linkButton.setEnabled(hasPairs);
-    linkPairBox.setEnabled(hasPairs);
-}
 
 void BandControlsPanel::paint(juce::Graphics& g)
 {
@@ -331,57 +357,100 @@ void BandControlsPanel::paint(juce::Graphics& g)
 
 void BandControlsPanel::resized()
 {
-    auto bounds = getLocalBounds().reduced(12);
-    auto headerRow = bounds.removeFromTop(24);
-    titleLabel.setBounds(headerRow.removeFromLeft(80));
-    copyButton.setBounds(headerRow.removeFromLeft(50));
-    pasteButton.setBounds(headerRow.removeFromLeft(50));
-    linkButton.setBounds(headerRow);
+    auto bounds = getLocalBounds().reduced(10);
+    const int gap = 6;
+    const int labelHeight = 14;
+    const int rowHeight = 22;
+    const int knobRowHeight = 86;
 
-    bounds.removeFromTop(4);
-    auto linkRow = bounds.removeFromTop(22);
-    linkPairLabel.setBounds(linkRow.removeFromLeft(70));
-    linkPairBox.setBounds(linkRow);
+    auto left = bounds.removeFromLeft(static_cast<int>(bounds.getWidth() * 0.60f));
+    auto right = bounds;
 
-    auto topRow = bounds.removeFromTop(100);
-    const int knobWidth = (topRow.getWidth() - 16) / 3;
-    freqSlider.setBounds(topRow.removeFromLeft(knobWidth));
-    topRow.removeFromLeft(8);
-    gainSlider.setBounds(topRow.removeFromLeft(knobWidth));
-    topRow.removeFromLeft(8);
-    qSlider.setBounds(topRow.removeFromLeft(knobWidth));
+    auto headerRow = left.removeFromTop(rowHeight);
+    titleLabel.setBounds(headerRow.removeFromLeft(70));
+    copyButton.setBounds(headerRow.removeFromLeft(48));
+    pasteButton.setBounds(headerRow.removeFromLeft(48));
+    resetButton.setBounds(headerRow.removeFromLeft(52));
+    deleteButton.setBounds(headerRow);
 
-    bounds.removeFromTop(8);
-    typeBox.setBounds(bounds.removeFromTop(24));
-    bounds.removeFromTop(6);
-    msBox.setBounds(bounds.removeFromTop(24));
-    bounds.removeFromTop(6);
-    slopeSlider.setBounds(bounds.removeFromTop(24));
-    bounds.removeFromTop(6);
-    auto togglesRow = bounds.removeFromTop(22);
+    left.removeFromTop(gap);
+    auto knobsRow = left.removeFromTop(knobRowHeight);
+    const int knobWidth = (knobsRow.getWidth() - gap * 2) / 3;
+    auto freqArea = knobsRow.removeFromLeft(knobWidth);
+    freqLabel.setBounds(freqArea.removeFromTop(labelHeight));
+    freqSlider.setBounds(freqArea);
+    knobsRow.removeFromLeft(gap);
+    auto gainArea = knobsRow.removeFromLeft(knobWidth);
+    gainLabel.setBounds(gainArea.removeFromTop(labelHeight));
+    gainSlider.setBounds(gainArea);
+    knobsRow.removeFromLeft(gap);
+    auto qArea = knobsRow.removeFromLeft(knobWidth);
+    qLabel.setBounds(qArea.removeFromTop(labelHeight));
+    qSlider.setBounds(qArea);
+
+    left.removeFromTop(gap);
+    auto qModeRow = left.removeFromTop(labelHeight + rowHeight);
+    qModeLabel.setBounds(qModeRow.removeFromLeft(60));
+    qModeBox.setBounds(qModeRow.removeFromLeft(140));
+    qAmountLabel.setBounds(qModeRow.removeFromLeft(50));
+    qAmountSlider.setBounds(qModeRow);
+
+    left.removeFromTop(gap);
+    auto typeRow = left.removeFromTop(labelHeight + rowHeight);
+    typeLabel.setBounds(typeRow.removeFromTop(labelHeight));
+    typeBox.setBounds(typeRow);
+
+    left.removeFromTop(2);
+    auto msRow = left.removeFromTop(labelHeight + rowHeight);
+    msLabel.setBounds(msRow.removeFromTop(labelHeight));
+    msBox.setBounds(msRow);
+
+    left.removeFromTop(2);
+    auto slopeRow = left.removeFromTop(labelHeight + rowHeight);
+    slopeLabel.setBounds(slopeRow.removeFromTop(labelHeight));
+    slopeSlider.setBounds(slopeRow);
+
+    left.removeFromTop(2);
+    auto togglesRow = left.removeFromTop(rowHeight);
     bypassButton.setBounds(togglesRow.removeFromLeft(70));
     soloButton.setBounds(togglesRow.removeFromLeft(60));
     dynEnableButton.setBounds(togglesRow);
 
-    bounds.removeFromTop(6);
-    auto dynHeaderRow = bounds.removeFromTop(22);
-    const int dynHeaderGap = 4;
-    const int dynHeaderWidth = (dynHeaderRow.getWidth() - dynHeaderGap * 2) / 3;
-    dynModeBox.setBounds(dynHeaderRow.removeFromLeft(dynHeaderWidth));
-    dynHeaderRow.removeFromLeft(dynHeaderGap);
-    dynSourceBox.setBounds(dynHeaderRow.removeFromLeft(dynHeaderWidth));
-    dynHeaderRow.removeFromLeft(dynHeaderGap);
+    auto dynHeader = right.removeFromTop(labelHeight + rowHeight);
+    dynModeLabel.setBounds(dynHeader.removeFromTop(labelHeight).removeFromLeft(dynHeader.getWidth() / 3));
+    dynSourceLabel.setBounds(dynHeader.removeFromTop(labelHeight).removeFromLeft(dynHeader.getWidth() / 3));
+    dynFilterLabel.setBounds(dynHeader.removeFromTop(labelHeight));
+
+    auto dynHeaderRow = right.removeFromTop(rowHeight);
+    const int dynGap = 4;
+    const int dynWidth = (dynHeaderRow.getWidth() - dynGap * 2) / 3;
+    dynModeBox.setBounds(dynHeaderRow.removeFromLeft(dynWidth));
+    dynHeaderRow.removeFromLeft(dynGap);
+    dynSourceBox.setBounds(dynHeaderRow.removeFromLeft(dynWidth));
+    dynHeaderRow.removeFromLeft(dynGap);
     dynFilterButton.setBounds(dynHeaderRow);
-    bounds.removeFromTop(6);
-    auto dynRow = bounds.removeFromTop(96);
-    const int dynWidth = (dynRow.getWidth() - 12) / 4;
-    thresholdSlider.setBounds(dynRow.removeFromLeft(dynWidth));
-    dynRow.removeFromLeft(4);
-    attackSlider.setBounds(dynRow.removeFromLeft(dynWidth));
-    dynRow.removeFromLeft(4);
-    releaseSlider.setBounds(dynRow.removeFromLeft(dynWidth));
-    dynRow.removeFromLeft(4);
-    dynMixSlider.setBounds(dynRow.removeFromLeft(dynWidth));
+
+    right.removeFromTop(gap);
+    auto dynLabelRow = right.removeFromTop(labelHeight);
+    const int dynLabelWidth = (dynLabelRow.getWidth() - gap * 3) / 4;
+    thresholdLabel.setBounds(dynLabelRow.removeFromLeft(dynLabelWidth));
+    dynLabelRow.removeFromLeft(gap);
+    attackLabel.setBounds(dynLabelRow.removeFromLeft(dynLabelWidth));
+    dynLabelRow.removeFromLeft(gap);
+    releaseLabel.setBounds(dynLabelRow.removeFromLeft(dynLabelWidth));
+    dynLabelRow.removeFromLeft(gap);
+    dynMixLabel.setBounds(dynLabelRow.removeFromLeft(dynLabelWidth));
+
+    right.removeFromTop(2);
+    auto dynRow = right.removeFromTop(90);
+    const int dynSliderWidth = (dynRow.getWidth() - gap * 3) / 4;
+    thresholdSlider.setBounds(dynRow.removeFromLeft(dynSliderWidth));
+    dynRow.removeFromLeft(gap);
+    attackSlider.setBounds(dynRow.removeFromLeft(dynSliderWidth));
+    dynRow.removeFromLeft(gap);
+    releaseSlider.setBounds(dynRow.removeFromLeft(dynSliderWidth));
+    dynRow.removeFromLeft(gap);
+    dynMixSlider.setBounds(dynRow.removeFromLeft(dynSliderWidth));
 }
 
 void BandControlsPanel::updateAttachments()
@@ -419,6 +488,36 @@ void BandControlsPanel::updateAttachments()
     attackAttachment = std::make_unique<SliderAttachment>(parameters, dynAttackId, attackSlider);
     releaseAttachment = std::make_unique<SliderAttachment>(parameters, dynReleaseId, releaseSlider);
     dynMixAttachment = std::make_unique<SliderAttachment>(parameters, dynMixId, dynMixSlider);
+    qModeAttachment = std::make_unique<ComboBoxAttachment>(parameters, ParamIDs::qMode, qModeBox);
+    qAmountAttachment = std::make_unique<SliderAttachment>(parameters, ParamIDs::qModeAmount, qAmountSlider);
+}
+
+void BandControlsPanel::resetSelectedBand(bool shouldBypass)
+{
+    auto resetParam = [this](const juce::String& suffix)
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, suffix)))
+            param->setValueNotifyingHost(param->getDefaultValue());
+    };
+
+    resetParam("freq");
+    resetParam("gain");
+    resetParam("q");
+    resetParam("type");
+    resetParam("ms");
+    resetParam("slope");
+    resetParam("solo");
+    resetParam("dynEnable");
+    resetParam("dynMode");
+    resetParam("dynThresh");
+    resetParam("dynAttack");
+    resetParam("dynRelease");
+    resetParam("dynMix");
+    resetParam("dynSource");
+    resetParam("dynFilter");
+
+    if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "bypass")))
+        bypassParam->setValueNotifyingHost(shouldBypass ? 1.0f : 0.0f);
 }
 
 void BandControlsPanel::updateTypeUi()
@@ -514,21 +613,5 @@ void BandControlsPanel::pasteBandState()
 
 void BandControlsPanel::mirrorToLinkedChannel(const juce::String& suffix, float value)
 {
-    if (! linkEnabled)
-        return;
-    const int pairIndex = linkPairBox.getSelectedItemIndex() - 1;
-    if (pairIndex < 0 || pairIndex >= static_cast<int>(linkPairIndices.size()))
-        return;
-
-    const auto pair = linkPairIndices[static_cast<size_t>(pairIndex)];
-    int other = -1;
-    if (selectedChannel == pair.first)
-        other = pair.second;
-    else if (selectedChannel == pair.second)
-        other = pair.first;
-    else
-        return;
-
-    if (auto* param = parameters.getParameter(ParamIDs::bandParamId(other, selectedBand, suffix)))
-        param->setValueNotifyingHost(param->convertTo0to1(value));
+    juce::ignoreUnused(suffix, value);
 }

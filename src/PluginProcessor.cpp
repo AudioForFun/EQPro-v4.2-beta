@@ -167,6 +167,12 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     eqDsp.setSmartSoloEnabled(smartSoloParam != nullptr && smartSoloParam->load() > 0.5f);
     eqDspOversampled.setGlobalBypass(globalBypass);
     eqDspOversampled.setSmartSoloEnabled(smartSoloParam != nullptr && smartSoloParam->load() > 0.5f);
+    const int qMode = qModeParam != nullptr ? static_cast<int>(qModeParam->load()) : 0;
+    const float qAmount = qModeAmountParam != nullptr ? qModeAmountParam->load() : 50.0f;
+    eqDsp.setQMode(qMode);
+    eqDsp.setQModeAmount(qAmount);
+    eqDspOversampled.setQMode(qMode);
+    eqDspOversampled.setQModeAmount(qAmount);
 
     const bool midiLearnEnabled = midiLearnParam != nullptr && midiLearnParam->load() > 0.5f;
     if (midiLearnEnabled || learnedMidiCC.load() >= 0)
@@ -663,43 +669,6 @@ juce::StringArray EQProAudioProcessor::getCorrelationPairNames()
     return labels;
 }
 
-juce::StringArray EQProAudioProcessor::getLinkPairNames()
-{
-    const int channelCount = juce::jlimit(0, ParamIDs::kMaxChannels, getTotalNumInputChannels());
-    if (channelCount != linkPairsChannelCount || linkPairs.empty())
-    {
-        linkPairsChannelCount = channelCount;
-        linkPairs.clear();
-        const auto* bus = getBus(true, 0);
-        if (bus == nullptr)
-            bus = getBus(false, 0);
-        if (bus != nullptr)
-            linkPairs = ChannelLayoutUtils::getLinkPairs(bus->getCurrentLayout());
-    }
-
-    juce::StringArray labels;
-    const auto names = getCurrentChannelNames();
-    for (const auto& pair : linkPairs)
-    {
-        const auto left = pair.first < static_cast<int>(names.size())
-            ? names[static_cast<size_t>(pair.first)]
-            : ("Ch " + juce::String(pair.first + 1));
-        const auto right = pair.second < static_cast<int>(names.size())
-            ? names[static_cast<size_t>(pair.second)]
-            : ("Ch " + juce::String(pair.second + 1));
-        labels.add(left + "/" + right);
-    }
-
-    return labels;
-}
-
-std::vector<std::pair<int, int>> EQProAudioProcessor::getLinkPairs()
-{
-    if (linkPairs.empty())
-        getLinkPairNames();
-    return linkPairs;
-}
-
 void EQProAudioProcessor::setCorrelationPairIndex(int index)
 {
     correlationPairIndex = index;
@@ -888,6 +857,8 @@ void EQProAudioProcessor::initializeParamPointers()
     spectralReleaseParam = parameters.getRawParameterValue(ParamIDs::spectralRelease);
     spectralMixParam = parameters.getRawParameterValue(ParamIDs::spectralMix);
     characterModeParam = parameters.getRawParameterValue(ParamIDs::characterMode);
+    qModeParam = parameters.getRawParameterValue(ParamIDs::qMode);
+    qModeAmountParam = parameters.getRawParameterValue(ParamIDs::qModeAmount);
     analyzerExternalParam = parameters.getRawParameterValue(ParamIDs::analyzerExternal);
     autoGainEnableParam = parameters.getRawParameterValue(ParamIDs::autoGainEnable);
     gainScaleParam = parameters.getRawParameterValue(ParamIDs::gainScale);
@@ -997,6 +968,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
         juce::StringArray("Off", "Gentle", "Warm"),
         0));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        ParamIDs::qMode, "Q Mode",
+        juce::StringArray("Constant", "Proportional"),
+        0));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        ParamIDs::qModeAmount, "Q Amount",
+        juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
+        50.0f));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
         ParamIDs::analyzerRange, "Analyzer Range",
         juce::StringArray("3 dB", "6 dB", "12 dB", "30 dB"),
         2));
@@ -1004,6 +983,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
         ParamIDs::analyzerSpeed, "Analyzer Speed",
         juce::StringArray("Slow", "Normal", "Fast"),
         1));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        ParamIDs::analyzerView, "Analyzer View",
+        juce::StringArray("Both", "Pre", "Post"),
+        0));
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         ParamIDs::analyzerFreeze, "Analyzer Freeze",
         false));
@@ -1070,7 +1053,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
             params.push_back(std::make_unique<juce::AudioParameterBool>(
                 ParamIDs::bandParamId(ch, band, kParamBypassSuffix),
                 ParamIDs::bandParamName(ch, band, "Bypass"),
-                false));
+                band != 0));
 
             params.push_back(std::make_unique<juce::AudioParameterChoice>(
                 ParamIDs::bandParamId(ch, band, kParamMsSuffix),
@@ -1544,19 +1527,10 @@ void EQProAudioProcessor::rebuildLinearPhase(int taps, double sampleRate, int ch
 
 void EQProAudioProcessor::updateOversampling()
 {
-    const int newIndex = oversamplingParam != nullptr
-        ? static_cast<int>(oversamplingParam->load())
-        : 0;
-
-    if (newIndex == oversamplingIndex && lastSampleRate > 0.0 && lastMaxBlockSize > 0)
-        return;
-
-    oversamplingIndex = juce::jlimit(0, 2, newIndex);
+    oversamplingIndex = 0;
     oversampler.reset();
     oversampledBuffer.setSize(0, 0);
-
-    if (oversamplingIndex == 0 || lastSampleRate <= 0.0 || lastMaxBlockSize <= 0)
-        return;
+    return;
 
     const int factor = oversamplingIndex;
     oversampler = std::make_unique<juce::dsp::Oversampling<float>>(

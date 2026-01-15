@@ -17,6 +17,7 @@ public:
     void setSelectedChannel(int channelIndex);
     void setShowPhase(bool shouldShow);
     void setTheme(const ThemeColors& newTheme);
+    void setUiScale(float scale);
 
     std::function<void(int)> onBandSelected;
 
@@ -27,6 +28,10 @@ public:
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseUp(const juce::MouseEvent& event) override;
     void mouseDoubleClick(const juce::MouseEvent& event) override;
+    void mouseWheelMove(const juce::MouseEvent& event,
+                        const juce::MouseWheelDetails& wheel) override;
+    void mouseMove(const juce::MouseEvent& event) override;
+    void mouseExit(const juce::MouseEvent& event) override;
 
 private:
     void timerCallback() override;
@@ -36,6 +41,7 @@ private:
     juce::Rectangle<int> getMagnitudeArea() const;
     juce::Rectangle<int> getPhaseArea() const;
     void drawLabels(juce::Graphics& g, const juce::Rectangle<int>& area);
+    int getAnalyzerView() const;
 
     float xToFrequency(float x) const;
     float yToGain(float y) const;
@@ -43,6 +49,11 @@ private:
     float gainToY(float gainDb) const;
     float phaseToY(float phase) const;
     float snapFrequencyToPeak(float x) const;
+    void createBandAtPosition(const juce::Point<float>& position);
+    void resetBandToDefaults(int bandIndex, bool shouldBypass);
+    void startAltSolo(const juce::Point<float>& position);
+    void updateAltSolo(const juce::Point<float>& position);
+    void stopAltSolo();
 
     void setBandParameter(int bandIndex, const juce::String& suffix, float value);
     float getBandParameter(int bandIndex, const juce::String& suffix) const;
@@ -58,6 +69,25 @@ private:
     int selectedBand = 0;
     int selectedChannel = 0;
     int draggingBand = -1;
+    int tempSoloBand = -1;
+    bool tempSoloWasEnabled = false;
+    int hoverBand = -1;
+    juce::Point<float> hoverPos;
+    bool isAltSoloing = false;
+    int altSoloBand = -1;
+    struct AltSoloState
+    {
+        float freqNorm = 0.0f;
+        float gainNorm = 0.0f;
+        float qNorm = 0.0f;
+        float typeNorm = 0.0f;
+        float bypassNorm = 0.0f;
+        float soloNorm = 0.0f;
+    };
+    AltSoloState altSoloState {};
+    bool draggingQ = false;
+    int qDragSide = 0;
+    float qDragStart = 1.0f;
     juce::Point<float> dragStartPos;
     struct DragBandState
     {
@@ -68,7 +98,7 @@ private:
     std::vector<int> selectedBands;
     std::vector<DragBandState> dragBands;
 
-    static constexpr int fftOrder = 11;
+    static constexpr int fftOrder = 12;
     static constexpr int fftSize = 1 << fftOrder;
     static constexpr int fftBins = fftSize / 2;
 
@@ -87,6 +117,9 @@ private:
     std::vector<float> phaseCurve;
     std::vector<float> selectedBandCurveDb;
     std::vector<juce::Point<float>> bandPoints;
+    std::vector<juce::Rectangle<float>> bypassIcons;
+    std::array<juce::Rectangle<float>, 2> qHandleRects {};
+    bool hasQHandles = false;
 
     float lastSampleRate = 48000.0f;
     int frameCounter = 0;
@@ -97,5 +130,6 @@ private:
     uint64_t lastCurveHash = 0;
     int lastCurveBand = -1;
     int lastCurveChannel = -1;
+    float uiScale = 1.0f;
     ThemeColors theme = makeDarkTheme();
 };

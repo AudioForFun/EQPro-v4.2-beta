@@ -15,6 +15,8 @@ public:
     void reset();
     void setGlobalBypass(bool shouldBypass);
     void setSmartSoloEnabled(bool enabled);
+    void setQMode(int mode);
+    void setQModeAmount(float amount);
     void updateBandParams(int channelIndex, int bandIndex, const BandParams& params);
     void updateMsBandParams(int bandIndex, const BandParams& params);
     void setMsTargets(const std::array<int, ParamIDs::kBandsPerChannel>& targets);
@@ -56,5 +58,9 @@ private:
     juce::AudioBuffer<float> msBuffer;
     bool globalBypass = false;
     bool smartSoloEnabled = false;
+    int qMode = 0;
+    float qModeAmount = 50.0f;
+
+    float applyQMode(const BandParams& params) const;
 };
 } // namespace eqdsp

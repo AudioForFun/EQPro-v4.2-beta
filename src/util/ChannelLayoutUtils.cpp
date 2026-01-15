@@ -70,40 +70,4 @@ std::vector<juce::String> getChannelNames(const juce::AudioChannelSet& layout)
     return names;
 }
 
-std::vector<std::pair<int, int>> getLinkPairs(const juce::AudioChannelSet& layout)
-{
-    std::vector<std::pair<int, int>> pairs;
-    auto types = layout.getChannelTypes();
-    if (types.isEmpty())
-        types = juce::AudioChannelSet::canonicalChannelSet(layout.size()).getChannelTypes();
-
-    auto findIndex = [&types](juce::AudioChannelSet::ChannelType type) -> int
-    {
-        for (int i = 0; i < types.size(); ++i)
-            if (types[i] == type)
-                return i;
-        return -1;
-    };
-
-    auto addPair = [&pairs, &findIndex](juce::AudioChannelSet::ChannelType left,
-                                        juce::AudioChannelSet::ChannelType right)
-    {
-        const int l = findIndex(left);
-        const int r = findIndex(right);
-        if (l >= 0 && r >= 0)
-            pairs.emplace_back(l, r);
-    };
-
-    addPair(juce::AudioChannelSet::left, juce::AudioChannelSet::right);
-    addPair(juce::AudioChannelSet::leftCentre, juce::AudioChannelSet::rightCentre);
-    addPair(juce::AudioChannelSet::leftSurround, juce::AudioChannelSet::rightSurround);
-    addPair(juce::AudioChannelSet::leftSurroundRear, juce::AudioChannelSet::rightSurroundRear);
-    addPair(juce::AudioChannelSet::wideLeft, juce::AudioChannelSet::wideRight);
-    addPair(juce::AudioChannelSet::topFrontLeft, juce::AudioChannelSet::topFrontRight);
-    addPair(juce::AudioChannelSet::topRearLeft, juce::AudioChannelSet::topRearRight);
-    addPair(juce::AudioChannelSet::topSideLeft, juce::AudioChannelSet::topSideRight);
-    addPair(juce::AudioChannelSet::bottomFrontLeft, juce::AudioChannelSet::bottomFrontRight);
-
-    return pairs;
-}
 } // namespace ChannelLayoutUtils

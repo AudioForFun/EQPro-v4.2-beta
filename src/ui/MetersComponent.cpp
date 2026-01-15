@@ -38,6 +38,7 @@ void MetersComponent::paint(juce::Graphics& g)
     g.drawRoundedRectangle(bounds.reduced(0.5f), 6.0f, 1.0f);
 
     auto meterArea = bounds.reduced(8.0f, 12.0f);
+    const auto phaseArea = meterArea.removeFromBottom(14.0f);
     const auto peakArea = meterArea.removeFromBottom(18.0f);
     const float meterWidth = dualMode ? (meterArea.getWidth() - 6.0f) * 0.5f : meterArea.getWidth();
 
@@ -48,8 +49,13 @@ void MetersComponent::paint(juce::Graphics& g)
         g.setColour(theme.panel);
         g.fillRoundedRectangle(meterBounds, 4.0f);
 
-        const float rmsY = dbToY(rmsDb);
-        const float peakY = dbToY(peakDb);
+        const auto mapDbToY = [&meterArea](float db)
+        {
+            const float clamped = juce::jlimit(kMinDb, kMaxDb, db);
+            return juce::jmap(clamped, kMinDb, kMaxDb, meterArea.getBottom(), meterArea.getY());
+        };
+        const float rmsY = mapDbToY(rmsDb);
+        const float peakY = mapDbToY(peakDb);
         const auto fill = juce::Rectangle<float>(meterBounds.getX(), rmsY,
                                                  meterBounds.getWidth(),
                                                  meterBounds.getBottom() - rmsY);
@@ -94,6 +100,21 @@ void MetersComponent::paint(juce::Graphics& g)
     g.setFont(12.0f);
     g.drawFittedText("Peak " + juce::String(peakDb, 1) + " dB",
                      peakArea.toNearestInt(), juce::Justification::centred, 1);
+
+    g.setColour(theme.panel);
+    g.fillRoundedRectangle(phaseArea, 4.0f);
+    const float midX = phaseArea.getCentreX();
+    const float phaseNorm = juce::jlimit(-1.0f, 1.0f, phaseValue);
+    const float phaseX = juce::jmap(phaseNorm, -1.0f, 1.0f, phaseArea.getX(), phaseArea.getRight());
+    g.setColour(theme.grid.withAlpha(0.5f));
+    g.drawLine(midX, phaseArea.getY() + 2.0f, midX, phaseArea.getBottom() - 2.0f, 1.0f);
+    g.setColour(theme.accentAlt.withAlpha(0.4f));
+    g.drawLine(midX, phaseArea.getCentreY(), phaseX, phaseArea.getCentreY(), 4.0f);
+    g.setColour(theme.accentAlt);
+    g.drawLine(midX, phaseArea.getCentreY(), phaseX, phaseArea.getCentreY(), 2.0f);
+    g.setColour(theme.textMuted);
+    g.setFont(11.0f);
+    g.drawFittedText("Phase", phaseArea.toNearestInt(), juce::Justification::centred, 1);
 }
 
 void MetersComponent::resized()
@@ -123,6 +144,7 @@ void MetersComponent::timerCallback()
         rightPeak = leftPeak;
     }
 
+    phaseValue = processorRef.getCorrelation();
     repaint();
 }
 

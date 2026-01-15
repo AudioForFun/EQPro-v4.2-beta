@@ -107,6 +107,31 @@ void EQDSP::setSmartSoloEnabled(bool enabled)
     smartSoloEnabled = enabled;
 }
 
+float EQDSP::applyQMode(const BandParams& params) const
+{
+    if (qMode != 1)
+        return params.q;
+
+    const bool supports = params.type == FilterType::bell;
+
+    if (! supports)
+        return params.q;
+
+    const float amountNorm = juce::jlimit(0.0f, 1.0f, qModeAmount / 100.0f);
+    const float factor = 1.0f + (std::abs(params.gainDb) / 18.0f) * amountNorm;
+    return juce::jlimit(0.1f, 18.0f, params.q * factor);
+}
+
+void EQDSP::setQMode(int mode)
+{
+    qMode = mode;
+}
+
+void EQDSP::setQModeAmount(float amount)
+{
+    qModeAmount = amount;
+}
+
 void EQDSP::updateBandParams(int channelIndex, int bandIndex, const BandParams& params)
 {
     if (channelIndex < 0 || channelIndex >= numChannels)
@@ -187,6 +212,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 params.frequencyHz = smoothFreq[ch][band].getCurrentValue();
                 params.gainDb = smoothGain[ch][band].getCurrentValue();
                 params.q = smoothQ[ch][band].getCurrentValue();
+                params.q = applyQMode(params);
                 params.type = FilterType::bandPass;
                 params.gainDb = smartSoloEnabled ? 6.0f : 0.0f;
                 if (smartSoloEnabled)
@@ -253,6 +279,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             params.frequencyHz = smoothFreq[0][band].getCurrentValue();
             params.gainDb = smoothGain[0][band].getCurrentValue();
             params.q = smoothQ[0][band].getCurrentValue();
+            params.q = applyQMode(params);
 
             if (params.dynamicEnabled
                 && params.type != FilterType::lowPass
@@ -443,7 +470,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             smoothQ[ch][band].skip(samples);
             params.frequencyHz = smoothFreq[ch][band].getCurrentValue();
             params.gainDb = smoothGain[ch][band].getCurrentValue();
-            params.q = smoothQ[ch][band].getCurrentValue();
+                params.q = smoothQ[ch][band].getCurrentValue();
+                params.q = applyQMode(params);
 
             if (params.dynamicEnabled
                 && params.type != FilterType::lowPass

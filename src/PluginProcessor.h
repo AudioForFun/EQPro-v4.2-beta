@@ -50,8 +50,6 @@ public:
     eqdsp::ChannelMeterState getMeterState(int channelIndex) const;
     float getCorrelation() const;
     juce::StringArray getCorrelationPairNames();
-    juce::StringArray getLinkPairNames();
-    std::vector<std::pair<int, int>> getLinkPairs();
     void setCorrelationPairIndex(int index);
     int getCorrelationPairIndex() const;
     void setShowPhasePreference(bool enabled);
@@ -135,6 +133,8 @@ private:
     std::atomic<float>* spectralReleaseParam = nullptr;
     std::atomic<float>* spectralMixParam = nullptr;
     std::atomic<float>* characterModeParam = nullptr;
+    std::atomic<float>* qModeParam = nullptr;
+    std::atomic<float>* qModeAmountParam = nullptr;
     std::atomic<float>* analyzerExternalParam = nullptr;
     std::atomic<float>* autoGainEnableParam = nullptr;
     std::atomic<float>* gainScaleParam = nullptr;
@@ -172,8 +172,6 @@ private:
     int correlationPairIndex = 0;
     int correlationChannelCount = 0;
     std::vector<std::pair<int, int>> correlationPairs;
-    int linkPairsChannelCount = 0;
-    std::vector<std::pair<int, int>> linkPairs;
     std::atomic<int> learnedMidiCC { -1 };
 
     static juce::String sharedStateClipboard;

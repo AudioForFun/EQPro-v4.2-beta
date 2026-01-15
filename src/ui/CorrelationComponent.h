@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <array>
 #include "Theme.h"
 
 class EQProAudioProcessor;
@@ -20,5 +21,8 @@ private:
 
     EQProAudioProcessor& processorRef;
     float correlation = 0.0f;
+    static constexpr int kHistorySize = 120;
+    std::array<float, kHistorySize> history {};
+    int historyIndex = 0;
     ThemeColors theme = makeDarkTheme();
 };

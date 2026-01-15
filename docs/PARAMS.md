@@ -1,0 +1,94 @@
+# EQ Pro Parameters (Milestone 1)
+
+## Global
+- `globalBypass` (bool)
+- `ellipticBypass` (bool)
+- `ellipticFreq` (float, Hz, 20..500)
+- `ellipticAmount` (float, 0..1)
+- `phaseMode` (choice)
+  - Real-time
+  - Natural
+  - Linear
+- `linearQuality` (choice)
+  - Low
+  - Medium
+  - High
+  - Very High
+  - Intensive
+- `linearWindow` (choice)
+  - Hann
+  - Blackman
+  - Kaiser
+- `oversampling` (choice)
+  - Off
+  - 2x
+  - 4x
+- `outputTrim` (float, dB, -24..+24)
+- `spectralEnable` (bool)
+- `spectralThreshold` (float, dB, -60..0)
+- `spectralRatio` (float, 1..20)
+- `spectralAttack` (float, ms, 1..200)
+- `spectralRelease` (float, ms, 5..1000)
+- `spectralMix` (float, %, 0..100)
+- `characterMode` (choice)
+  - Off
+  - Gentle
+  - Warm
+- `analyzerRange` (choice)
+  - 3 dB
+  - 6 dB
+  - 12 dB
+  - 30 dB
+- `analyzerSpeed` (choice)
+  - Slow
+  - Normal
+  - Fast
+- `analyzerFreeze` (bool)
+- `analyzerExternal` (bool)
+- `autoGainEnable` (bool)
+- `gainScale` (float, %, 0..100)
+- `phaseInvert` (bool)
+- `midiLearn` (bool)
+- `midiTarget` (choice)
+  - Gain
+  - Freq
+  - Q
+- `smartSolo` (bool)
+
+## Per Channel / Band
+For channels 1..16 and bands 1..24:
+- `ch{C}_b{B}_freq` (float, Hz, 20..192000)
+- `ch{C}_b{B}_gain` (float, dB, -24..+24)
+- `ch{C}_b{B}_q` (float, 0.1..18)
+- `ch{C}_b{B}_type` (choice)
+  - Bell
+  - Low Shelf
+  - High Shelf
+  - Low Pass
+  - High Pass
+  - Notch
+  - Band Pass
+  - All Pass
+  - Tilt
+  - Flat Tilt
+- `ch{C}_b{B}_bypass` (bool)
+- `ch{C}_b{B}_solo` (bool)
+- `ch{C}_b{B}_ms` (choice)
+  - Stereo
+  - Mid
+  - Side
+  - Left
+  - Right
+- `ch{C}_b{B}_slope` (float, dB/oct, 6..96)
+- `ch{C}_b{B}_dynEnable` (bool)
+- `ch{C}_b{B}_dynMode` (choice)
+  - Down
+  - Up
+- `ch{C}_b{B}_dynThresh` (float, dB, -60..0)
+- `ch{C}_b{B}_dynAttack` (float, ms, 1..200)
+- `ch{C}_b{B}_dynRelease` (float, ms, 5..1000)
+- `ch{C}_b{B}_dynMix` (float, %, 0..100)
+- `ch{C}_b{B}_dynSource` (choice)
+  - Internal
+  - External
+- `ch{C}_b{B}_dynFilter` (bool)

@@ -1,0 +1,12 @@
+build/
+.vs/
+.idea/
+*.user
+*.log
+*.tmp
+*.obj
+*.pdb
+*.lib
+*.exp
+*.ilk
+*.tlog

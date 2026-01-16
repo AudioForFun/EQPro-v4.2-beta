@@ -11,7 +11,8 @@
 #include "ui/SpectralDynamicsPanel.h"
 #include "util/Version.h"
 
-class EQProAudioProcessorEditor final : public juce::AudioProcessorEditor
+class EQProAudioProcessorEditor final : public juce::AudioProcessorEditor,
+                                        private juce::Timer
 {
 public:
     explicit EQProAudioProcessorEditor(EQProAudioProcessor&);
@@ -22,6 +23,9 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
 
 private:
+    void timerCallback() override;
+    void refreshChannelLayout();
+
     EQProAudioProcessor& processorRef;
 
     juce::ToggleButton globalBypassButton;
@@ -114,11 +118,14 @@ private:
     juce::ResizableCornerComponent resizer { this, &resizeConstrainer };
     juce::ComponentBoundsConstrainer resizeConstrainer;
     juce::OpenGLContext openGLContext;
+    juce::Image backgroundNoise;
 
     bool debugVisible = false;
 
     int selectedBand = 0;
     int selectedChannel = 0;
+    std::vector<juce::String> cachedChannelNames;
+    juce::String cachedLayoutDescription;
 
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::unique_ptr<ButtonAttachment> globalBypassAttachment;

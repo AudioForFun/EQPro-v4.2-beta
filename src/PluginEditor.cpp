@@ -15,6 +15,22 @@ constexpr int kLeftPanelWidth = 0;
 constexpr int kRightPanelWidth = 180;
 constexpr float kLabelFontSize = 12.0f;
 constexpr float kHeaderFontSize = 20.0f;
+
+juce::Image makeNoiseImage(int size)
+{
+    juce::Image noise(juce::Image::ARGB, size, size, true);
+    juce::Random rng(0x5a17);
+    for (int y = 0; y < size; ++y)
+    {
+        for (int x = 0; x < size; ++x)
+        {
+            const float shade = rng.nextFloat();
+            const uint8 alpha = static_cast<uint8>(8 + shade * 18.0f);
+            noise.setPixelAt(x, y, juce::Colour::fromRGBA(255, 255, 255, alpha));
+        }
+    }
+    return noise;
+}
 } // namespace
 
 EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
@@ -29,8 +45,13 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     setLookAndFeel(&lookAndFeel);
     setWantsKeyboardFocus(true);
     openGLContext.setContinuousRepainting(false);
+    openGLContext.setComponentPaintingEnabled(true);
+    openGLContext.setMultisamplingEnabled(true);
+    openGLContext.setSwapInterval(1);
     openGLContext.attachTo(*this);
     analyzer.setInteractive(false);
+    backgroundNoise = makeNoiseImage(128);
+    startTimerHz(2);
 
     headerLabel.setText("EQ Pro", juce::dontSendNotification);
     headerLabel.setJustificationType(juce::Justification::centredLeft);
@@ -59,7 +80,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(globalMixLabel);
 
     globalMixSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    globalMixSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 52, 18);
+    globalMixSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 68, 18);
     globalMixSlider.setTextBoxIsEditable(true);
     globalMixSlider.setTextValueSuffix(" %");
     globalMixSlider.setColour(juce::Slider::trackColourId, juce::Colour(0xff38bdf8));
@@ -165,7 +186,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(qAmountLabel);
 
     qAmountSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    qAmountSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 54, 18);
+    qAmountSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 68, 18);
     qAmountSlider.setTextBoxIsEditable(true);
     qAmountSlider.setTextValueSuffix(" %");
     addAndMakeVisible(qAmountSlider);
@@ -185,7 +206,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         processorRef.getParameters(), ParamIDs::autoGainEnable, autoGainToggle);
 
     gainScaleSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    gainScaleSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+    gainScaleSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 68, 18);
     gainScaleSlider.setTextBoxIsEditable(true);
     gainScaleSlider.setTextValueSuffix(" %");
     addAndMakeVisible(gainScaleSlider);
@@ -292,7 +313,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(outputTrimLabel);
 
     outputTrimSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    outputTrimSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+    outputTrimSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 68, 18);
     outputTrimSlider.setTextBoxIsEditable(true);
     outputTrimSlider.setTextValueSuffix(" dB");
     addAndMakeVisible(outputTrimSlider);
@@ -861,54 +882,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         }
     };
 
-    const auto channelNames = processorRef.getCurrentChannelNames();
-    auto buildPairLabels = [&channelNames]()
-    {
-        std::vector<juce::String> labels(channelNames.size());
-        auto findIndex = [&channelNames](const juce::String& name)
-        {
-            for (int i = 0; i < static_cast<int>(channelNames.size()); ++i)
-                if (channelNames[static_cast<size_t>(i)] == name)
-                    return i;
-            return -1;
-        };
-        auto addPair = [&](const juce::String& left, const juce::String& right, const juce::String& label)
-        {
-            const int li = findIndex(left);
-            const int ri = findIndex(right);
-            if (li >= 0 && ri >= 0)
-            {
-                labels[static_cast<size_t>(li)] = label;
-                labels[static_cast<size_t>(ri)] = label;
-            }
-        };
-
-        addPair("L", "R", "L/R");
-        addPair("Ls", "Rs", "Ls/Rs");
-        addPair("Lrs", "Rrs", "Lrs/Rrs");
-        addPair("Lc", "Rc", "Lc/Rc");
-        addPair("Ltf", "Rtf", "Ltf/Rtf");
-        addPair("Ltr", "Rtr", "Ltr/Rtr");
-        addPair("Lts", "Rts", "Lts/Rts");
-        addPair("Lw", "Rw", "Lw/Rw");
-        addPair("Bfl", "Bfr", "Bfl/Bfr");
-        return labels;
-    };
-    const auto pairLabels = buildPairLabels();
-    channelSelector.clear();
-    for (int i = 0; i < static_cast<int>(channelNames.size()); ++i)
-    {
-        const auto& name = channelNames[static_cast<size_t>(i)];
-        const auto& pair = pairLabels[static_cast<size_t>(i)];
-        const juce::String label = pair.isNotEmpty() ? (name + " (" + pair + ")") : name;
-        channelSelector.addItem(label, i + 1);
-    }
-    channelSelector.setSelectedItemIndex(0, juce::dontSendNotification);
-    juce::StringArray labels;
-    for (const auto& name : channelNames)
-        labels.add(name);
-    meters.setChannelLabels(labels);
-    bandControls.setMsEnabled(true);
+    refreshChannelLayout();
 
     analyzer.onBandSelected = [this](int band)
     {
@@ -992,6 +966,83 @@ EQProAudioProcessorEditor::~EQProAudioProcessorEditor()
     setLookAndFeel(nullptr);
 }
 
+void EQProAudioProcessorEditor::timerCallback()
+{
+    refreshChannelLayout();
+}
+
+void EQProAudioProcessorEditor::refreshChannelLayout()
+{
+    const auto channelNames = processorRef.getCurrentChannelNames();
+    const auto layoutDesc = processorRef.getCurrentLayoutDescription();
+    if (channelNames == cachedChannelNames && layoutDesc == cachedLayoutDescription)
+        return;
+
+    cachedChannelNames = channelNames;
+    cachedLayoutDescription = layoutDesc;
+    layoutValueLabel.setText(layoutDesc, juce::dontSendNotification);
+
+    auto buildPairLabels = [&channelNames]()
+    {
+        std::vector<juce::String> labels(channelNames.size());
+        auto findIndex = [&channelNames](const juce::String& name)
+        {
+            for (int i = 0; i < static_cast<int>(channelNames.size()); ++i)
+                if (channelNames[static_cast<size_t>(i)] == name)
+                    return i;
+            return -1;
+        };
+        auto addPair = [&](const juce::String& left, const juce::String& right, const juce::String& label)
+        {
+            const int li = findIndex(left);
+            const int ri = findIndex(right);
+            if (li >= 0 && ri >= 0)
+            {
+                labels[static_cast<size_t>(li)] = label;
+                labels[static_cast<size_t>(ri)] = label;
+            }
+        };
+
+        addPair("L", "R", "L/R");
+        addPair("Ls", "Rs", "Ls/Rs");
+        addPair("Lrs", "Rrs", "Lrs/Rrs");
+        addPair("Lc", "Rc", "Lc/Rc");
+        addPair("Ltf", "Rtf", "Ltf/Rtf");
+        addPair("Ltr", "Rtr", "Ltr/Rtr");
+        addPair("Lts", "Rts", "Lts/Rts");
+        addPair("Lw", "Rw", "Lw/Rw");
+        addPair("Bfl", "Bfr", "Bfl/Bfr");
+        return labels;
+    };
+
+    const int previousSelection = selectedChannel;
+    const auto pairLabels = buildPairLabels();
+    channelSelector.clear(juce::dontSendNotification);
+    for (int i = 0; i < static_cast<int>(channelNames.size()); ++i)
+    {
+        const auto& name = channelNames[static_cast<size_t>(i)];
+        const auto& pair = pairLabels[static_cast<size_t>(i)];
+        const juce::String label = pair.isNotEmpty() ? (name + " (" + pair + ")") : name;
+        channelSelector.addItem(label, i + 1);
+    }
+
+    const int maxIndex = juce::jmax(0, static_cast<int>(channelNames.size()) - 1);
+    selectedChannel = juce::jlimit(0, maxIndex, previousSelection);
+    channelSelector.setSelectedItemIndex(selectedChannel, juce::dontSendNotification);
+
+    juce::StringArray labels;
+    for (const auto& name : channelNames)
+        labels.add(name);
+    meters.setChannelLabels(labels);
+    bandControls.setMsEnabled(true);
+    bandControls.setChannelNames(channelNames);
+    analyzer.invalidateCaches();
+    analyzer.setSelectedChannel(selectedChannel);
+    bandControls.setSelectedBand(selectedChannel, selectedBand);
+    meters.setSelectedChannel(selectedChannel);
+    processorRef.setSelectedChannelIndex(selectedChannel);
+}
+
 void EQProAudioProcessorEditor::paint(juce::Graphics& g)
 {
     juce::ColourGradient bg(theme.background.brighter(0.02f),
@@ -1001,6 +1052,21 @@ void EQProAudioProcessorEditor::paint(juce::Graphics& g)
                             false);
     g.setGradientFill(bg);
     g.fillAll();
+    if (backgroundNoise.isValid())
+    {
+        g.setOpacity(0.08f);
+        g.setTiledImageFill(backgroundNoise, 0, 0, 1.0f);
+        g.fillRect(getLocalBounds());
+        g.setOpacity(1.0f);
+    }
+    auto frameBounds = getLocalBounds().toFloat().reduced(6.0f);
+    juce::ColourGradient sheen(theme.panel.withAlpha(0.35f),
+                               frameBounds.getTopLeft(),
+                               juce::Colours::transparentBlack,
+                               frameBounds.getBottomLeft(),
+                               false);
+    g.setGradientFill(sheen);
+    g.fillRoundedRectangle(frameBounds, 8.0f);
     g.setColour(theme.panelOutline);
     g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(6.0f), 6.0f, 1.0f);
 
@@ -1017,10 +1083,14 @@ void EQProAudioProcessorEditor::paint(juce::Graphics& g)
         const auto phaseMode = processorRef.getParameters()
                                    .getRawParameterValue(ParamIDs::phaseMode)
                                    ->load();
+        const float cpu = processorRef.getCpuUsage() * 100.0f;
         const juce::String text = "Debug Panel\n"
             "SR: " + juce::String(sr, 0) + " Hz\n"
             "Latency: " + juce::String(latency) + " samples\n"
-            "Phase Mode: " + juce::String(static_cast<int>(phaseMode));
+            "Phase Mode: " + juce::String(static_cast<int>(phaseMode)) + "\n"
+            "Analyzer: " + juce::String(analyzer.getTimerHz()) + " Hz\n"
+            "OpenGL: " + juce::String(openGLContext.isAttached() ? "On" : "Off") + "\n"
+            "CPU: " + juce::String(cpu, 1) + "%";
         g.setColour(theme.text);
         g.setFont(12.0f);
         g.drawFittedText(text, area, juce::Justification::topLeft, 4);
@@ -1048,8 +1118,11 @@ void EQProAudioProcessorEditor::resized()
     const int margin = static_cast<int>(kOuterMargin * uiScale);
     auto bounds = getLocalBounds().reduced(margin);
 
-    headerLabel.setBounds({0, 0, 0, 0});
-    versionLabel.setBounds({0, 0, 0, 0});
+    const int headerHeight = static_cast<int>(26 * uiScale);
+    auto headerRow = bounds.removeFromTop(headerHeight);
+    const int headerWidth = static_cast<int>(220 * uiScale);
+    headerLabel.setBounds(headerRow.removeFromLeft(headerWidth));
+    versionLabel.setBounds(headerRow.removeFromRight(static_cast<int>(220 * uiScale)));
 
     const int topBarHeight = static_cast<int>(32 * uiScale);
     auto topBar = bounds.removeFromTop(topBarHeight);

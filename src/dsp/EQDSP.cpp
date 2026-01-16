@@ -248,7 +248,9 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
         return;
 
     const int samples = buffer.getNumSamples();
-    juce::ignoreUnused(detectorBuffer);
+    const bool externalAvailable = detectorBuffer != nullptr
+        && detectorBuffer->getNumSamples() == samples
+        && detectorBuffer->getNumChannels() > 0;
     bool anySolo = false;
     for (int ch = 0; ch < numChannels; ++ch)
     {
@@ -336,6 +338,19 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
 
     if (useMs)
     {
+        bool anyExternalMs = false;
+        if (externalAvailable)
+        {
+            for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+            {
+                if (cachedParams[0][band].useExternalDetector)
+                {
+                    anyExternalMs = true;
+                    break;
+                }
+            }
+        }
+
         auto* mid = msBuffer.getWritePointer(0);
         auto* side = msBuffer.getWritePointer(1);
         auto* left = buffer.getWritePointer(0);
@@ -348,10 +363,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
         juce::FloatVectorOperations::subtract(side, right, samples);
         juce::FloatVectorOperations::multiply(side, 0.5f, samples);
 
-        const bool useExternalDetector = detectorBuffer != nullptr
-            && detectorBuffer->getNumSamples() == samples
-            && detectorBuffer->getNumChannels() > 0;
-        if (useExternalDetector)
+        if (anyExternalMs)
         {
             auto* detMid = detectorMsBuffer.getWritePointer(0);
             auto* detSide = detectorMsBuffer.getWritePointer(1);
@@ -377,6 +389,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             if (target == 3 || target == 4)
                 continue;
             auto params = cachedParams[0][band];
+            const bool bandUseExternal = externalAvailable && params.useExternalDetector;
             const bool isHpLp = params.type == FilterType::lowPass || params.type == FilterType::highPass;
             const bool isTilt = params.type == FilterType::tilt || params.type == FilterType::flatTilt;
             const float tiltQ = (params.type == FilterType::flatTilt) ? 0.5f : -1.0f;
@@ -445,10 +458,10 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     float m = dryM;
                     float s = dryS;
 
-                    const float detM = useExternalDetector
+                    const float detM = bandUseExternal
                         ? detectorMsBuffer.getReadPointer(0)[i]
                         : dryM;
-                    const float detS = useExternalDetector
+                    const float detS = bandUseExternal
                         ? detectorMsBuffer.getReadPointer(1)[i]
                         : dryS;
                     const float detInput = (target == 2) ? detS : detM;
@@ -507,7 +520,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 {
                     const float dryM = mid[i];
                     float m = dryM;
-                    const float detInput = useExternalDetector
+                    const float detInput = bandUseExternal
                         ? detectorMsBuffer.getReadPointer(0)[i]
                         : dryM;
                     const float detSample = detectorFilters[0][band].processSample(detInput);
@@ -551,7 +564,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 {
                     const float dryS = side[i];
                     float s = dryS;
-                    const float detInput = useExternalDetector
+                    const float detInput = bandUseExternal
                         ? detectorMsBuffer.getReadPointer(1)[i]
                         : dryS;
                     const float detSample = detectorFilters[1][band].processSample(detInput);
@@ -609,6 +622,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 continue;
 
             auto params = cachedParams[ch][band];
+            const bool bandUseExternal = externalAvailable && params.useExternalDetector;
             if (params.mix <= 0.0001f)
                 continue;
             const bool isHpLp = params.type == FilterType::lowPass || params.type == FilterType::highPass;
@@ -665,8 +679,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     onePoles[ch][band].setHighPass(params.frequencyHz);
             }
 
-            const float* detData = nullptr;
-            if (detectorBuffer != nullptr && detectorBuffer->getNumSamples() == samples)
+            const float* detData = channelData;
+            if (bandUseExternal)
             {
                 const int detChannel = juce::jmin(ch, detectorBuffer->getNumChannels() - 1);
                 if (detChannel >= 0)
@@ -685,7 +699,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 && cachedParams[0][band].thresholdDb == cachedParams[1][band].thresholdDb
                 && cachedParams[0][band].attackMs == cachedParams[1][band].attackMs
                 && cachedParams[0][band].releaseMs == cachedParams[1][band].releaseMs
-                && cachedParams[0][band].autoScale == cachedParams[1][band].autoScale;
+                && cachedParams[0][band].autoScale == cachedParams[1][band].autoScale
+                && cachedParams[0][band].useExternalDetector == cachedParams[1][band].useExternalDetector;
             const bool canStereoSimd = numChannels == 2 && ch == 0 && rightData != nullptr
                 && linkStereoDetectors
                 && paramsMatchStereo;
@@ -726,7 +741,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 && cachedParams[0][band].thresholdDb == params.thresholdDb
                 && cachedParams[0][band].attackMs == params.attackMs
                 && cachedParams[0][band].releaseMs == params.releaseMs
-                && cachedParams[0][band].autoScale == params.autoScale;
+                && cachedParams[0][band].autoScale == params.autoScale
+                && cachedParams[0][band].useExternalDetector == params.useExternalDetector;
             float* detTempWrite = linkStereoDetectors && ch == 0 ? detectorTemp.getWritePointer(0) : nullptr;
             const float* detTempRead = linkDetector ? detectorTemp.getReadPointer(0) : nullptr;
 

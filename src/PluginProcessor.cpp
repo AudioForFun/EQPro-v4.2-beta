@@ -22,6 +22,7 @@ constexpr const char* kParamDynThreshSuffix = "dynThresh";
 constexpr const char* kParamDynAttackSuffix = "dynAttack";
 constexpr const char* kParamDynReleaseSuffix = "dynRelease";
 constexpr const char* kParamDynAutoSuffix = "dynAuto";
+constexpr const char* kParamDynExternalSuffix = "dynExternal";
 
 const juce::StringArray kFilterTypeChoices {
     "Bell",
@@ -701,6 +702,8 @@ void EQProAudioProcessor::initializeParamPointers()
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynReleaseSuffix));
             bandParamPointers[ch][band].dynAuto =
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynAutoSuffix));
+            bandParamPointers[ch][band].dynExternal =
+                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynExternalSuffix));
         }
     }
 }
@@ -708,7 +711,7 @@ void EQProAudioProcessor::initializeParamPointers()
 juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
-    params.reserve(ParamIDs::kMaxChannels * ParamIDs::kBandsPerChannel * 21 + 8);
+    params.reserve(ParamIDs::kMaxChannels * ParamIDs::kBandsPerChannel * 22 + 8);
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         ParamIDs::globalBypass, "Global Bypass", false));
@@ -899,6 +902,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
                 ParamIDs::bandParamId(ch, band, kParamDynAutoSuffix),
                 ParamIDs::bandParamName(ch, band, "Dyn Auto Scale"),
                 true));
+
+            params.push_back(std::make_unique<juce::AudioParameterBool>(
+                ParamIDs::bandParamId(ch, band, kParamDynExternalSuffix),
+                ParamIDs::bandParamName(ch, band, "Dyn External"),
+                false));
 
         }
     }
@@ -1388,6 +1396,7 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
             dst.dynAttackMs = ptrs.dynAttack != nullptr ? ptrs.dynAttack->load() : 20.0f;
             dst.dynReleaseMs = ptrs.dynRelease != nullptr ? ptrs.dynRelease->load() : 200.0f;
             dst.dynAuto = ptrs.dynAuto != nullptr && ptrs.dynAuto->load() > 0.5f;
+            dst.dynExternal = ptrs.dynExternal != nullptr && ptrs.dynExternal->load() > 0.5f;
         }
     }
 
@@ -1524,6 +1533,7 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
             hashFloat(b.dynAttackMs);
             hashFloat(b.dynReleaseMs);
             hashBool(b.dynAuto);
+            hashBool(b.dynExternal);
         }
     }
 

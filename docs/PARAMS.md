@@ -41,6 +41,10 @@
   - Slow
   - Normal
   - Fast
+- `analyzerView` (choice)
+  - Both
+  - Pre
+  - Post
 - `analyzerFreeze` (bool)
 - `analyzerExternal` (bool)
 - `autoGainEnable` (bool)
@@ -114,6 +118,7 @@ For channels 1..16 and bands 1..12:
   - Lts/Rts
   - Lw/Rw
   - Bfl/Bfr
+  - (UI filters to the current host layout)
 - `ch{C}_b{B}_slope` (float, dB/oct, 6..96 step 6)
 - `ch{C}_b{B}_mix` (float, %, 0..100)
 - `ch{C}_b{B}_dynEnable` (bool)
@@ -124,3 +129,4 @@ For channels 1..16 and bands 1..12:
 - `ch{C}_b{B}_dynAttack` (float, ms, 1..200)
 - `ch{C}_b{B}_dynRelease` (float, ms, 5..1000)
 - `ch{C}_b{B}_dynAuto` (bool)
+- `ch{C}_b{B}_dynExternal` (bool)

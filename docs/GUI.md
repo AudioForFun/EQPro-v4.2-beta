@@ -11,11 +11,14 @@
 - Drag band points to change frequency/gain.
 - Shift-click to multi-select bands; drag to move all selected.
 - Alt-drag to snap to nearby spectrum peaks (Spectrum Grab).
+- Pre/Post/External spectra can be shown; view selection controls render.
 - Per-band curves are overlaid with a highlighted selected band.
+- The plot shows a small legend for Pre/Post/Ext.
 
 ## Band Controls
 - Per-band: Frequency, Gain, Q, Mix, Filter Type (button grid), Slope.
 - Routing: All/Mid/Side/Left/Right plus immersive channels/pairs.
+- Channel options are filtered to the current host layout and refresh on layout change.
 - Solo and Bypass per band.
 - Dynamic EQ: Enable, Up/Down trigger, Threshold, Attack, Release, Auto Scale + detector meter.
 - Copy/Paste band state, Reset/Default/Delete.
@@ -32,11 +35,12 @@
 
 ## Analyzer Options
 - Range: 3/6/12/30 dB.
-- Speed: Slow/Normal/Fast.
+- Speed: Slow/Normal/Fast (adaptive).
+- View: Pre/Post/Both.
 - Freeze and External overlay toggles.
 
 ## MIDI
 - MIDI Learn toggle and target selector.
 
 ## Resizing
-- Corner resize handle for scaling.
+- Fixed size (1400x900).

@@ -18,6 +18,8 @@ public:
     void setTheme(const ThemeColors& newTheme);
     void setUiScale(float scale);
     void setInteractive(bool shouldAllow);
+    void invalidateCaches();
+    int getTimerHz() const noexcept { return lastTimerHz; }
 
     std::function<void(int)> onBandSelected;
 

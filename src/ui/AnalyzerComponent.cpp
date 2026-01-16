@@ -96,6 +96,19 @@ void AnalyzerComponent::setInteractive(bool shouldAllow)
     allowInteraction = shouldAllow;
 }
 
+void AnalyzerComponent::invalidateCaches()
+{
+    lastCurveWidth = 0;
+    lastCurveHash = 0;
+    lastCurveBand = -1;
+    lastCurveChannel = -1;
+    perBandCurveHash.assign(ParamIDs::kBandsPerChannel, 0);
+    eqCurveDb.clear();
+    selectedBandCurveDb.clear();
+    perBandCurveDb.clear();
+    perBandActive.clear();
+}
+
 void AnalyzerComponent::paint(juce::Graphics& g)
 {
     auto plotArea = getPlotArea();
@@ -108,6 +121,16 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
     g.setColour(theme.panelOutline);
     g.drawRect(plotArea);
+
+    juce::ColourGradient vignette(juce::Colours::transparentBlack,
+                                  plotArea.getCentreX(), plotArea.getY(),
+                                  theme.panel.darker(0.35f).withAlpha(0.35f),
+                                  plotArea.getCentreX(), plotArea.getBottom(),
+                                  false);
+    g.setGradientFill(vignette);
+    g.fillRect(plotArea);
+    g.setColour(theme.panel.darker(0.4f).withAlpha(0.6f));
+    g.drawRect(plotArea.reduced(1.0f), 1.0f);
 
     g.setColour(theme.grid);
 
@@ -162,7 +185,13 @@ void AnalyzerComponent::paint(juce::Graphics& g)
             break;
     }
 
-    if (hasPre)
+    const int viewIndex = parameters.getRawParameterValue(ParamIDs::analyzerView) != nullptr
+        ? static_cast<int>(parameters.getRawParameterValue(ParamIDs::analyzerView)->load())
+        : 0;
+    const bool drawPre = viewIndex != 2;
+    const bool drawPost = viewIndex != 1;
+
+    if (hasPre && drawPre)
     {
         g.setColour(theme.accent.withAlpha(0.2f));
         g.strokePath(prePath, juce::PathStrokeType(3.0f * scale));
@@ -170,7 +199,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         g.strokePath(prePath, juce::PathStrokeType(1.4f * scale));
     }
 
-    if (hasPost)
+    if (hasPost && drawPost)
     {
         g.setColour(theme.accentAlt.withAlpha(0.25f));
         g.strokePath(postPath, juce::PathStrokeType(3.0f * scale));
@@ -180,7 +209,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
     const bool showExternal = parameters.getRawParameterValue(ParamIDs::analyzerExternal) != nullptr
         && parameters.getRawParameterValue(ParamIDs::analyzerExternal)->load() > 0.5f;
-    if (showExternal && hasPost)
+    if (showExternal)
     {
         juce::Path extPath;
         extPath.startNewSubPath(plotArea.getX(), gainToY(externalMagnitudes.front()));
@@ -189,6 +218,45 @@ void AnalyzerComponent::paint(juce::Graphics& g)
                            gainToY(externalMagnitudes[static_cast<size_t>(x)]));
         g.setColour(theme.accentAlt.withAlpha(0.4f));
         g.strokePath(extPath, juce::PathStrokeType(1.0f * scale));
+    }
+
+    const bool showLegend = drawPre || drawPost || showExternal;
+    if (showLegend)
+    {
+        const float pad = 6.0f * scale;
+        const float swatch = 10.0f * scale;
+        const float rowH = 14.0f * scale;
+        juce::StringArray items;
+        if (drawPre) items.add("Pre");
+        if (drawPost) items.add("Post");
+        if (showExternal) items.add("Ext");
+
+        const float legendW = 70.0f * scale;
+        const float legendH = rowH * items.size() + pad * 2.0f;
+        auto legend = juce::Rectangle<float>(plotArea.getRight() - legendW - pad,
+                                             plotArea.getY() + pad,
+                                             legendW, legendH);
+        g.setColour(theme.panel.withAlpha(0.75f));
+        g.fillRoundedRectangle(legend, 6.0f * scale);
+        g.setColour(theme.panelOutline.withAlpha(0.8f));
+        g.drawRoundedRectangle(legend, 6.0f * scale, 1.0f);
+
+        g.setFont(11.0f * scale);
+        auto row = legend.reduced(pad);
+        for (int i = 0; i < items.size(); ++i)
+        {
+            auto line = row.removeFromTop(rowH);
+            juce::Colour swatchColour = theme.accent;
+            if (items[i] == "Post")
+                swatchColour = theme.accentAlt;
+            else if (items[i] == "Ext")
+                swatchColour = theme.accentAlt.withAlpha(0.6f);
+            g.setColour(swatchColour);
+            g.fillRoundedRectangle(line.removeFromLeft(swatch), 2.0f);
+            g.setColour(theme.textMuted);
+            g.drawFittedText(items[i], line.toNearestInt(),
+                             juce::Justification::centredLeft, 1);
+        }
     }
 
     if (! eqCurveDb.empty())
@@ -815,7 +883,7 @@ void AnalyzerComponent::stopAltSolo()
 
 void AnalyzerComponent::timerCallback()
 {
-    if (! isShowing())
+    if (! isShowing() || getWidth() <= 0 || getHeight() <= 0)
         return;
 
     minDb = kMinDb;
@@ -836,6 +904,11 @@ void AnalyzerComponent::timerCallback()
         hz = juce::jmax(10, hz / 2);
     if (effectiveSr >= 384000.0f)
         hz = juce::jmax(10, hz / 3);
+    const int viewIndex = parameters.getRawParameterValue(ParamIDs::analyzerView) != nullptr
+        ? static_cast<int>(parameters.getRawParameterValue(ParamIDs::analyzerView)->load())
+        : 0;
+    if (viewIndex != 0)
+        hz = juce::jmax(10, static_cast<int>(hz * 0.8f));
     if (hz != lastTimerHz)
     {
         lastTimerHz = hz;
@@ -844,17 +917,19 @@ void AnalyzerComponent::timerCallback()
 
     const bool freeze = parameters.getRawParameterValue(ParamIDs::analyzerFreeze) != nullptr
         && parameters.getRawParameterValue(ParamIDs::analyzerFreeze)->load() > 0.5f;
+    if (freeze)
+        hz = juce::jmax(8, hz / 2);
 
     bool didUpdate = false;
     if (! freeze)
     {
         updateFft();
         didUpdate = true;
-        if (++frameCounter % 2 == 0)
-        {
-            updateCurves();
-            didUpdate = true;
-        }
+    }
+    if (++frameCounter % 2 == 0)
+    {
+        updateCurves();
+        didUpdate = true;
     }
     if (didUpdate)
         repaint();
@@ -870,7 +945,13 @@ void AnalyzerComponent::updateFft()
     if (lastSampleRate <= 0.0f)
         lastSampleRate = 48000.0f;
 
-    if (preFifo.pull(timeBuffer.data(), fftSize) == fftSize)
+    const int viewIndex = parameters.getRawParameterValue(ParamIDs::analyzerView) != nullptr
+        ? static_cast<int>(parameters.getRawParameterValue(ParamIDs::analyzerView)->load())
+        : 0;
+    const bool wantPre = viewIndex != 2;
+    const bool wantPost = viewIndex != 1;
+
+    if (wantPre && preFifo.pull(timeBuffer.data(), fftSize) == fftSize)
     {
         std::fill(fftDataPre.begin(), fftDataPre.end(), 0.0f);
         juce::FloatVectorOperations::copy(fftDataPre.data(), timeBuffer.data(), fftSize);
@@ -885,7 +966,7 @@ void AnalyzerComponent::updateFft()
         }
     }
 
-    if (postFifo.pull(timeBuffer.data(), fftSize) == fftSize)
+    if (wantPost && postFifo.pull(timeBuffer.data(), fftSize) == fftSize)
     {
         std::fill(fftDataPost.begin(), fftDataPost.end(), 0.0f);
         juce::FloatVectorOperations::copy(fftDataPost.data(), timeBuffer.data(), fftSize);

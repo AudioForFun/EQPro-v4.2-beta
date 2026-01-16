@@ -23,6 +23,7 @@ struct BandSnapshot
     float dynAttackMs = 20.0f;
     float dynReleaseMs = 200.0f;
     bool dynAuto = true;
+    bool dynExternal = false;
 };
 
 struct ParamSnapshot

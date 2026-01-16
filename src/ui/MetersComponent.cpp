@@ -36,6 +36,10 @@ void MetersComponent::paint(juce::Graphics& g)
     g.fillRoundedRectangle(bounds, 6.0f);
     g.setColour(theme.panelOutline);
     g.drawRoundedRectangle(bounds.reduced(0.5f), 6.0f, 1.0f);
+    g.setColour(theme.panel.darker(0.5f).withAlpha(0.6f));
+    g.drawRoundedRectangle(bounds.reduced(1.5f), 6.0f, 1.0f);
+    g.setColour(theme.panel.brighter(0.3f).withAlpha(0.2f));
+    g.drawRoundedRectangle(bounds.reduced(2.5f), 6.0f, 1.0f);
 
     auto meterArea = bounds.reduced(8.0f, 12.0f);
     const auto phaseArea = meterArea.removeFromBottom(14.0f);
@@ -46,28 +50,44 @@ void MetersComponent::paint(juce::Graphics& g)
         / static_cast<float>(channels);
     const float fontSize = channels > 8 ? 9.5f : 11.0f;
 
-    auto drawMeter = [&](float x, float rmsDbValue, float peakDbValue, const juce::String& label)
+    auto drawMeter = [&](float x, float rmsDbValue, float peakDbValue, float holdDbValue,
+                         const juce::String& label)
     {
         const auto meterBounds = juce::Rectangle<float>(x, meterArea.getY(), meterWidth,
                                                         meterArea.getHeight());
         g.setColour(theme.panel);
         g.fillRoundedRectangle(meterBounds, 4.0f);
+        g.setColour(theme.panelOutline.withAlpha(0.6f));
+        g.drawRoundedRectangle(meterBounds.reduced(0.6f), 3.5f, 1.0f);
 
         const auto mapDbToY = [&meterArea](float db)
         {
             const float clamped = juce::jlimit(kMinDb, kMaxDb, db);
             return juce::jmap(clamped, kMinDb, kMaxDb, meterArea.getBottom(), meterArea.getY());
         };
+        const float tickDb[] { -60.0f, -48.0f, -36.0f, -24.0f, -12.0f, -6.0f, 0.0f, 6.0f };
+        g.setColour(theme.grid.withAlpha(0.35f));
+        for (float tick : tickDb)
+        {
+            const float y = mapDbToY(tick);
+            g.drawLine(meterBounds.getX() + 2.0f, y, meterBounds.getRight() - 2.0f, y, 1.0f);
+        }
         const float rmsY = mapDbToY(rmsDbValue);
         const float peakY = mapDbToY(peakDbValue);
         const auto fill = juce::Rectangle<float>(meterBounds.getX(), rmsY,
                                                  meterBounds.getWidth(),
                                                  meterBounds.getBottom() - rmsY);
-        g.setColour(theme.meterFill);
+        juce::ColourGradient fillGrad(theme.meterFill.brighter(0.2f), fill.getTopLeft(),
+                                      theme.meterFill.darker(0.25f), fill.getBottomLeft(), false);
+        g.setGradientFill(fillGrad);
         g.fillRoundedRectangle(fill, 3.0f);
 
         g.setColour(theme.meterPeak);
         g.drawLine(meterBounds.getX(), peakY, meterBounds.getRight(), peakY, 1.5f);
+
+        const float holdY = mapDbToY(holdDbValue);
+        g.setColour(theme.meterPeak.withAlpha(0.75f));
+        g.drawLine(meterBounds.getX(), holdY, meterBounds.getRight(), holdY, 1.0f);
 
         g.setColour(theme.textMuted);
         g.setFont(fontSize);
@@ -82,9 +102,13 @@ void MetersComponent::paint(juce::Graphics& g)
                 ? channelLabels[ch]
                 : ("Ch " + juce::String(ch + 1));
         const float x = meterArea.getX() + ch * (meterWidth + gap);
+        const float holdValue = peakHoldDb.size() > static_cast<size_t>(ch)
+            ? peakHoldDb[static_cast<size_t>(ch)]
+            : peakDb[static_cast<size_t>(ch)];
         drawMeter(x,
                   rmsDb[static_cast<size_t>(ch)],
                   peakDb[static_cast<size_t>(ch)],
+                  holdValue,
                   label);
     }
 
@@ -130,6 +154,7 @@ void MetersComponent::timerCallback()
     {
         rmsDb.assign(static_cast<size_t>(totalChannels), kMinDb);
         peakDb.assign(static_cast<size_t>(totalChannels), kMinDb);
+        peakHoldDb.assign(static_cast<size_t>(totalChannels), kMinDb);
     }
 
     for (int ch = 0; ch < totalChannels; ++ch)
@@ -137,6 +162,12 @@ void MetersComponent::timerCallback()
         const auto state = processorRef.getMeterState(ch);
         rmsDb[static_cast<size_t>(ch)] = state.rmsDb;
         peakDb[static_cast<size_t>(ch)] = state.peakDb;
+        const float currentPeak = peakDb[static_cast<size_t>(ch)];
+        float& hold = peakHoldDb[static_cast<size_t>(ch)];
+        if (currentPeak >= hold || hold <= kMinDb + 0.1f)
+            hold = currentPeak;
+        else
+            hold = juce::jmax(currentPeak, hold - 0.7f);
     }
 
     phaseValue = processorRef.getCorrelation();

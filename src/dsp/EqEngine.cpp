@@ -141,6 +141,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             params.attackMs = src.dynAttackMs;
             params.releaseMs = src.dynReleaseMs;
             params.autoScale = src.dynAuto;
+            params.useExternalDetector = src.dynExternal;
 
             eqDsp.updateBandParams(ch, band, params);
             if (ch == 0)

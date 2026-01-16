@@ -32,5 +32,6 @@ struct BandParams
     float attackMs = 20.0f;
     float releaseMs = 200.0f;
     bool autoScale = true;
+    bool useExternalDetector = false;
 };
 } // namespace eqdsp

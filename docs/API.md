@@ -25,6 +25,7 @@ Key fields (non‑exhaustive):
 - `outputTrimDb`, `characterMode`, `smartSolo`
 - `autoGainEnabled`, `gainScale`, `phaseInvert`
 - `bands[ch][band]` with freq/gain/Q/type/bypass/slope/mix/dynamic parameters
+- `bands[ch][band].dynExternal` for per‑band external sidechain detection
 - `msTargets[]` and `bandChannelMasks[]` for channel routing
 
 ### `eqdsp::EqEngine`

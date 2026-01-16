@@ -15,6 +15,7 @@ public:
     explicit BandControlsPanel(EQProAudioProcessor& processor);
 
     void setSelectedBand(int channelIndex, int bandIndex);
+    void setChannelNames(const std::vector<juce::String>& names);
     void setTheme(const ThemeColors& newTheme);
     void setMsEnabled(bool enabled);
     std::function<void(int)> onBandNavigate;
@@ -33,6 +34,9 @@ private:
     void mirrorToLinkedChannel(const juce::String& suffix, float value);
     bool isBandExisting(int bandIndex) const;
     int findNextExisting(int startIndex, int direction) const;
+    void updateMsChoices();
+    void syncMsSelectionFromParam();
+    int getMsParamValue() const;
 
     struct BandState
     {
@@ -51,6 +55,7 @@ private:
         float dynAttack = 20.0f;
         float dynRelease = 200.0f;
         float dynAuto = 1.0f;
+        float dynExternal = 0.0f;
     };
 
     EQProAudioProcessor& processor;
@@ -85,6 +90,7 @@ private:
     juce::ToggleButton dynEnableToggle;
     juce::TextButton dynUpButton;
     juce::TextButton dynDownButton;
+    juce::ToggleButton dynExternalToggle;
     juce::Label thresholdLabel;
     juce::Slider thresholdSlider;
     juce::Label attackLabel;
@@ -101,7 +107,6 @@ private:
     std::unique_ptr<SliderAttachment> freqAttachment;
     std::unique_ptr<SliderAttachment> gainAttachment;
     std::unique_ptr<SliderAttachment> qAttachment;
-    std::unique_ptr<ComboBoxAttachment> msAttachment;
     std::unique_ptr<SliderAttachment> mixAttachment;
     std::unique_ptr<ButtonAttachment> bypassAttachment;
     std::unique_ptr<ButtonAttachment> soloAttachment;
@@ -111,11 +116,14 @@ private:
     std::unique_ptr<SliderAttachment> dynAttackAttachment;
     std::unique_ptr<SliderAttachment> dynReleaseAttachment;
     std::unique_ptr<ButtonAttachment> dynAutoAttachment;
+    std::unique_ptr<ButtonAttachment> dynExternalAttachment;
 
     ThemeColors theme = makeDarkTheme();
     bool msEnabled = true;
     std::optional<BandState> clipboard;
     float detectorDb = -60.0f;
+    std::vector<juce::String> channelNames;
+    std::vector<int> msChoiceMap;
 
     void resetSelectedBand(bool shouldBypass);
 };

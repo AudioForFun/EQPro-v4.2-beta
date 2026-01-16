@@ -60,6 +60,11 @@ const juce::StringArray kMsChoices {
     "Bfl/Bfr"
 };
 
+bool containsName(const std::vector<juce::String>& names, const juce::String& target)
+{
+    return std::find(names.begin(), names.end(), target) != names.end();
+}
+
 } // namespace
 
 BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
@@ -67,6 +72,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
       parameters(processorIn.getParameters())
 {
     startTimerHz(30);
+    channelNames = processor.getCurrentChannelNames();
 
     titleLabel.setText("Band 1 / " + juce::String(ParamIDs::kBandsPerChannel), juce::dontSendNotification);
     titleLabel.setJustificationType(juce::Justification::centred);
@@ -188,7 +194,15 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     addAndMakeVisible(msBox);
     msBox.onChange = [this]
     {
-        mirrorToLinkedChannel("ms", static_cast<float>(msBox.getSelectedItemIndex()));
+        if (msChoiceMap.empty())
+            return;
+        const int uiIndex = msBox.getSelectedItemIndex();
+        if (uiIndex < 0 || uiIndex >= static_cast<int>(msChoiceMap.size()))
+            return;
+        const int paramIndex = msChoiceMap[static_cast<size_t>(uiIndex)];
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "ms")))
+            param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(paramIndex)));
+        mirrorToLinkedChannel("ms", static_cast<float>(paramIndex));
     };
 
     for (int i = 0; i < static_cast<int>(slopeButtons.size()); ++i)
@@ -244,6 +258,10 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     };
     addAndMakeVisible(dynUpButton);
     addAndMakeVisible(dynDownButton);
+
+    dynExternalToggle.setButtonText("Ext SC");
+    dynExternalToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
+    addAndMakeVisible(dynExternalToggle);
 
     thresholdSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     thresholdSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
@@ -315,6 +333,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     updateAttachments();
     updateFilterButtonsFromType(getCurrentTypeIndex());
     updateTypeUi();
+    updateMsChoices();
+    syncMsSelectionFromParam();
 }
 
 void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
@@ -338,6 +358,17 @@ void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
     releaseSlider.setColour(juce::Slider::trackColourId, bandColour);
     updateAttachments();
     updateTypeUi();
+    updateMsChoices();
+    syncMsSelectionFromParam();
+}
+
+void BandControlsPanel::setChannelNames(const std::vector<juce::String>& names)
+{
+    if (channelNames == names)
+        return;
+    channelNames = names;
+    updateMsChoices();
+    syncMsSelectionFromParam();
 }
 
 void BandControlsPanel::setTheme(const ThemeColors& newTheme)
@@ -381,6 +412,7 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     dynUpButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     dynDownButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     autoScaleToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
+    dynExternalToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     repaint();
 }
 
@@ -425,6 +457,7 @@ void BandControlsPanel::paint(juce::Graphics& g)
 void BandControlsPanel::timerCallback()
 {
     detectorDb = processor.getBandDetectorDb(selectedChannel, selectedBand);
+    syncMsSelectionFromParam();
     repaint(detectorMeterBounds.getSmallestIntegerContainer());
 }
 
@@ -513,7 +546,8 @@ void BandControlsPanel::resized()
     dynEnableToggle.setBounds(dynRow.removeFromLeft(90));
     dynUpButton.setBounds(dynRow.removeFromLeft(50));
     dynDownButton.setBounds(dynRow.removeFromLeft(60));
-    autoScaleToggle.setBounds(dynRow);
+    autoScaleToggle.setBounds(dynRow.removeFromLeft(90));
+    dynExternalToggle.setBounds(dynRow);
 
     right.removeFromTop(4);
     auto dynKnobs = right.removeFromTop(knobRowHeight);
@@ -570,7 +604,6 @@ void BandControlsPanel::updateAttachments()
     freqAttachment = std::make_unique<SliderAttachment>(parameters, freqId, freqSlider);
     gainAttachment = std::make_unique<SliderAttachment>(parameters, gainId, gainSlider);
     qAttachment = std::make_unique<SliderAttachment>(parameters, qId, qSlider);
-    msAttachment = std::make_unique<ComboBoxAttachment>(parameters, msId, msBox);
     mixAttachment = std::make_unique<SliderAttachment>(parameters, mixId, mixSlider);
     bypassAttachment = std::make_unique<ButtonAttachment>(parameters, bypassId, bypassButton);
     soloAttachment = std::make_unique<ButtonAttachment>(parameters, soloId, soloButton);
@@ -584,6 +617,8 @@ void BandControlsPanel::updateAttachments()
         parameters, ParamIDs::bandParamId(selectedChannel, selectedBand, "dynRelease"), releaseSlider);
     dynAutoAttachment = std::make_unique<ButtonAttachment>(
         parameters, ParamIDs::bandParamId(selectedChannel, selectedBand, "dynAuto"), autoScaleToggle);
+    dynExternalAttachment = std::make_unique<ButtonAttachment>(
+        parameters, ParamIDs::bandParamId(selectedChannel, selectedBand, "dynExternal"), dynExternalToggle);
 
     if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynMode")))
     {
@@ -624,6 +659,7 @@ void BandControlsPanel::resetSelectedBand(bool shouldBypass)
     resetParam("dynAttack");
     resetParam("dynRelease");
     resetParam("dynAuto");
+    resetParam("dynExternal");
 
     if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "bypass")))
         bypassParam->setValueNotifyingHost(shouldBypass ? 1.0f : 0.0f);
@@ -662,6 +698,108 @@ void BandControlsPanel::updateTypeUi()
     attackSlider.setVisible(true);
     releaseSlider.setVisible(true);
     autoScaleToggle.setVisible(true);
+    dynExternalToggle.setVisible(true);
+}
+
+int BandControlsPanel::getMsParamValue() const
+{
+    const auto msId = ParamIDs::bandParamId(selectedChannel, selectedBand, "ms");
+    if (auto* param = parameters.getParameter(msId))
+        return static_cast<int>(param->convertFrom0to1(param->getValue()));
+    return 0;
+}
+
+void BandControlsPanel::updateMsChoices()
+{
+    msChoiceMap.clear();
+    juce::StringArray labels;
+
+    const bool hasL = containsName(channelNames, "L");
+    const bool hasR = containsName(channelNames, "R");
+
+    auto addChoice = [&](int index)
+    {
+        msChoiceMap.push_back(index);
+        labels.add(kMsChoices[index]);
+    };
+
+    addChoice(0); // All
+    if (hasL && hasR)
+    {
+        addChoice(1); // Mid
+        addChoice(2); // Side
+        addChoice(3); // L/R
+        addChoice(4); // Left
+        addChoice(5); // Right
+        addChoice(6); // Mono
+        addChoice(7); // L
+        addChoice(8); // R
+    }
+
+    auto addIfPresent = [&](int index, const juce::String& name)
+    {
+        if (containsName(channelNames, name))
+            addChoice(index);
+    };
+
+    addIfPresent(9, "C");
+    addIfPresent(10, "LFE");
+    addIfPresent(11, "Ls");
+    addIfPresent(12, "Rs");
+    addIfPresent(13, "Lrs");
+    addIfPresent(14, "Rrs");
+    addIfPresent(15, "Lc");
+    addIfPresent(16, "Rc");
+    addIfPresent(17, "Ltf");
+    addIfPresent(18, "Rtf");
+    addIfPresent(19, "Tfc");
+    addIfPresent(20, "Tm");
+    addIfPresent(21, "Ltr");
+    addIfPresent(22, "Rtr");
+    addIfPresent(23, "Trc");
+    addIfPresent(24, "Lts");
+    addIfPresent(25, "Rts");
+    addIfPresent(26, "Lw");
+    addIfPresent(27, "Rw");
+    addIfPresent(28, "LFE2");
+    addIfPresent(29, "Bfl");
+    addIfPresent(30, "Bfr");
+    addIfPresent(31, "Bfc");
+
+    auto addPairIfPresent = [&](int index, const juce::String& left, const juce::String& right)
+    {
+        if (containsName(channelNames, left) && containsName(channelNames, right))
+            addChoice(index);
+    };
+
+    addPairIfPresent(32, "Ls", "Rs");
+    addPairIfPresent(33, "Lrs", "Rrs");
+    addPairIfPresent(34, "Lc", "Rc");
+    addPairIfPresent(35, "Ltf", "Rtf");
+    addPairIfPresent(36, "Ltr", "Rtr");
+    addPairIfPresent(37, "Lts", "Rts");
+    addPairIfPresent(38, "Lw", "Rw");
+    addPairIfPresent(39, "Bfl", "Bfr");
+
+    msBox.clear(juce::dontSendNotification);
+    msBox.addItemList(labels, 1);
+}
+
+void BandControlsPanel::syncMsSelectionFromParam()
+{
+    if (msChoiceMap.empty())
+        return;
+    const int paramValue = getMsParamValue();
+    auto it = std::find(msChoiceMap.begin(), msChoiceMap.end(), paramValue);
+    if (it == msChoiceMap.end())
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "ms")))
+            param->setValueNotifyingHost(param->convertTo0to1(0.0f));
+        msBox.setSelectedItemIndex(0, juce::dontSendNotification);
+        return;
+    }
+    const int uiIndex = static_cast<int>(std::distance(msChoiceMap.begin(), it));
+    msBox.setSelectedItemIndex(uiIndex, juce::dontSendNotification);
 }
 
 int BandControlsPanel::getCurrentTypeIndex() const
@@ -686,7 +824,7 @@ void BandControlsPanel::copyBandState()
     state.q = static_cast<float>(qSlider.getValue());
     state.type = static_cast<float>(getCurrentTypeIndex());
     state.bypass = bypassButton.getToggleState() ? 1.0f : 0.0f;
-    state.ms = static_cast<float>(msBox.getSelectedItemIndex());
+    state.ms = static_cast<float>(getMsParamValue());
     const auto slopeId = ParamIDs::bandParamId(selectedChannel, selectedBand, "slope");
     if (auto* param = parameters.getParameter(slopeId))
         state.slope = param->convertFrom0to1(param->getValue());
@@ -698,6 +836,7 @@ void BandControlsPanel::copyBandState()
     state.dynAttack = static_cast<float>(attackSlider.getValue());
     state.dynRelease = static_cast<float>(releaseSlider.getValue());
     state.dynAuto = autoScaleToggle.getToggleState() ? 1.0f : 0.0f;
+    state.dynExternal = dynExternalToggle.getToggleState() ? 1.0f : 0.0f;
     clipboard = state;
 }
 
@@ -728,6 +867,7 @@ void BandControlsPanel::pasteBandState()
     setParam("dynAttack", state.dynAttack);
     setParam("dynRelease", state.dynRelease);
     setParam("dynAuto", state.dynAuto);
+    setParam("dynExternal", state.dynExternal);
 }
 
 void BandControlsPanel::mirrorToLinkedChannel(const juce::String& suffix, float value)

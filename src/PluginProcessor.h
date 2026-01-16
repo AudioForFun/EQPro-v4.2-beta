@@ -101,6 +101,7 @@ private:
         std::atomic<float>* dynAttack = nullptr;
         std::atomic<float>* dynRelease = nullptr;
         std::atomic<float>* dynAuto = nullptr;
+        std::atomic<float>* dynExternal = nullptr;
     };
 
     void initializeParamPointers();

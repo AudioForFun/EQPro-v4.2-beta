@@ -326,6 +326,8 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         const float freq = getBandParameter(band, kParamFreqSuffix);
         const float gain = getBandParameter(band, kParamGainSuffix);
         const bool bypassed = getBandBypassed(band);
+        const float mix = getBandParameter(band, kParamMixSuffix) / 100.0f;
+        const bool isActive = ! bypassed && mix > 0.0005f;
 
         const float x = frequencyToX(freq);
         const float y = gainToY(gain);
@@ -406,11 +408,12 @@ void AnalyzerComponent::paint(juce::Graphics& g)
             }
         }
 
-        if (isSelected && ! bypassed)
+        if (isSelected || isActive)
         {
-            g.setColour(colour.withAlpha(0.9f));
-            g.setFont(12.0f * scale);
-            const float labelW = 20.0f * scale;
+            const float labelAlpha = bypassed ? 0.35f : (isSelected ? 0.95f : 0.6f);
+            g.setColour(colour.withAlpha(labelAlpha));
+            g.setFont((isSelected ? 12.0f : 11.0f) * scale);
+            const float labelW = 22.0f * scale;
             const float labelH = 14.0f * scale;
             juce::Rectangle<float> labelRect(point.x + radius + 2.0f * scale,
                                              point.y - 7.0f * scale,
@@ -805,6 +808,7 @@ void AnalyzerComponent::resetBandToDefaults(int bandIndex, bool shouldBypass)
     resetParam(kParamDynAttackSuffix);
     resetParam(kParamDynReleaseSuffix);
     resetParam(kParamDynAutoSuffix);
+        resetParam("dynExternal");
 
     if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, bandIndex, kParamBypassSuffix)))
         bypassParam->setValueNotifyingHost(shouldBypass ? 1.0f : 0.0f);

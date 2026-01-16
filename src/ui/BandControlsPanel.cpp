@@ -463,12 +463,12 @@ void BandControlsPanel::timerCallback()
 
 void BandControlsPanel::resized()
 {
-    auto bounds = getLocalBounds().reduced(10);
-    const int gap = 6;
+    auto bounds = getLocalBounds().reduced(12);
+    const int gap = 8;
     const int labelHeight = 16;
-    const int rowHeight = 22;
-    const int knobRowHeight = 120;
-    const int knobSize = 90;
+    const int rowHeight = 24;
+    const int knobRowHeight = 132;
+    const int knobSize = juce::jmin(96, knobRowHeight - labelHeight - 6);
 
     auto left = bounds.removeFromLeft(static_cast<int>(bounds.getWidth() * 0.70f));
     auto right = bounds;

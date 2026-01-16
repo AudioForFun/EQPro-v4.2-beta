@@ -9,10 +9,11 @@
 
 ## Performance Notes
 - Snapshot swaps are hashed and applied only when parameters change.
-- Linear-phase rebuilds are debounced to avoid repeated FIR regeneration during automation.
+- Linear-phase rebuilds are debounced and dispatched to a background job to avoid UI stalls.
 - Analyzer taps decimate at high sample rates / large buffers to reduce FIFO pressure.
 - Metering updates are decimated at very high sample rates to lower CPU.
 - Global mix and output trim use block ramps instead of per-sample smoothing loops.
+- External sidechain buffers drive dynamic detectors when present.
 
 ## DSP Pipeline (Milestone 1)
 - Per-channel processing pipeline with 12 fixed bands each.

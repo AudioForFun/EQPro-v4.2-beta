@@ -8,3 +8,4 @@
 - Read a stable `ParamSnapshot` once per block; no APVTS reads in the audio thread.
 - Prefer block ramps (e.g., `applyGainRamp`) over per-sample smoothing loops.
 - Decimate analyzer/meter updates at high sample rates to reduce CPU load.
+- Heavy FIR rebuilds should run off the audio thread (background job or message thread).

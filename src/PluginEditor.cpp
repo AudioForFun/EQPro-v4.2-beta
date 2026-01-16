@@ -27,6 +27,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
       correlation(p)
 {
     setLookAndFeel(&lookAndFeel);
+    setWantsKeyboardFocus(true);
     openGLContext.setContinuousRepainting(false);
     openGLContext.attachTo(*this);
     analyzer.setInteractive(false);
@@ -447,6 +448,10 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         processorRef.setPresetApplyTarget(applyTargetBox.getSelectedItemIndex());
     };
 
+    presetDeltaToggle.setButtonText("Delta");
+    presetDeltaToggle.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffcbd5e1));
+    addAndMakeVisible(presetDeltaToggle);
+
     presetLabel.setText("Preset", juce::dontSendNotification);
     presetLabel.setJustificationType(juce::Justification::centredLeft);
     presetLabel.setFont(kLabelFontSize);
@@ -487,13 +492,16 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
 
         auto applyPresetToChannel = [&](int ch)
         {
-            for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+            if (! presetDeltaToggle.getToggleState())
             {
-                setParam(ParamIDs::bandParamId(ch, band, "bypass"), 1.0f);
-                setParam(ParamIDs::bandParamId(ch, band, "gain"), 0.0f);
-                setParam(ParamIDs::bandParamId(ch, band, "q"), 0.707f);
-                setParam(ParamIDs::bandParamId(ch, band, "type"), 0.0f);
-                setParam(ParamIDs::bandParamId(ch, band, "ms"), 0.0f);
+                for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+                {
+                    setParam(ParamIDs::bandParamId(ch, band, "bypass"), 1.0f);
+                    setParam(ParamIDs::bandParamId(ch, band, "gain"), 0.0f);
+                    setParam(ParamIDs::bandParamId(ch, band, "q"), 0.707f);
+                    setParam(ParamIDs::bandParamId(ch, band, "type"), 0.0f);
+                    setParam(ParamIDs::bandParamId(ch, band, "ms"), 0.0f);
+                }
             }
 
             auto enableBand = [&](int band, float freq, float gain, float q, int type)
@@ -589,11 +597,11 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
                                  [this](const juce::FileChooser& chooser)
                                  {
                                      const auto file = chooser.getResult();
-                                     if (file != juce::File())
-                                     {
-                                         if (auto xml = juce::XmlDocument::parse(file))
-                                             processorRef.getParameters().replaceState(juce::ValueTree::fromXml(*xml));
-                                     }
+                                    if (file != juce::File())
+                                    {
+                                        if (auto xml = juce::XmlDocument::parse(file))
+                                            processorRef.replaceStateSafely(juce::ValueTree::fromXml(*xml));
+                                    }
                                      loadChooser.reset();
                                  });
     };
@@ -995,7 +1003,41 @@ void EQProAudioProcessorEditor::paint(juce::Graphics& g)
     g.setColour(theme.panelOutline);
     g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(6.0f), 6.0f, 1.0f);
 
+    if (debugVisible)
+    {
+        auto area = getLocalBounds().removeFromBottom(90).removeFromLeft(280).reduced(12);
+        g.setColour(theme.panel.withAlpha(0.9f));
+        g.fillRoundedRectangle(area.toFloat(), 6.0f);
+        g.setColour(theme.panelOutline);
+        g.drawRoundedRectangle(area.toFloat(), 6.0f, 1.0f);
+
+        const double sr = processorRef.getSampleRate();
+        const int latency = processorRef.getLatencySamples();
+        const auto phaseMode = processorRef.getParameters()
+                                   .getRawParameterValue(ParamIDs::phaseMode)
+                                   ->load();
+        const juce::String text = "Debug Panel\n"
+            "SR: " + juce::String(sr, 0) + " Hz\n"
+            "Latency: " + juce::String(latency) + " samples\n"
+            "Phase Mode: " + juce::String(static_cast<int>(phaseMode));
+        g.setColour(theme.text);
+        g.setFont(12.0f);
+        g.drawFittedText(text, area, juce::Justification::topLeft, 4);
+    }
+
     juce::ignoreUnused(kOuterMargin);
+}
+
+bool EQProAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress('d', juce::ModifierKeys::ctrlModifier, 0))
+    {
+        debugVisible = ! debugVisible;
+        processorRef.setDebugToneEnabled(debugVisible);
+        repaint();
+        return true;
+    }
+    return false;
 }
 
 void EQProAudioProcessorEditor::resized()
@@ -1077,6 +1119,7 @@ void EQProAudioProcessorEditor::resized()
     analyzerExternalToggle.setBounds({0, 0, 0, 0});
     smartSoloToggle.setBounds({0, 0, 0, 0});
     showSpectralToggle.setBounds({0, 0, 0, 0});
+    presetDeltaToggle.setBounds({0, 0, 0, 0});
 
     layoutLabel.setBounds({0, 0, 0, 0});
     layoutValueLabel.setBounds({0, 0, 0, 0});

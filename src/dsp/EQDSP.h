@@ -57,6 +57,7 @@ private:
     std::array<std::array<std::atomic<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
         detectorDb {};
     juce::AudioBuffer<float> msBuffer;
+    juce::AudioBuffer<float> detectorMsBuffer;
     bool globalBypass = false;
     bool smartSoloEnabled = false;
     int qMode = 0;

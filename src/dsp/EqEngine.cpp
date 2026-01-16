@@ -8,6 +8,7 @@ namespace eqdsp
 void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
 {
     sampleRateHz = sampleRate;
+    debugPhaseDelta = 2.0 * juce::MathConstants<double>::pi * 1000.0 / sampleRateHz;
     eqDsp.prepare(sampleRate, maxBlockSize, numChannels);
     eqDsp.reset();
     linearPhaseEq.prepare(sampleRate, maxBlockSize, numChannels);
@@ -51,6 +52,19 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                        MeterTap& meterTap)
 {
     const int numChannels = juce::jmin(buffer.getNumChannels(), snapshot.numChannels);
+    if (debugToneEnabled.load())
+    {
+        const int samples = buffer.getNumSamples();
+        for (int i = 0; i < samples; ++i)
+        {
+            const float tone = 0.25f * std::sin(debugPhase);
+            debugPhase += debugPhaseDelta;
+            if (debugPhase >= 2.0 * juce::MathConstants<double>::pi)
+                debugPhase -= 2.0 * juce::MathConstants<double>::pi;
+            for (int ch = 0; ch < numChannels; ++ch)
+                buffer.getWritePointer(ch)[i] = tone;
+        }
+    }
     eqDsp.setGlobalBypass(snapshot.globalBypass);
     eqDsp.setSmartSoloEnabled(snapshot.smartSolo);
     eqDsp.setQMode(snapshot.qMode);
@@ -356,6 +370,17 @@ void EqEngine::setOversampling(int index)
     oversamplingIndex = index;
 }
 
+void EqEngine::setDebugToneEnabled(bool enabled)
+{
+    debugToneEnabled.store(enabled);
+}
+
+void EqEngine::setDebugToneFrequency(float frequencyHz)
+{
+    const double freq = juce::jmax(10.0, static_cast<double>(frequencyHz));
+    debugPhaseDelta = 2.0 * juce::MathConstants<double>::pi * freq / sampleRateHz;
+}
+
 int EqEngine::getLatencySamples() const
 {
     return linearPhaseEq.getLatencySamples();
@@ -473,9 +498,12 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, doubl
     if (static_cast<int>(firImpulse.size()) != taps)
         firImpulse.assign(static_cast<size_t>(taps), 0.0f);
 
-    const auto method = snapshot.linearWindow == 1
+    int windowIndex = snapshot.linearWindow;
+    if (windowIndex == 0)
+        windowIndex = snapshot.linearQuality >= 3 ? 1 : 0;
+    const auto method = windowIndex == 1
         ? juce::dsp::WindowingFunction<float>::blackman
-        : (snapshot.linearWindow == 2 ? juce::dsp::WindowingFunction<float>::kaiser
+        : (windowIndex == 2 ? juce::dsp::WindowingFunction<float>::kaiser
                                        : juce::dsp::WindowingFunction<float>::hann);
 
     if (firWindow == nullptr || static_cast<int>(firImpulse.size()) != taps

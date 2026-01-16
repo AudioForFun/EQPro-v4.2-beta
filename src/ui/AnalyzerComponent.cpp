@@ -59,6 +59,7 @@ AnalyzerComponent::AnalyzerComponent(EQProAudioProcessor& processor)
     postMagnitudes.fill(kAnalyzerMinDb);
     externalMagnitudes.fill(kAnalyzerMinDb);
     selectedBands.push_back(selectedBand);
+    lastTimerHz = 30;
     startTimerHz(30);
 }
 
@@ -822,7 +823,18 @@ void AnalyzerComponent::timerCallback()
     if (speedIndex != analyzerSpeedIndex)
     {
         analyzerSpeedIndex = speedIndex;
-        const int hz = (speedIndex == 0 ? 15 : (speedIndex == 1 ? 30 : 60));
+    }
+
+    const float sr = static_cast<float>(processorRef.getSampleRate());
+    const float effectiveSr = sr > 0.0f ? sr : lastSampleRate;
+    int hz = (analyzerSpeedIndex == 0 ? 15 : (analyzerSpeedIndex == 1 ? 30 : 60));
+    if (effectiveSr >= 192000.0f)
+        hz = juce::jmax(10, hz / 2);
+    if (effectiveSr >= 384000.0f)
+        hz = juce::jmax(10, hz / 3);
+    if (hz != lastTimerHz)
+    {
+        lastTimerHz = hz;
         startTimerHz(hz);
     }
 

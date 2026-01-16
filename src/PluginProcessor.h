@@ -73,6 +73,8 @@ public:
     juce::String getFavoritePresets() const;
     void copyStateToClipboard();
     void pasteStateFromClipboard();
+    bool replaceStateSafely(const juce::ValueTree& newState);
+    void setDebugToneEnabled(bool enabled);
     void setSelectedBandIndex(int index);
     void setSelectedChannelIndex(int index);
     int getSelectedBandIndex() const;
@@ -171,6 +173,9 @@ private:
     int lastLinearPhaseMode = 0;
     int lastLinearQuality = 0;
     int lastLinearWindow = 0;
+    juce::ThreadPool linearPhasePool { 1 };
+    std::atomic<bool> linearJobRunning { false };
+    std::atomic<int> pendingLatencySamples { -1 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EQProAudioProcessor)
 };

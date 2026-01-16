@@ -12,8 +12,9 @@ struct SlopeConfig
 
 SlopeConfig slopeFromDb(float slopeDb)
 {
+    constexpr int kMaxSlopeStages = 8;
     const float clamped = juce::jlimit(6.0f, 96.0f, slopeDb);
-    const int stages = static_cast<int>(std::floor(clamped / 12.0f));
+    const int stages = juce::jmin(kMaxSlopeStages, static_cast<int>(std::floor(clamped / 12.0f)));
     const float remainder = clamped - static_cast<float>(stages) * 12.0f;
     const bool useOnePole = (remainder >= 6.0f) || stages == 0;
     return { juce::jmax(0, stages), useOnePole };
@@ -61,6 +62,8 @@ void EQDSP::prepare(double sampleRate, int maxBlockSize, int channels)
 
     msBuffer.setSize(2, maxBlockSize);
     msBuffer.clear();
+    detectorMsBuffer.setSize(2, maxBlockSize);
+    detectorMsBuffer.clear();
     scratchBuffer.setSize(numChannels, maxBlockSize);
     scratchBuffer.clear();
 
@@ -281,10 +284,29 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
         auto* left = buffer.getWritePointer(0);
         auto* right = buffer.getWritePointer(1);
 
-        for (int i = 0; i < samples; ++i)
+        juce::FloatVectorOperations::copy(mid, left, samples);
+        juce::FloatVectorOperations::add(mid, right, samples);
+        juce::FloatVectorOperations::multiply(mid, 0.5f, samples);
+        juce::FloatVectorOperations::copy(side, left, samples);
+        juce::FloatVectorOperations::subtract(side, right, samples);
+        juce::FloatVectorOperations::multiply(side, 0.5f, samples);
+
+        const bool useExternalDetector = detectorBuffer != nullptr
+            && detectorBuffer->getNumSamples() == samples
+            && detectorBuffer->getNumChannels() > 0;
+        if (useExternalDetector)
         {
-            mid[i] = 0.5f * (left[i] + right[i]);
-            side[i] = 0.5f * (left[i] - right[i]);
+            auto* detMid = detectorMsBuffer.getWritePointer(0);
+            auto* detSide = detectorMsBuffer.getWritePointer(1);
+            const auto* detLeft = detectorBuffer->getReadPointer(0);
+            const auto* detRight = detectorBuffer->getReadPointer(
+                juce::jmin(1, detectorBuffer->getNumChannels() - 1));
+            juce::FloatVectorOperations::copy(detMid, detLeft, samples);
+            juce::FloatVectorOperations::add(detMid, detRight, samples);
+            juce::FloatVectorOperations::multiply(detMid, 0.5f, samples);
+            juce::FloatVectorOperations::copy(detSide, detLeft, samples);
+            juce::FloatVectorOperations::subtract(detSide, detRight, samples);
+            juce::FloatVectorOperations::multiply(detSide, 0.5f, samples);
         }
 
         for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
@@ -366,7 +388,13 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     float m = dryM;
                     float s = dryS;
 
-                    const float detInput = (target == 2) ? dryS : dryM;
+                    const float detM = useExternalDetector
+                        ? detectorMsBuffer.getReadPointer(0)[i]
+                        : dryM;
+                    const float detS = useExternalDetector
+                        ? detectorMsBuffer.getReadPointer(1)[i]
+                        : dryS;
+                    const float detInput = (target == 2) ? detS : detM;
                     const float detSample = (target == 2)
                         ? detectorFilters[1][band].processSample(detInput)
                         : detectorFilters[0][band].processSample(detInput);
@@ -422,7 +450,10 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 {
                     const float dryM = mid[i];
                     float m = dryM;
-                    const float detSample = detectorFilters[0][band].processSample(dryM);
+                    const float detInput = useExternalDetector
+                        ? detectorMsBuffer.getReadPointer(0)[i]
+                        : dryM;
+                    const float detSample = detectorFilters[0][band].processSample(detInput);
                     float& env = detectorEnv[0][band];
                     const float absVal = std::abs(detSample);
                     const float coeff = absVal > env ? attackCoeff : releaseCoeff;
@@ -463,7 +494,10 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 {
                     const float dryS = side[i];
                     float s = dryS;
-                    const float detSample = detectorFilters[1][band].processSample(dryS);
+                    const float detInput = useExternalDetector
+                        ? detectorMsBuffer.getReadPointer(1)[i]
+                        : dryS;
+                    const float detSample = detectorFilters[1][band].processSample(detInput);
                     float& env = detectorEnv[1][band];
                     const float absVal = std::abs(detSample);
                     const float coeff = absVal > env ? attackCoeff : releaseCoeff;
@@ -492,11 +526,10 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             }
         }
 
-        for (int i = 0; i < samples; ++i)
-        {
-            left[i] = mid[i] + side[i];
-            right[i] = mid[i] - side[i];
-        }
+        juce::FloatVectorOperations::copy(left, mid, samples);
+        juce::FloatVectorOperations::add(left, side, samples);
+        juce::FloatVectorOperations::copy(right, mid, samples);
+        juce::FloatVectorOperations::subtract(right, side, samples);
     }
 
     for (int ch = 0; ch < numChannels; ++ch)
@@ -567,12 +600,21 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     onePoles[ch][band].setHighPass(params.frequencyHz);
             }
 
+            const float* detData = nullptr;
+            if (detectorBuffer != nullptr && detectorBuffer->getNumSamples() == samples)
+            {
+                const int detChannel = juce::jmin(ch, detectorBuffer->getNumChannels() - 1);
+                if (detChannel >= 0)
+                    detData = detectorBuffer->getReadPointer(detChannel);
+            }
+
             for (int i = 0; i < samples; ++i)
             {
                 const float dry = channelData[i];
                 float sample = dry;
 
-                const float detSample = detectorFilters[ch][band].processSample(dry);
+                const float detInput = detData != nullptr ? detData[i] : dry;
+                const float detSample = detectorFilters[ch][band].processSample(detInput);
                 float& env = detectorEnv[ch][band];
                 const float absVal = std::abs(detSample);
                 const float coeff = absVal > env ? attackCoeff : releaseCoeff;

@@ -25,6 +25,8 @@ public:
 
     void setOversampling(int index);
     int getLatencySamples() const;
+    void setDebugToneEnabled(bool enabled);
+    void setDebugToneFrequency(float frequencyHz);
 
     EQDSP& getEqDsp();
     const EQDSP& getEqDsp() const;
@@ -51,6 +53,9 @@ private:
     double sampleRateHz = 48000.0;
     int meterSkipFactor = 1;
     int meterSkipCounter = 0;
+    std::atomic<bool> debugToneEnabled { false };
+    double debugPhase = 0.0;
+    double debugPhaseDelta = 0.0;
     int lastPhaseMode = 0;
     int lastLinearQuality = 0;
     int lastTaps = 0;

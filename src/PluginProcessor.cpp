@@ -105,6 +105,37 @@ const juce::StringArray kOversamplingChoices {
     "2x",
     "4x"
 };
+
+struct LinearPhaseJob final : public juce::ThreadPoolJob
+{
+    LinearPhaseJob(eqdsp::EqEngine& engineIn,
+                   eqdsp::ParamSnapshot snapshotIn,
+                   double sampleRateIn,
+                   std::atomic<int>& pendingLatencyIn,
+                   std::atomic<bool>& runningIn)
+        : juce::ThreadPoolJob("LinearPhaseJob"),
+          engine(engineIn),
+          snapshot(std::move(snapshotIn)),
+          sampleRate(sampleRateIn),
+          pendingLatency(pendingLatencyIn),
+          running(runningIn)
+    {
+    }
+
+    JobStatus runJob() override
+    {
+        engine.updateLinearPhase(snapshot, sampleRate);
+        pendingLatency.store(engine.getLatencySamples());
+        running.store(false);
+        return jobHasFinished;
+    }
+
+    eqdsp::EqEngine& engine;
+    eqdsp::ParamSnapshot snapshot;
+    double sampleRate = 48000.0;
+    std::atomic<int>& pendingLatency;
+    std::atomic<bool>& running;
+};
 } // namespace
 
 juce::String EQProAudioProcessor::sharedStateClipboard;
@@ -123,6 +154,7 @@ EQProAudioProcessor::EQProAudioProcessor()
 EQProAudioProcessor::~EQProAudioProcessor()
 {
     stopTimer();
+    linearPhasePool.removeAllJobs(true, 2000);
 }
 
 void EQProAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -310,7 +342,7 @@ void EQProAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
     if (xml != nullptr && xml->hasTagName(parameters.state.getType()))
-        parameters.replaceState(juce::ValueTree::fromXml(*xml));
+        replaceStateSafely(juce::ValueTree::fromXml(*xml));
 
     showPhasePreference = parameters.state.getProperty("showPhase", true);
     presetSelection = static_cast<int>(parameters.state.getProperty("presetSelection", 0));
@@ -561,7 +593,27 @@ void EQProAudioProcessor::copyStateToClipboard()
 void EQProAudioProcessor::pasteStateFromClipboard()
 {
     if (sharedStateClipboard.isNotEmpty())
-        parameters.replaceState(juce::ValueTree::fromXml(sharedStateClipboard));
+        replaceStateSafely(juce::ValueTree::fromXml(sharedStateClipboard));
+}
+
+bool EQProAudioProcessor::replaceStateSafely(const juce::ValueTree& newState)
+{
+    if (! newState.isValid())
+        return false;
+    if (newState.getType() != parameters.state.getType())
+        return false;
+    if (newState.getNumChildren() == 0)
+        return false;
+
+    parameters.replaceState(newState);
+    selectedBandIndex.store(juce::jlimit(0, ParamIDs::kBandsPerChannel - 1, selectedBandIndex.load()));
+    selectedChannelIndex.store(juce::jlimit(0, ParamIDs::kMaxChannels - 1, selectedChannelIndex.load()));
+    return true;
+}
+
+void EQProAudioProcessor::setDebugToneEnabled(bool enabled)
+{
+    eqEngine.setDebugToneEnabled(enabled);
 }
 
 void EQProAudioProcessor::setSelectedBandIndex(int index)
@@ -867,6 +919,12 @@ void EQProAudioProcessor::timerCallback()
     ++snapshotTick;
 
     const auto sampleRate = getSampleRate();
+    if (pendingLatencySamples.load() >= 0)
+    {
+        setLatencySamples(pendingLatencySamples.load());
+        pendingLatencySamples.store(-1);
+    }
+
     if (sampleRate > 0.0 && hash != lastSnapshotHash)
     {
         const auto& snapshot = snapshots[nextIndex];
@@ -876,10 +934,12 @@ void EQProAudioProcessor::timerCallback()
         const bool allowRebuild = phaseConfigChanged
             || (snapshotTick - lastLinearRebuildTick) >= 2;
 
-        if (allowRebuild)
+        if (allowRebuild && ! linearJobRunning.load())
         {
-            eqEngine.updateLinearPhase(snapshot, sampleRate);
-            setLatencySamples(eqEngine.getLatencySamples());
+            linearJobRunning.store(true);
+            linearPhasePool.addJob(new LinearPhaseJob(eqEngine, snapshot, sampleRate,
+                                                      pendingLatencySamples, linearJobRunning),
+                                   true);
             lastLinearRebuildTick = snapshotTick;
             lastLinearPhaseMode = snapshot.phaseMode;
             lastLinearQuality = snapshot.linearQuality;

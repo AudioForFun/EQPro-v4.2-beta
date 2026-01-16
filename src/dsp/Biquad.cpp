@@ -1,4 +1,5 @@
 #include "Biquad.h"
+#include <algorithm>
 
 namespace eqdsp
 {
@@ -69,7 +70,8 @@ void Biquad::setCoefficients(const BandParams& params)
         case FilterType::lowShelf:
         {
             const double sqrtA = std::sqrt(a);
-            const double beta = std::sqrt(a) / q;
+            const double shelfQ = std::clamp(q / sqrtA, 0.1, 18.0);
+            const double beta = sqrtA / shelfQ;
             b0d = a * ((a + 1.0) - (a - 1.0) * cosW + beta * sinW);
             b1d = 2.0 * a * ((a - 1.0) - (a + 1.0) * cosW);
             b2d = a * ((a + 1.0) - (a - 1.0) * cosW - beta * sinW);
@@ -81,7 +83,8 @@ void Biquad::setCoefficients(const BandParams& params)
         case FilterType::highShelf:
         {
             const double sqrtA = std::sqrt(a);
-            const double beta = std::sqrt(a) / q;
+            const double shelfQ = std::clamp(q / sqrtA, 0.1, 18.0);
+            const double beta = sqrtA / shelfQ;
             b0d = a * ((a + 1.0) + (a - 1.0) * cosW + beta * sinW);
             b1d = -2.0 * a * ((a - 1.0) + (a + 1.0) * cosW);
             b2d = a * ((a + 1.0) + (a - 1.0) * cosW - beta * sinW);
@@ -137,7 +140,9 @@ void Biquad::setCoefficients(const BandParams& params)
         case FilterType::tilt:
         {
             const double aTilt = std::pow(10.0, (params.gainDb * 0.5) / 40.0);
-            const double beta = std::sqrt(aTilt) / q;
+            const double sqrtA = std::sqrt(aTilt);
+            const double shelfQ = std::clamp(q / sqrtA, 0.1, 18.0);
+            const double beta = sqrtA / shelfQ;
             b0d = aTilt * ((aTilt + 1.0) - (aTilt - 1.0) * cosW + beta * sinW);
             b1d = 2.0 * aTilt * ((aTilt - 1.0) - (aTilt + 1.0) * cosW);
             b2d = aTilt * ((aTilt + 1.0) - (aTilt - 1.0) * cosW - beta * sinW);

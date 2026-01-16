@@ -126,6 +126,7 @@ private:
     float minDb = -60.0f;
     float maxDb = 60.0f;
     int analyzerSpeedIndex = -1;
+    int lastTimerHz = 0;
     uint64_t lastCurveHash = 0;
     int lastCurveBand = -1;
     int lastCurveChannel = -1;

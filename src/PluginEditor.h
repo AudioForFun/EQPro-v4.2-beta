@@ -19,6 +19,7 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    bool keyPressed(const juce::KeyPress& key) override;
 
 private:
     EQProAudioProcessor& processorRef;
@@ -74,6 +75,7 @@ private:
     EQProLookAndFeel lookAndFeel;
     juce::Label applyLabel;
     juce::ComboBox applyTargetBox;
+    juce::ToggleButton presetDeltaToggle;
     juce::Label presetLabel;
     juce::ComboBox presetBox;
     juce::TextButton savePresetButton;
@@ -112,6 +114,8 @@ private:
     juce::ResizableCornerComponent resizer { this, &resizeConstrainer };
     juce::ComponentBoundsConstrainer resizeConstrainer;
     juce::OpenGLContext openGLContext;
+
+    bool debugVisible = false;
 
     int selectedBand = 0;
     int selectedChannel = 0;

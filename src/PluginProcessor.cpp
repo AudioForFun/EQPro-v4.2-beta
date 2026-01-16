@@ -16,14 +16,6 @@ constexpr const char* kParamBypassSuffix = "bypass";
 constexpr const char* kParamMsSuffix = "ms";
 constexpr const char* kParamSlopeSuffix = "slope";
 constexpr const char* kParamSoloSuffix = "solo";
-constexpr const char* kParamDynEnabledSuffix = "dynEnable";
-constexpr const char* kParamDynModeSuffix = "dynMode";
-constexpr const char* kParamDynThresholdSuffix = "dynThresh";
-constexpr const char* kParamDynAttackSuffix = "dynAttack";
-constexpr const char* kParamDynReleaseSuffix = "dynRelease";
-constexpr const char* kParamDynMixSuffix = "dynMix";
-constexpr const char* kParamDynSourceSuffix = "dynSource";
-constexpr const char* kParamDynFilterSuffix = "dynFilter";
 
 const juce::StringArray kFilterTypeChoices {
     "Bell",
@@ -46,15 +38,6 @@ const juce::StringArray kMsChoices {
     "Right"
 };
 
-const juce::StringArray kDynamicModeChoices {
-    "Down",
-    "Up"
-};
-
-const juce::StringArray kDynamicSourceChoices {
-    "Internal",
-    "External"
-};
 
 const juce::StringArray kPhaseModeChoices {
     "Real-time",
@@ -105,7 +88,6 @@ void EQProAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     eqDsp.prepare(sampleRate, samplesPerBlock, getTotalNumInputChannels());
     eqDsp.reset();
-    ellipticDsp.prepare(sampleRate);
     meteringDsp.prepare(sampleRate);
     spectralDsp.prepare(sampleRate, samplesPerBlock, getTotalNumInputChannels());
     spectralDsp.reset();
@@ -242,14 +224,6 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             params.slopeDb = ptrs.slope != nullptr ? ptrs.slope->load() : 12.0f;
             params.bypassed = ptrs.bypass->load() > 0.5f;
             params.solo = ptrs.solo != nullptr && ptrs.solo->load() > 0.5f;
-            params.dynamicEnabled = ptrs.dynEnabled != nullptr && ptrs.dynEnabled->load() > 0.5f;
-            params.dynamicMode = ptrs.dynMode != nullptr ? static_cast<int>(ptrs.dynMode->load()) : 0;
-            params.thresholdDb = ptrs.dynThreshold != nullptr ? ptrs.dynThreshold->load() : -24.0f;
-            params.attackMs = ptrs.dynAttack != nullptr ? ptrs.dynAttack->load() : 20.0f;
-            params.releaseMs = ptrs.dynRelease != nullptr ? ptrs.dynRelease->load() : 200.0f;
-            params.dynamicMix = ptrs.dynMix != nullptr ? (ptrs.dynMix->load() / 100.0f) : 1.0f;
-            params.dynamicSource = ptrs.dynSource != nullptr ? static_cast<int>(ptrs.dynSource->load()) : 0;
-            params.dynamicFilter = ptrs.dynFilter != nullptr ? (ptrs.dynFilter->load() > 0.5f) : true;
 
             eqDsp.updateBandParams(ch, band, params);
 
@@ -282,19 +256,6 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         eqDspOversampled.setMsTargets(msTargets);
         eqDspOversampled.process(oversampledBuffer, nullptr);
 
-        const bool ellipticEnabled = ellipticBypassParam != nullptr
-            && ellipticBypassParam->load() < 0.5f;
-        if (ellipticEnabled)
-        {
-            const float cutoff = ellipticFreqParam != nullptr ? ellipticFreqParam->load() : 120.0f;
-            const float amount = ellipticAmountParam != nullptr ? ellipticAmountParam->load() : 1.0f;
-            ellipticDspOversampled.setParams(true, cutoff, amount);
-            ellipticDspOversampled.process(oversampledBuffer);
-        }
-        else
-        {
-            ellipticDspOversampled.setParams(false, 120.0f, 1.0f);
-        }
 
         const int characterMode = characterModeParam != nullptr
             ? static_cast<int>(characterModeParam->load())
@@ -364,19 +325,6 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         }
     }
 
-    const bool ellipticEnabled = ellipticBypassParam != nullptr
-        && ellipticBypassParam->load() < 0.5f;
-    if (! useOversampling && ellipticEnabled)
-    {
-        const float cutoff = ellipticFreqParam != nullptr ? ellipticFreqParam->load() : 120.0f;
-        const float amount = ellipticAmountParam != nullptr ? ellipticAmountParam->load() : 1.0f;
-        ellipticDsp.setParams(true, cutoff, amount);
-        ellipticDsp.process(buffer);
-    }
-    else if (! useOversampling)
-    {
-        ellipticDsp.setParams(false, 120.0f, 1.0f);
-    }
 
     const bool spectralEnabled = spectralEnableParam != nullptr
         && spectralEnableParam->load() > 0.5f;
@@ -627,14 +575,6 @@ float EQProAudioProcessor::getCorrelation() const
     return meteringDsp.getCorrelation();
 }
 
-float EQProAudioProcessor::getDynamicGainDb(int channelIndex, int bandIndex) const
-{
-    const int mode = phaseModeParam != nullptr ? static_cast<int>(phaseModeParam->load()) : 0;
-    if (mode != 0)
-        return 0.0f;
-    return eqDsp.getDynamicGainDb(channelIndex, bandIndex);
-}
-
 juce::StringArray EQProAudioProcessor::getCorrelationPairNames()
 {
     const int channelCount = juce::jlimit(0, ParamIDs::kMaxChannels, getTotalNumInputChannels());
@@ -842,9 +782,6 @@ int EQProAudioProcessor::getSelectedChannelIndex() const
 void EQProAudioProcessor::initializeParamPointers()
 {
     globalBypassParam = parameters.getRawParameterValue(ParamIDs::globalBypass);
-    ellipticBypassParam = parameters.getRawParameterValue(ParamIDs::ellipticBypass);
-    ellipticFreqParam = parameters.getRawParameterValue(ParamIDs::ellipticFreq);
-    ellipticAmountParam = parameters.getRawParameterValue(ParamIDs::ellipticAmount);
     phaseModeParam = parameters.getRawParameterValue(ParamIDs::phaseMode);
     linearQualityParam = parameters.getRawParameterValue(ParamIDs::linearQuality);
     linearWindowParam = parameters.getRawParameterValue(ParamIDs::linearWindow);
@@ -887,22 +824,6 @@ void EQProAudioProcessor::initializeParamPointers()
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamSlopeSuffix));
             bandParamPointers[ch][band].solo =
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamSoloSuffix));
-            bandParamPointers[ch][band].dynEnabled =
-                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynEnabledSuffix));
-            bandParamPointers[ch][band].dynMode =
-                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynModeSuffix));
-            bandParamPointers[ch][band].dynThreshold =
-                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynThresholdSuffix));
-            bandParamPointers[ch][band].dynAttack =
-                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynAttackSuffix));
-            bandParamPointers[ch][band].dynRelease =
-                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynReleaseSuffix));
-            bandParamPointers[ch][band].dynMix =
-                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynMixSuffix));
-            bandParamPointers[ch][band].dynSource =
-                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynSourceSuffix));
-            bandParamPointers[ch][band].dynFilter =
-                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynFilterSuffix));
         }
     }
 }
@@ -914,16 +835,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         ParamIDs::globalBypass, "Global Bypass", false));
-    params.push_back(std::make_unique<juce::AudioParameterBool>(
-        ParamIDs::ellipticBypass, "Elliptic Bypass", true));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        ParamIDs::ellipticFreq, "Elliptic Freq",
-        juce::NormalisableRange<float>(20.0f, 500.0f, 0.01f, 0.5f),
-        120.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        ParamIDs::ellipticAmount, "Elliptic Amount",
-        juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f),
-        1.0f));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         ParamIDs::phaseMode, "Phase Mode",
         kPhaseModeChoices, 0));
@@ -1017,10 +928,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
     const juce::NormalisableRange<float> freqRange(20.0f, 192000.0f, 0.01f, 0.5f);
     const juce::NormalisableRange<float> gainRange(-24.0f, 24.0f, 0.01f);
     const juce::NormalisableRange<float> qRange(0.1f, 18.0f, 0.01f, 0.5f);
-    const juce::NormalisableRange<float> thresholdRange(-60.0f, 0.0f, 0.1f);
-    const juce::NormalisableRange<float> attackRange(1.0f, 200.0f, 0.1f);
-    const juce::NormalisableRange<float> releaseRange(5.0f, 1000.0f, 0.1f);
-    const juce::NormalisableRange<float> mixRange(0.0f, 100.0f, 0.01f);
 
     for (int ch = 0; ch < ParamIDs::kMaxChannels; ++ch)
     {
@@ -1053,7 +960,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
             params.push_back(std::make_unique<juce::AudioParameterBool>(
                 ParamIDs::bandParamId(ch, band, kParamBypassSuffix),
                 ParamIDs::bandParamName(ch, band, "Bypass"),
-                band != 0));
+                true));
 
             params.push_back(std::make_unique<juce::AudioParameterChoice>(
                 ParamIDs::bandParamId(ch, band, kParamMsSuffix),
@@ -1072,51 +979,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
                 ParamIDs::bandParamName(ch, band, "Solo"),
                 false));
 
-            params.push_back(std::make_unique<juce::AudioParameterBool>(
-                ParamIDs::bandParamId(ch, band, kParamDynEnabledSuffix),
-                ParamIDs::bandParamName(ch, band, "Dyn Enable"),
-                false));
-
-            params.push_back(std::make_unique<juce::AudioParameterChoice>(
-                ParamIDs::bandParamId(ch, band, kParamDynModeSuffix),
-                ParamIDs::bandParamName(ch, band, "Dyn Mode"),
-                kDynamicModeChoices,
-                0));
-
-            params.push_back(std::make_unique<juce::AudioParameterFloat>(
-                ParamIDs::bandParamId(ch, band, kParamDynThresholdSuffix),
-                ParamIDs::bandParamName(ch, band, "Dyn Threshold"),
-                thresholdRange,
-                -24.0f));
-
-            params.push_back(std::make_unique<juce::AudioParameterFloat>(
-                ParamIDs::bandParamId(ch, band, kParamDynAttackSuffix),
-                ParamIDs::bandParamName(ch, band, "Dyn Attack"),
-                attackRange,
-                20.0f));
-
-            params.push_back(std::make_unique<juce::AudioParameterFloat>(
-                ParamIDs::bandParamId(ch, band, kParamDynReleaseSuffix),
-                ParamIDs::bandParamName(ch, band, "Dyn Release"),
-                releaseRange,
-                200.0f));
-
-            params.push_back(std::make_unique<juce::AudioParameterFloat>(
-                ParamIDs::bandParamId(ch, band, kParamDynMixSuffix),
-                ParamIDs::bandParamName(ch, band, "Dyn Mix"),
-                mixRange,
-                1.0f));
-
-            params.push_back(std::make_unique<juce::AudioParameterChoice>(
-                ParamIDs::bandParamId(ch, band, kParamDynSourceSuffix),
-                ParamIDs::bandParamName(ch, band, "Dyn Source"),
-                kDynamicSourceChoices,
-                0));
-
-            params.push_back(std::make_unique<juce::AudioParameterBool>(
-                ParamIDs::bandParamId(ch, band, kParamDynFilterSuffix),
-                ParamIDs::bandParamName(ch, band, "Dyn Filter"),
-                true));
         }
     }
 
@@ -1547,5 +1409,4 @@ void EQProAudioProcessor::updateOversampling()
 
     eqDspOversampled.prepare(lastSampleRate * upFactor, lastMaxBlockSize * upFactor, channels);
     eqDspOversampled.reset();
-    ellipticDspOversampled.prepare(lastSampleRate * upFactor);
 }

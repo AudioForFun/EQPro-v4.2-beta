@@ -25,13 +25,5 @@ struct BandParams
     float slopeDb = 12.0f;
     bool bypassed = false;
     bool solo = false;
-    bool dynamicEnabled = false;
-    int dynamicMode = 0;
-    float thresholdDb = -24.0f;
-    float attackMs = 20.0f;
-    float releaseMs = 200.0f;
-    float dynamicMix = 1.0f;
-    int dynamicSource = 0;
-    bool dynamicFilter = true;
 };
 } // namespace eqdsp

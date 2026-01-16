@@ -7,8 +7,7 @@
 
 class EQProAudioProcessor;
 
-class BandControlsPanel final : public juce::Component,
-                               private juce::Timer
+class BandControlsPanel final : public juce::Component
 {
 public:
     explicit BandControlsPanel(EQProAudioProcessor& processor);
@@ -16,6 +15,7 @@ public:
     void setSelectedBand(int channelIndex, int bandIndex);
     void setTheme(const ThemeColors& newTheme);
     void setMsEnabled(bool enabled);
+    std::function<void(int)> onBandNavigate;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -26,7 +26,6 @@ private:
     void copyBandState();
     void pasteBandState();
     void mirrorToLinkedChannel(const juce::String& suffix, float value);
-    void timerCallback() override;
 
     struct BandState
     {
@@ -38,14 +37,6 @@ private:
         float ms = 0.0f;
         float slope = 1.0f;
         float solo = 0.0f;
-        float dynEnable = 0.0f;
-        float dynMode = 0.0f;
-        float dynThresh = -24.0f;
-        float dynAttack = 20.0f;
-        float dynRelease = 200.0f;
-        float dynMix = 100.0f;
-        float dynSource = 0.0f;
-        float dynFilter = 1.0f;
     };
 
     EQProAudioProcessor& processor;
@@ -56,6 +47,8 @@ private:
     juce::Label titleLabel;
     juce::TextButton resetButton;
     juce::TextButton deleteButton;
+    juce::TextButton prevBandButton;
+    juce::TextButton nextBandButton;
     juce::Label freqLabel;
     juce::Label gainLabel;
     juce::Label qLabel;
@@ -76,22 +69,6 @@ private:
     juce::TextButton copyButton;
     juce::TextButton pasteButton;
     juce::ToggleButton soloButton;
-    juce::ToggleButton dynEnableButton;
-    juce::Label dynModeLabel;
-    juce::ComboBox dynModeBox;
-    juce::Label dynSourceLabel;
-    juce::ComboBox dynSourceBox;
-    juce::Label dynFilterLabel;
-    juce::ToggleButton dynFilterButton;
-    juce::Label thresholdLabel;
-    juce::Slider thresholdSlider;
-    juce::Label attackLabel;
-    juce::Slider attackSlider;
-    juce::Label releaseLabel;
-    juce::Slider releaseSlider;
-    juce::Label dynMixLabel;
-    juce::Slider dynMixSlider;
-    float dynMeterDb = 0.0f;
 
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
@@ -105,14 +82,6 @@ private:
     std::unique_ptr<SliderAttachment> slopeAttachment;
     std::unique_ptr<ButtonAttachment> bypassAttachment;
     std::unique_ptr<ButtonAttachment> soloAttachment;
-    std::unique_ptr<ButtonAttachment> dynEnableAttachment;
-    std::unique_ptr<ComboBoxAttachment> dynModeAttachment;
-    std::unique_ptr<ComboBoxAttachment> dynSourceAttachment;
-    std::unique_ptr<ButtonAttachment> dynFilterAttachment;
-    std::unique_ptr<SliderAttachment> thresholdAttachment;
-    std::unique_ptr<SliderAttachment> attackAttachment;
-    std::unique_ptr<SliderAttachment> releaseAttachment;
-    std::unique_ptr<SliderAttachment> dynMixAttachment;
     std::unique_ptr<ComboBoxAttachment> qModeAttachment;
     std::unique_ptr<SliderAttachment> qAmountAttachment;
 

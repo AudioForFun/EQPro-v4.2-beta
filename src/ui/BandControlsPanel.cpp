@@ -25,15 +25,6 @@ const juce::StringArray kMsChoices {
     "Right"
 };
 
-const juce::StringArray kDynModeChoices {
-    "Down",
-    "Up"
-};
-
-const juce::StringArray kDynSourceChoices {
-    "Internal",
-    "External"
-};
 } // namespace
 
 BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
@@ -61,6 +52,24 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     deleteButton.onClick = [this] { resetSelectedBand(true); };
     addAndMakeVisible(deleteButton);
 
+    prevBandButton.setButtonText("<");
+    prevBandButton.onClick = [this]
+    {
+        const int next = (selectedBand + ParamIDs::kBandsPerChannel - 1) % ParamIDs::kBandsPerChannel;
+        if (onBandNavigate)
+            onBandNavigate(next);
+    };
+    addAndMakeVisible(prevBandButton);
+
+    nextBandButton.setButtonText(">");
+    nextBandButton.onClick = [this]
+    {
+        const int next = (selectedBand + 1) % ParamIDs::kBandsPerChannel;
+        if (onBandNavigate)
+            onBandNavigate(next);
+    };
+    addAndMakeVisible(nextBandButton);
+
 
     auto initLabel = [this](juce::Label& label, const juce::String& text)
     {
@@ -79,13 +88,6 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     initLabel(typeLabel, "Type");
     initLabel(msLabel, "Mode");
     initLabel(slopeLabel, "Slope");
-    initLabel(dynModeLabel, "Dyn");
-    initLabel(dynSourceLabel, "Src");
-    initLabel(dynFilterLabel, "Det");
-    initLabel(thresholdLabel, "Thresh");
-    initLabel(attackLabel, "Attack");
-    initLabel(releaseLabel, "Release");
-    initLabel(dynMixLabel, "Mix");
 
     freqSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     freqSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 20);
@@ -187,86 +189,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         mirrorToLinkedChannel("solo", enabled ? 1.0f : 0.0f);
     };
 
-    dynEnableButton.setButtonText("Dyn");
-    dynEnableButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
-    addAndMakeVisible(dynEnableButton);
-    dynEnableButton.onClick = [this]
-    {
-        updateTypeUi();
-        mirrorToLinkedChannel("dynEnable", dynEnableButton.getToggleState() ? 1.0f : 0.0f);
-    };
-
-    dynModeBox.addItemList(kDynModeChoices, 1);
-    dynModeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
-    dynModeBox.setColour(juce::ComboBox::textColourId, theme.text);
-    dynModeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    addAndMakeVisible(dynModeBox);
-    dynModeBox.onChange = [this]
-    {
-        mirrorToLinkedChannel("dynMode", static_cast<float>(dynModeBox.getSelectedItemIndex()));
-    };
-
-    dynSourceBox.addItemList(kDynSourceChoices, 1);
-    dynSourceBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
-    dynSourceBox.setColour(juce::ComboBox::textColourId, theme.text);
-    dynSourceBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    addAndMakeVisible(dynSourceBox);
-    dynSourceBox.onChange = [this]
-    {
-        mirrorToLinkedChannel("dynSource", static_cast<float>(dynSourceBox.getSelectedItemIndex()));
-    };
-
-    dynFilterButton.setButtonText("Filter");
-    dynFilterButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
-    addAndMakeVisible(dynFilterButton);
-    dynFilterButton.onClick = [this]
-    {
-        mirrorToLinkedChannel("dynFilter", dynFilterButton.getToggleState() ? 1.0f : 0.0f);
-    };
-
-    thresholdSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    thresholdSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-    thresholdSlider.setTextBoxIsEditable(true);
-    thresholdSlider.setTextValueSuffix(" dB");
-    addAndMakeVisible(thresholdSlider);
-    thresholdSlider.onValueChange = [this]
-    {
-        mirrorToLinkedChannel("dynThresh", static_cast<float>(thresholdSlider.getValue()));
-    };
-
-    attackSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    attackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-    attackSlider.setTextBoxIsEditable(true);
-    attackSlider.setTextValueSuffix(" ms");
-    addAndMakeVisible(attackSlider);
-    attackSlider.onValueChange = [this]
-    {
-        mirrorToLinkedChannel("dynAttack", static_cast<float>(attackSlider.getValue()));
-    };
-
-    releaseSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    releaseSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-    releaseSlider.setTextBoxIsEditable(true);
-    releaseSlider.setTextValueSuffix(" ms");
-    addAndMakeVisible(releaseSlider);
-    releaseSlider.onValueChange = [this]
-    {
-        mirrorToLinkedChannel("dynRelease", static_cast<float>(releaseSlider.getValue()));
-    };
-
-    dynMixSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    dynMixSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-    dynMixSlider.setTextBoxIsEditable(true);
-    dynMixSlider.setTextValueSuffix(" %");
-    addAndMakeVisible(dynMixSlider);
-    dynMixSlider.onValueChange = [this]
-    {
-        mirrorToLinkedChannel("dynMix", static_cast<float>(dynMixSlider.getValue()));
-    };
-
     updateAttachments();
     updateTypeUi();
-    startTimerHz(30);
 }
 
 void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
@@ -292,13 +216,6 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     typeLabel.setColour(juce::Label::textColourId, theme.textMuted);
     msLabel.setColour(juce::Label::textColourId, theme.textMuted);
     slopeLabel.setColour(juce::Label::textColourId, theme.textMuted);
-    dynModeLabel.setColour(juce::Label::textColourId, theme.textMuted);
-    dynSourceLabel.setColour(juce::Label::textColourId, theme.textMuted);
-    dynFilterLabel.setColour(juce::Label::textColourId, theme.textMuted);
-    thresholdLabel.setColour(juce::Label::textColourId, theme.textMuted);
-    attackLabel.setColour(juce::Label::textColourId, theme.textMuted);
-    releaseLabel.setColour(juce::Label::textColourId, theme.textMuted);
-    dynMixLabel.setColour(juce::Label::textColourId, theme.textMuted);
     typeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     typeBox.setColour(juce::ComboBox::textColourId, theme.text);
     typeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
@@ -313,15 +230,9 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     pasteButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     resetButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     deleteButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
+    prevBandButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
+    nextBandButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     soloButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
-    dynEnableButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
-    dynModeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
-    dynModeBox.setColour(juce::ComboBox::textColourId, theme.text);
-    dynModeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    dynSourceBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
-    dynSourceBox.setColour(juce::ComboBox::textColourId, theme.text);
-    dynSourceBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    dynFilterButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     qModeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     qModeBox.setColour(juce::ComboBox::textColourId, theme.text);
     qModeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
@@ -346,28 +257,23 @@ void BandControlsPanel::paint(juce::Graphics& g)
     g.setColour(theme.panelOutline);
     g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), 8.0f, 1.0f);
 
-    auto meterArea = getLocalBounds().reduced(12).removeFromBottom(10);
-    g.setColour(theme.panelOutline);
-    g.drawRoundedRectangle(meterArea.toFloat(), 3.0f, 1.0f);
-    const float norm = juce::jlimit(-1.0f, 1.0f, dynMeterDb / 12.0f);
-    const auto fillWidth = static_cast<int>((norm * 0.5f + 0.5f) * meterArea.getWidth());
-    g.setColour(theme.accent.withAlpha(0.7f));
-    g.fillRoundedRectangle(meterArea.removeFromLeft(fillWidth).toFloat(), 3.0f);
 }
 
 void BandControlsPanel::resized()
 {
     auto bounds = getLocalBounds().reduced(10);
     const int gap = 6;
-    const int labelHeight = 14;
+    const int labelHeight = 16;
     const int rowHeight = 22;
-    const int knobRowHeight = 86;
+    const int knobRowHeight = 110;
 
-    auto left = bounds.removeFromLeft(static_cast<int>(bounds.getWidth() * 0.60f));
+    auto left = bounds.removeFromLeft(static_cast<int>(bounds.getWidth() * 0.75f));
     auto right = bounds;
 
     auto headerRow = left.removeFromTop(rowHeight);
     titleLabel.setBounds(headerRow.removeFromLeft(70));
+    prevBandButton.setBounds(headerRow.removeFromLeft(24));
+    nextBandButton.setBounds(headerRow.removeFromLeft(24));
     copyButton.setBounds(headerRow.removeFromLeft(48));
     pasteButton.setBounds(headerRow.removeFromLeft(48));
     resetButton.setBounds(headerRow.removeFromLeft(52));
@@ -414,43 +320,6 @@ void BandControlsPanel::resized()
     auto togglesRow = left.removeFromTop(rowHeight);
     bypassButton.setBounds(togglesRow.removeFromLeft(70));
     soloButton.setBounds(togglesRow.removeFromLeft(60));
-    dynEnableButton.setBounds(togglesRow);
-
-    auto dynHeader = right.removeFromTop(labelHeight + rowHeight);
-    dynModeLabel.setBounds(dynHeader.removeFromTop(labelHeight).removeFromLeft(dynHeader.getWidth() / 3));
-    dynSourceLabel.setBounds(dynHeader.removeFromTop(labelHeight).removeFromLeft(dynHeader.getWidth() / 3));
-    dynFilterLabel.setBounds(dynHeader.removeFromTop(labelHeight));
-
-    auto dynHeaderRow = right.removeFromTop(rowHeight);
-    const int dynGap = 4;
-    const int dynWidth = (dynHeaderRow.getWidth() - dynGap * 2) / 3;
-    dynModeBox.setBounds(dynHeaderRow.removeFromLeft(dynWidth));
-    dynHeaderRow.removeFromLeft(dynGap);
-    dynSourceBox.setBounds(dynHeaderRow.removeFromLeft(dynWidth));
-    dynHeaderRow.removeFromLeft(dynGap);
-    dynFilterButton.setBounds(dynHeaderRow);
-
-    right.removeFromTop(gap);
-    auto dynLabelRow = right.removeFromTop(labelHeight);
-    const int dynLabelWidth = (dynLabelRow.getWidth() - gap * 3) / 4;
-    thresholdLabel.setBounds(dynLabelRow.removeFromLeft(dynLabelWidth));
-    dynLabelRow.removeFromLeft(gap);
-    attackLabel.setBounds(dynLabelRow.removeFromLeft(dynLabelWidth));
-    dynLabelRow.removeFromLeft(gap);
-    releaseLabel.setBounds(dynLabelRow.removeFromLeft(dynLabelWidth));
-    dynLabelRow.removeFromLeft(gap);
-    dynMixLabel.setBounds(dynLabelRow.removeFromLeft(dynLabelWidth));
-
-    right.removeFromTop(2);
-    auto dynRow = right.removeFromTop(90);
-    const int dynSliderWidth = (dynRow.getWidth() - gap * 3) / 4;
-    thresholdSlider.setBounds(dynRow.removeFromLeft(dynSliderWidth));
-    dynRow.removeFromLeft(gap);
-    attackSlider.setBounds(dynRow.removeFromLeft(dynSliderWidth));
-    dynRow.removeFromLeft(gap);
-    releaseSlider.setBounds(dynRow.removeFromLeft(dynSliderWidth));
-    dynRow.removeFromLeft(gap);
-    dynMixSlider.setBounds(dynRow.removeFromLeft(dynSliderWidth));
 }
 
 void BandControlsPanel::updateAttachments()
@@ -463,14 +332,6 @@ void BandControlsPanel::updateAttachments()
     const auto msId = ParamIDs::bandParamId(selectedChannel, selectedBand, "ms");
     const auto slopeId = ParamIDs::bandParamId(selectedChannel, selectedBand, "slope");
     const auto soloId = ParamIDs::bandParamId(selectedChannel, selectedBand, "solo");
-    const auto dynEnableId = ParamIDs::bandParamId(selectedChannel, selectedBand, "dynEnable");
-    const auto dynModeId = ParamIDs::bandParamId(selectedChannel, selectedBand, "dynMode");
-    const auto dynThresholdId = ParamIDs::bandParamId(selectedChannel, selectedBand, "dynThresh");
-    const auto dynAttackId = ParamIDs::bandParamId(selectedChannel, selectedBand, "dynAttack");
-    const auto dynReleaseId = ParamIDs::bandParamId(selectedChannel, selectedBand, "dynRelease");
-    const auto dynMixId = ParamIDs::bandParamId(selectedChannel, selectedBand, "dynMix");
-    const auto dynSourceId = ParamIDs::bandParamId(selectedChannel, selectedBand, "dynSource");
-    const auto dynFilterId = ParamIDs::bandParamId(selectedChannel, selectedBand, "dynFilter");
 
     freqAttachment = std::make_unique<SliderAttachment>(parameters, freqId, freqSlider);
     gainAttachment = std::make_unique<SliderAttachment>(parameters, gainId, gainSlider);
@@ -480,14 +341,6 @@ void BandControlsPanel::updateAttachments()
     slopeAttachment = std::make_unique<SliderAttachment>(parameters, slopeId, slopeSlider);
     bypassAttachment = std::make_unique<ButtonAttachment>(parameters, bypassId, bypassButton);
     soloAttachment = std::make_unique<ButtonAttachment>(parameters, soloId, soloButton);
-    dynEnableAttachment = std::make_unique<ButtonAttachment>(parameters, dynEnableId, dynEnableButton);
-    dynModeAttachment = std::make_unique<ComboBoxAttachment>(parameters, dynModeId, dynModeBox);
-    dynSourceAttachment = std::make_unique<ComboBoxAttachment>(parameters, dynSourceId, dynSourceBox);
-    dynFilterAttachment = std::make_unique<ButtonAttachment>(parameters, dynFilterId, dynFilterButton);
-    thresholdAttachment = std::make_unique<SliderAttachment>(parameters, dynThresholdId, thresholdSlider);
-    attackAttachment = std::make_unique<SliderAttachment>(parameters, dynAttackId, attackSlider);
-    releaseAttachment = std::make_unique<SliderAttachment>(parameters, dynReleaseId, releaseSlider);
-    dynMixAttachment = std::make_unique<SliderAttachment>(parameters, dynMixId, dynMixSlider);
     qModeAttachment = std::make_unique<ComboBoxAttachment>(parameters, ParamIDs::qMode, qModeBox);
     qAmountAttachment = std::make_unique<SliderAttachment>(parameters, ParamIDs::qModeAmount, qAmountSlider);
 }
@@ -507,14 +360,6 @@ void BandControlsPanel::resetSelectedBand(bool shouldBypass)
     resetParam("ms");
     resetParam("slope");
     resetParam("solo");
-    resetParam("dynEnable");
-    resetParam("dynMode");
-    resetParam("dynThresh");
-    resetParam("dynAttack");
-    resetParam("dynRelease");
-    resetParam("dynMix");
-    resetParam("dynSource");
-    resetParam("dynFilter");
 
     if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "bypass")))
         bypassParam->setValueNotifyingHost(shouldBypass ? 1.0f : 0.0f);
@@ -532,31 +377,7 @@ void BandControlsPanel::updateTypeUi()
     slopeSlider.setEnabled(isHpLp);
     slopeSlider.setAlpha(isHpLp ? 1.0f : 0.5f);
 
-    const bool supportsDyn = (typeIndex != 3 && typeIndex != 4 && typeIndex != 7);
-    dynEnableButton.setEnabled(supportsDyn);
-    dynEnableButton.setAlpha(supportsDyn ? 1.0f : 0.5f);
-    const bool dynEnabled = dynEnableButton.getToggleState() && supportsDyn;
-    dynModeBox.setEnabled(dynEnabled);
-    dynSourceBox.setEnabled(dynEnabled);
-    dynFilterButton.setEnabled(dynEnabled);
-    thresholdSlider.setEnabled(dynEnabled);
-    attackSlider.setEnabled(dynEnabled);
-    releaseSlider.setEnabled(dynEnabled);
-    dynMixSlider.setEnabled(dynEnabled);
-    const float dynAlpha = dynEnabled ? 1.0f : 0.5f;
-    dynModeBox.setAlpha(dynAlpha);
-    dynSourceBox.setAlpha(dynAlpha);
-    dynFilterButton.setAlpha(dynAlpha);
-    thresholdSlider.setAlpha(dynAlpha);
-    attackSlider.setAlpha(dynAlpha);
-    releaseSlider.setAlpha(dynAlpha);
-    dynMixSlider.setAlpha(dynAlpha);
-}
-
-void BandControlsPanel::timerCallback()
-{
-    dynMeterDb = processor.getDynamicGainDb(selectedChannel, selectedBand);
-    repaint();
+    // No dynamic EQ controls in this revision.
 }
 
 void BandControlsPanel::copyBandState()
@@ -570,14 +391,6 @@ void BandControlsPanel::copyBandState()
     state.ms = static_cast<float>(msBox.getSelectedItemIndex());
     state.slope = static_cast<float>(slopeSlider.getValue());
     state.solo = soloButton.getToggleState() ? 1.0f : 0.0f;
-    state.dynEnable = dynEnableButton.getToggleState() ? 1.0f : 0.0f;
-    state.dynMode = static_cast<float>(dynModeBox.getSelectedItemIndex());
-    state.dynThresh = static_cast<float>(thresholdSlider.getValue());
-    state.dynAttack = static_cast<float>(attackSlider.getValue());
-    state.dynRelease = static_cast<float>(releaseSlider.getValue());
-    state.dynMix = static_cast<float>(dynMixSlider.getValue());
-    state.dynSource = static_cast<float>(dynSourceBox.getSelectedItemIndex());
-    state.dynFilter = dynFilterButton.getToggleState() ? 1.0f : 0.0f;
     clipboard = state;
 }
 
@@ -601,14 +414,6 @@ void BandControlsPanel::pasteBandState()
     setParam("ms", state.ms);
     setParam("slope", state.slope);
     setParam("solo", state.solo);
-    setParam("dynEnable", state.dynEnable);
-    setParam("dynMode", state.dynMode);
-    setParam("dynThresh", state.dynThresh);
-    setParam("dynAttack", state.dynAttack);
-    setParam("dynRelease", state.dynRelease);
-    setParam("dynMix", state.dynMix);
-    setParam("dynSource", state.dynSource);
-    setParam("dynFilter", state.dynFilter);
 }
 
 void BandControlsPanel::mirrorToLinkedChannel(const juce::String& suffix, float value)

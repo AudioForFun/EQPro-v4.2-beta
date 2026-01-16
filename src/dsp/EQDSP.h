@@ -22,7 +22,6 @@ public:
     void setMsTargets(const std::array<int, ParamIDs::kBandsPerChannel>& targets);
     void process(juce::AudioBuffer<float>& buffer,
                  const juce::AudioBuffer<float>* detectorBuffer = nullptr);
-    float getDynamicGainDb(int channelIndex, int bandIndex) const;
 
 private:
     double sampleRateHz = 48000.0;
@@ -41,14 +40,6 @@ private:
         smoothQ {};
     std::array<std::array<Biquad, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
         soloFilters {};
-    std::array<std::array<Biquad, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
-        detectorFilters {};
-    std::array<std::array<float, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
-        detectorEnv {};
-    std::array<std::array<juce::SmoothedValue<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
-        dynGainDb {};
-    std::array<std::array<float, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
-        lastDynGainDb {};
     juce::AudioBuffer<float> scratchBuffer;
     std::array<std::array<BandParams, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels> cachedParams {};
     std::array<std::array<std::array<Biquad, kMaxStages>, ParamIDs::kBandsPerChannel>, 2>

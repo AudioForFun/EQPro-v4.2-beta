@@ -8,9 +8,6 @@ constexpr int kMaxChannels = 16;
 constexpr int kBandsPerChannel = 24;
 
 extern const juce::String globalBypass;
-extern const juce::String ellipticBypass;
-extern const juce::String ellipticFreq;
-extern const juce::String ellipticAmount;
 extern const juce::String phaseMode;
 extern const juce::String linearQuality;
 extern const juce::String linearWindow;

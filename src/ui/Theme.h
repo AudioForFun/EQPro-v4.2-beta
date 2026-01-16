@@ -21,16 +21,16 @@ struct ThemeColors
 inline ThemeColors makeDarkTheme()
 {
     return {
+        juce::Colour(0xff040506),
         juce::Colour(0xff07090d),
-        juce::Colour(0xff0a0d12),
-        juce::Colour(0xff151a22),
+        juce::Colour(0xff10141b),
         juce::Colour(0xffe6edf3),
         juce::Colour(0xffb6c2cf),
         juce::Colour(0xff22d3ee),
         juce::Colour(0xffa78bfa),
-        juce::Colour(0xff0c1017),
-        juce::Colour(0xff07090d),
-        juce::Colour(0xff0f141a),
+        juce::Colour(0xff0a0c10),
+        juce::Colour(0xff040506),
+        juce::Colour(0xff0b0f15),
         juce::Colour(0xff22c55e),
         juce::Colour(0xfff97316),
     };

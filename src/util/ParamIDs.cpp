@@ -3,9 +3,6 @@
 namespace ParamIDs
 {
 const juce::String globalBypass = "globalBypass";
-const juce::String ellipticBypass = "ellipticBypass";
-const juce::String ellipticFreq = "ellipticFreq";
-const juce::String ellipticAmount = "ellipticAmount";
 const juce::String phaseMode = "phaseMode";
 const juce::String linearQuality = "linearQuality";
 const juce::String linearWindow = "linearWindow";

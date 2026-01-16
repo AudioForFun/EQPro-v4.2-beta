@@ -15,7 +15,6 @@ public:
 
     void setSelectedBand(int bandIndex);
     void setSelectedChannel(int channelIndex);
-    void setShowPhase(bool shouldShow);
     void setTheme(const ThemeColors& newTheme);
     void setUiScale(float scale);
 
@@ -39,15 +38,12 @@ private:
     void updateCurves();
     juce::Rectangle<int> getPlotArea() const;
     juce::Rectangle<int> getMagnitudeArea() const;
-    juce::Rectangle<int> getPhaseArea() const;
     void drawLabels(juce::Graphics& g, const juce::Rectangle<int>& area);
-    int getAnalyzerView() const;
 
     float xToFrequency(float x) const;
     float yToGain(float y) const;
     float frequencyToX(float freq) const;
     float gainToY(float gainDb) const;
-    float phaseToY(float phase) const;
     float snapFrequencyToPeak(float x) const;
     void createBandAtPosition(const juce::Point<float>& position);
     void resetBandToDefaults(int bandIndex, bool shouldBypass);
@@ -114,7 +110,6 @@ private:
     std::array<float, fftBins> externalMagnitudes {};
 
     std::vector<float> eqCurveDb;
-    std::vector<float> phaseCurve;
     std::vector<float> selectedBandCurveDb;
     std::vector<juce::Point<float>> bandPoints;
     std::vector<juce::Rectangle<float>> bypassIcons;
@@ -123,7 +118,6 @@ private:
 
     float lastSampleRate = 48000.0f;
     int frameCounter = 0;
-    bool showPhase = true;
     float minDb = -24.0f;
     float maxDb = 24.0f;
     int analyzerSpeedIndex = -1;

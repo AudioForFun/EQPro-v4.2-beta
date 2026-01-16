@@ -18,7 +18,6 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
       meters(p),
       analyzer(p),
       bandControls(p),
-      ellipticPanel(p.getParameters()),
       spectralPanel(p.getParameters()),
       correlation(p)
 {
@@ -245,15 +244,6 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         resized();
     };
 
-    showEllipticToggle.setButtonText("Elliptic");
-    showEllipticToggle.setToggleState(true, juce::dontSendNotification);
-    showEllipticToggle.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffcbd5e1));
-    addAndMakeVisible(showEllipticToggle);
-    showEllipticToggle.onClick = [this]()
-    {
-        ellipticPanel.setVisible(showEllipticToggle.getToggleState());
-        resized();
-    };
 
     showCorrelationToggle.setButtonText("v");
     showCorrelationToggle.setClickingTogglesState(true);
@@ -310,16 +300,6 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     updateQualityEnabled();
 
-    phaseViewToggle.setButtonText("Phase View");
-    phaseViewToggle.setToggleState(processorRef.getShowPhasePreference(),
-                                   juce::dontSendNotification);
-    phaseViewToggle.onClick = [this]
-    {
-        const bool enabled = phaseViewToggle.getToggleState();
-        analyzer.setShowPhase(enabled);
-        processorRef.setShowPhasePreference(enabled);
-    };
-    addAndMakeVisible(phaseViewToggle);
 
     auto initSectionLabel = [this](juce::Label& label, const juce::String& text)
     {
@@ -355,7 +335,6 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         lookAndFeel.setTheme(newTheme);
         analyzer.setTheme(newTheme);
         bandControls.setTheme(newTheme);
-        ellipticPanel.setTheme(newTheme);
         spectralPanel.setTheme(newTheme);
         meters.setTheme(newTheme);
         correlation.setTheme(newTheme);
@@ -363,7 +342,6 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         headerLabel.setColour(juce::Label::textColourId, newTheme.text);
         versionLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         globalBypassButton.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
-        phaseViewToggle.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
         themeLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         phaseLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         qualityLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
@@ -921,9 +899,16 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         bandControls.setSelectedBand(selectedChannel, selectedBand);
     };
 
+    bandControls.onBandNavigate = [this](int band)
+    {
+        selectedBand = band;
+        processorRef.setSelectedBandIndex(selectedBand);
+        analyzer.setSelectedBand(selectedBand);
+        bandControls.setSelectedBand(selectedChannel, selectedBand);
+    };
+
     analyzer.setSelectedChannel(selectedChannel);
     analyzer.setSelectedBand(selectedBand);
-    analyzer.setShowPhase(phaseViewToggle.getToggleState());
     bandControls.setSelectedBand(selectedChannel, selectedBand);
     meters.setSelectedChannel(selectedChannel);
     processorRef.setSelectedBandIndex(selectedBand);
@@ -935,7 +920,6 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(meters);
     addAndMakeVisible(analyzer);
     addAndMakeVisible(bandControls);
-    addAndMakeVisible(ellipticPanel);
     addAndMakeVisible(spectralPanel);
     addAndMakeVisible(correlation);
 
@@ -1003,12 +987,7 @@ void EQProAudioProcessorEditor::paint(juce::Graphics& g)
     g.setColour(theme.panelOutline);
     g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(6.0f), 6.0f, 1.0f);
 
-    const auto bounds = getLocalBounds().reduced(kOuterMargin);
-    const float uiScale = juce::jlimit(0.8f, 2.5f, getWidth() / static_cast<float>(kEditorWidth));
-    const float splitY = static_cast<float>(bounds.getY() + bounds.getHeight() * 0.80f);
-    g.setColour(theme.grid);
-    g.drawLine(static_cast<float>(bounds.getX()), splitY,
-               static_cast<float>(bounds.getRight()), splitY, 1.0f * uiScale);
+    juce::ignoreUnused(kOuterMargin);
 }
 
 void EQProAudioProcessorEditor::resized()
@@ -1059,11 +1038,9 @@ void EQProAudioProcessorEditor::resized()
     phaseModeBox.setBounds(processingRow.removeFromLeft(static_cast<int>(140 * uiScale)));
     qualityLabel.setBounds(processingRow.removeFromLeft(static_cast<int>(70 * uiScale)));
     linearQualityBox.setBounds(processingRow.removeFromLeft(static_cast<int>(120 * uiScale)));
-    phaseViewToggle.setBounds(processingRow.removeFromLeft(static_cast<int>(110 * uiScale)));
     bandControls.setBounds(controlsArea.reduced(static_cast<int>(6 * uiScale), 0));
 
     spectralPanel.setBounds({0, 0, 0, 0});
-    ellipticPanel.setBounds({0, 0, 0, 0});
 
     characterLabel.setBounds({0, 0, 0, 0});
     characterBox.setBounds({0, 0, 0, 0});
@@ -1088,7 +1065,6 @@ void EQProAudioProcessorEditor::resized()
     analyzerExternalToggle.setBounds({0, 0, 0, 0});
     smartSoloToggle.setBounds({0, 0, 0, 0});
     showSpectralToggle.setBounds({0, 0, 0, 0});
-    showEllipticToggle.setBounds({0, 0, 0, 0});
 
     layoutLabel.setBounds({0, 0, 0, 0});
     layoutValueLabel.setBounds({0, 0, 0, 0});

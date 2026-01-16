@@ -2,7 +2,6 @@
 
 #include <JuceHeader.h>
 #include "dsp/EQDSP.h"
-#include "dsp/EllipticDSP.h"
 #include "dsp/LinearPhaseEQ.h"
 #include "dsp/MeteringDSP.h"
 #include "dsp/SpectralDynamicsDSP.h"
@@ -73,7 +72,6 @@ public:
     int getThemeMode() const;
     void setFavoritePresets(const juce::String& names);
     juce::String getFavoritePresets() const;
-    float getDynamicGainDb(int channelIndex, int bandIndex) const;
     void copyStateToClipboard();
     void pasteStateFromClipboard();
     void setSelectedBandIndex(int index);
@@ -94,14 +92,6 @@ private:
         std::atomic<float>* msTarget = nullptr;
         std::atomic<float>* slope = nullptr;
         std::atomic<float>* solo = nullptr;
-        std::atomic<float>* dynEnabled = nullptr;
-        std::atomic<float>* dynMode = nullptr;
-        std::atomic<float>* dynThreshold = nullptr;
-        std::atomic<float>* dynAttack = nullptr;
-        std::atomic<float>* dynRelease = nullptr;
-        std::atomic<float>* dynMix = nullptr;
-        std::atomic<float>* dynSource = nullptr;
-        std::atomic<float>* dynFilter = nullptr;
     };
 
     void initializeParamPointers();
@@ -118,9 +108,6 @@ private:
         bandParamPointers {};
 
     std::atomic<float>* globalBypassParam = nullptr;
-    std::atomic<float>* ellipticBypassParam = nullptr;
-    std::atomic<float>* ellipticFreqParam = nullptr;
-    std::atomic<float>* ellipticAmountParam = nullptr;
     std::atomic<float>* phaseModeParam = nullptr;
     std::atomic<float>* linearQualityParam = nullptr;
     std::atomic<float>* linearWindowParam = nullptr;
@@ -145,8 +132,6 @@ private:
 
     eqdsp::EQDSP eqDsp;
     eqdsp::EQDSP eqDspOversampled;
-    eqdsp::EllipticDSP ellipticDsp;
-    eqdsp::EllipticDSP ellipticDspOversampled;
     eqdsp::LinearPhaseEQ linearPhaseEq;
     eqdsp::LinearPhaseEQ linearPhaseMsEq;
     eqdsp::MeteringDSP meteringDsp;

@@ -15,10 +15,8 @@ constexpr float kMaxDb = 24.0f;
 constexpr float kMinDb = -24.0f;
 constexpr float kAnalyzerMinDb = -90.0f;
 constexpr float kAnalyzerMaxDb = 6.0f;
-constexpr float kPhaseMin = -2.0f * juce::MathConstants<float>::pi;
-constexpr float kPhaseMax = 2.0f * juce::MathConstants<float>::pi;
 constexpr float kPointRadius = 6.5f;
-constexpr float kHitRadius = 14.0f;
+constexpr float kHitRadius = 10.0f;
 constexpr float kSmoothingCoeff = 0.2f;
 
 const juce::String kParamFreqSuffix = "freq";
@@ -71,12 +69,6 @@ void AnalyzerComponent::setSelectedChannel(int channelIndex)
     repaint();
 }
 
-void AnalyzerComponent::setShowPhase(bool shouldShow)
-{
-    showPhase = shouldShow;
-    updateCurves();
-    repaint();
-}
 
 void AnalyzerComponent::setTheme(const ThemeColors& newTheme)
 {
@@ -94,7 +86,6 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 {
     auto plotArea = getPlotArea();
     auto magnitudeArea = getMagnitudeArea();
-    auto phaseArea = getPhaseArea();
     const float scale = uiScale;
     juce::ColourGradient grad(theme.analyzerBg, plotArea.getTopLeft().toFloat(),
                               theme.panel, plotArea.getBottomLeft().toFloat(), false);
@@ -105,20 +96,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     g.drawRect(plotArea);
 
     g.setColour(theme.grid);
-    for (int i = 1; i < 6; ++i)
-    {
-        const int y = magnitudeArea.getY() + magnitudeArea.getHeight() * i / 6;
-        g.drawHorizontalLine(y, static_cast<float>(plotArea.getX()),
-                             static_cast<float>(plotArea.getRight()));
-    }
 
-    if (showPhase)
-    {
-        g.setColour(theme.analyzerPhaseBg);
-        g.fillRect(phaseArea);
-        g.setColour(theme.grid);
-        g.drawRect(phaseArea);
-    }
 
     drawLabels(g, magnitudeArea);
 
@@ -158,22 +136,10 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         }
     }
 
-    const int viewMode = getAnalyzerView();
-    if (viewMode == 0 || viewMode == 1)
-    {
-    g.setColour(theme.accent.withAlpha(0.2f));
-    g.strokePath(prePath, juce::PathStrokeType(3.0f * scale));
-    g.setColour(theme.accent.withAlpha(0.75f));
-    g.strokePath(prePath, juce::PathStrokeType(1.4f * scale));
-    }
-
-    if (viewMode == 0 || viewMode == 2)
-    {
     g.setColour(theme.accentAlt.withAlpha(0.25f));
     g.strokePath(postPath, juce::PathStrokeType(3.0f * scale));
     g.setColour(theme.accentAlt.withAlpha(0.85f));
     g.strokePath(postPath, juce::PathStrokeType(1.5f * scale));
-    }
 
     const bool showExternal = parameters.getRawParameterValue(ParamIDs::analyzerExternal) != nullptr
         && parameters.getRawParameterValue(ParamIDs::analyzerExternal)->load() > 0.5f;
@@ -309,7 +275,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
             }
         }
 
-        g.setColour(theme.textMuted);
+        g.setColour(colour.withAlpha(0.9f));
         g.setFont(12.0f * scale);
         g.drawFittedText(juce::String(band + 1),
                          juce::Rectangle<int>(static_cast<int>(point.x + radius + 2.0f * scale),
@@ -317,31 +283,6 @@ void AnalyzerComponent::paint(juce::Graphics& g)
                                               static_cast<int>(20 * scale),
                                               static_cast<int>(14 * scale)),
                          juce::Justification::left, 1);
-    }
-    auto legendArea = plotArea.removeFromTop(static_cast<int>(18 * scale))
-        .removeFromRight(static_cast<int>(160 * scale));
-    g.setFont(12.0f * scale);
-    if (viewMode == 0 || viewMode == 1)
-    {
-        g.setColour(theme.accent.withAlpha(0.9f));
-        g.drawFittedText("PRE", legendArea.removeFromLeft(60), juce::Justification::centredLeft, 1);
-    }
-    if (viewMode == 0 || viewMode == 2)
-    {
-        g.setColour(theme.accentAlt.withAlpha(0.9f));
-        g.drawFittedText("POST", legendArea, juce::Justification::centredLeft, 1);
-    }
-    if (showPhase && ! phaseCurve.empty())
-    {
-        juce::Path phasePath;
-        phasePath.startNewSubPath(phaseArea.getX(),
-                                  phaseToY(phaseCurve.front()));
-        for (int x = 1; x < static_cast<int>(phaseCurve.size()); ++x)
-            phasePath.lineTo(phaseArea.getX() + x,
-                             phaseToY(phaseCurve[static_cast<size_t>(x)]));
-
-        g.setColour(theme.accent.withAlpha(0.6f));
-        g.strokePath(phasePath, juce::PathStrokeType(1.0f * scale));
     }
 
     if (hoverBand >= 0 && hoverBand < ParamIDs::kBandsPerChannel)
@@ -679,14 +620,6 @@ void AnalyzerComponent::resetBandToDefaults(int bandIndex, bool shouldBypass)
     resetParam(kParamMsSuffix);
     resetParam(kParamSlopeSuffix);
     resetParam(kParamSoloSuffix);
-    resetParam("dynEnable");
-    resetParam("dynMode");
-    resetParam("dynThresh");
-    resetParam("dynAttack");
-    resetParam("dynRelease");
-    resetParam("dynMix");
-    resetParam("dynSource");
-    resetParam("dynFilter");
 
     if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, bandIndex, kParamBypassSuffix)))
         bypassParam->setValueNotifyingHost(shouldBypass ? 1.0f : 0.0f);
@@ -761,12 +694,6 @@ void AnalyzerComponent::stopAltSolo()
 
     isAltSoloing = false;
     altSoloBand = -1;
-}
-
-int AnalyzerComponent::getAnalyzerView() const
-{
-    const auto* value = parameters.getRawParameterValue(ParamIDs::analyzerView);
-    return value != nullptr ? static_cast<int>(value->load()) : 0;
 }
 
 void AnalyzerComponent::timerCallback()
@@ -892,14 +819,9 @@ void AnalyzerComponent::updateCurves()
 
     eqCurveDb.assign(static_cast<size_t>(magnitudeArea.getWidth()), 0.0f);
     selectedBandCurveDb.assign(static_cast<size_t>(magnitudeArea.getWidth()), 0.0f);
-    if (showPhase)
-        phaseCurve.assign(static_cast<size_t>(magnitudeArea.getWidth()), 0.0f);
-    else
-        phaseCurve.clear();
+    // Phase view removed.
 
     const float maxFreq = std::min(20000.0f, lastSampleRate * 0.5f);
-    double prevPhase = 0.0;
-    bool hasPrev = false;
     for (int x = 0; x < magnitudeArea.getWidth(); ++x)
     {
         const float norm = static_cast<float>(x) / static_cast<float>(magnitudeArea.getWidth());
@@ -911,32 +833,10 @@ void AnalyzerComponent::updateCurves()
 
         const auto bandResp = computeBandResponse(selectedBand, freq);
         const double mag = std::abs(total);
-        double phase = std::arg(total);
-        if (showPhase)
-        {
-            if (hasPrev)
-            {
-                double delta = phase - prevPhase;
-                while (delta > juce::MathConstants<double>::pi)
-                {
-                    phase -= 2.0 * juce::MathConstants<double>::pi;
-                    delta = phase - prevPhase;
-                }
-                while (delta < -juce::MathConstants<double>::pi)
-                {
-                    phase += 2.0 * juce::MathConstants<double>::pi;
-                    delta = phase - prevPhase;
-                }
-            }
-            prevPhase = phase;
-            hasPrev = true;
-        }
         eqCurveDb[static_cast<size_t>(x)] =
             juce::Decibels::gainToDecibels(static_cast<float>(mag), minDb);
         selectedBandCurveDb[static_cast<size_t>(x)] =
             juce::Decibels::gainToDecibels(static_cast<float>(std::abs(bandResp)), minDb);
-        if (showPhase)
-            phaseCurve[static_cast<size_t>(x)] = static_cast<float>(phase);
     }
 }
 
@@ -999,25 +899,17 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
         }
     }
 
-    const float rangeDb = maxDb - minDb;
-    const float step = rangeDb <= 6.0f ? 1.0f : (rangeDb <= 12.0f ? 2.0f : 3.0f);
-    for (float db = minDb; db <= maxDb + 0.001f; db += step)
-    {
-        const int y = static_cast<int>(gainToY(db));
-        const bool major = (std::abs(std::fmod(db, 6.0f)) < 0.01f) || (std::abs(db) < 0.01f);
-        g.setColour((major ? theme.grid.withAlpha(0.6f) : theme.grid.withAlpha(0.25f)));
-        g.drawHorizontalLine(y, static_cast<float>(area.getX()), static_cast<float>(area.getRight()));
-        if (major)
-        {
-            g.setColour(theme.textMuted);
-            g.drawFittedText(juce::String(db, 0) + " dB",
-                             juce::Rectangle<int>(static_cast<int>(area.getRight() - rightGutter + 4 * scale),
-                                                  static_cast<int>(y - 9 * scale),
-                                                  static_cast<int>(rightGutter - 6 * scale),
-                                                  static_cast<int>(14 * scale)),
-                             juce::Justification::left, 1);
-        }
-    }
+    const float db = 0.0f;
+    const int y = static_cast<int>(gainToY(db));
+    g.setColour(theme.grid.withAlpha(0.6f));
+    g.drawHorizontalLine(y, static_cast<float>(area.getX()), static_cast<float>(area.getRight()));
+    g.setColour(theme.textMuted);
+    g.drawFittedText("0 dB",
+                     juce::Rectangle<int>(static_cast<int>(area.getRight() - rightGutter + 4 * scale),
+                                          static_cast<int>(y - 9 * scale),
+                                          static_cast<int>(rightGutter - 6 * scale),
+                                          static_cast<int>(14 * scale)),
+                     juce::Justification::left, 1);
 
     g.setColour(theme.textMuted.withAlpha(0.6f));
     g.drawFittedText("EQ",
@@ -1044,16 +936,7 @@ juce::Rectangle<int> AnalyzerComponent::getPlotArea() const
 juce::Rectangle<int> AnalyzerComponent::getMagnitudeArea() const
 {
     auto area = getPlotArea();
-    const int phaseHeight = area.getHeight() / 4;
-    const int gap = static_cast<int>(8 * uiScale);
-    return showPhase ? area.withTrimmedBottom(phaseHeight + gap) : area;
-}
-
-juce::Rectangle<int> AnalyzerComponent::getPhaseArea() const
-{
-    auto area = getPlotArea();
-    const int phaseHeight = area.getHeight() / 4;
-    return showPhase ? area.removeFromBottom(phaseHeight) : juce::Rectangle<int>();
+    return area;
 }
 
 float AnalyzerComponent::xToFrequency(float x) const
@@ -1089,13 +972,6 @@ float AnalyzerComponent::gainToY(float gainDb) const
                       static_cast<float>(plotArea.getY()));
 }
 
-float AnalyzerComponent::phaseToY(float phase) const
-{
-    const auto area = getPhaseArea();
-    return juce::jmap(phase, kPhaseMin, kPhaseMax,
-                      static_cast<float>(area.getBottom()),
-                      static_cast<float>(area.getY()));
-}
 
 float AnalyzerComponent::snapFrequencyToPeak(float x) const
 {

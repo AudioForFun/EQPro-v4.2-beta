@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(EQPro VERSION 1.1.0)
+project(EQPro VERSION 1.2.0)
 
 # Set this to your local JUCE path or pass -DJUCE_DIR=... when configuring.
 if (NOT DEFINED JUCE_DIR)
@@ -37,8 +37,6 @@ target_sources(EQPro PRIVATE
     src/dsp/EQDSP.h
     src/dsp/OnePole.cpp
     src/dsp/OnePole.h
-    src/dsp/EllipticDSP.cpp
-    src/dsp/EllipticDSP.h
     src/dsp/LinearPhaseEQ.cpp
     src/dsp/LinearPhaseEQ.h
     src/dsp/MeteringDSP.cpp
@@ -49,8 +47,6 @@ target_sources(EQPro PRIVATE
     src/ui/AnalyzerComponent.h
     src/ui/BandControlsPanel.cpp
     src/ui/BandControlsPanel.h
-    src/ui/EllipticPanel.cpp
-    src/ui/EllipticPanel.h
     src/ui/LookAndFeel.cpp
     src/ui/LookAndFeel.h
     src/ui/Theme.h
@@ -78,7 +74,7 @@ target_compile_definitions(EQPro PUBLIC
     JUCE_USE_CURL=0
     JUCE_IGNORE_VST3_MISMATCHED_PARAMETER_ID_WARNING=1
     EQPRO_VERSION="${PROJECT_VERSION}"
-    EQPRO_ITERATION="v1.1 beta"
+    EQPRO_ITERATION="v1.2 beta"
 )
 
 target_link_libraries(EQPro PRIVATE

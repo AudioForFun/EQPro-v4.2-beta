@@ -4,7 +4,6 @@
 #include "PluginProcessor.h"
 #include "ui/AnalyzerComponent.h"
 #include "ui/BandControlsPanel.h"
-#include "ui/EllipticPanel.h"
 #include "ui/MetersComponent.h"
 #include "ui/CorrelationComponent.h"
 #include "ui/Theme.h"
@@ -49,7 +48,6 @@ private:
     juce::ToggleButton autoGainToggle;
     juce::Slider gainScaleSlider;
     juce::ToggleButton phaseInvertToggle;
-    juce::ToggleButton phaseViewToggle;
     juce::Label themeLabel;
     juce::ComboBox themeBox;
     ThemeColors theme = makeDarkTheme();
@@ -68,7 +66,6 @@ private:
     juce::ToggleButton analyzerExternalToggle;
     juce::ToggleButton smartSoloToggle;
     juce::ToggleButton showSpectralToggle;
-    juce::ToggleButton showEllipticToggle;
     juce::TextButton showCorrelationToggle;
     juce::Label midiSectionLabel;
     juce::ToggleButton midiLearnToggle;
@@ -109,7 +106,6 @@ private:
     MetersComponent meters;
     AnalyzerComponent analyzer;
     BandControlsPanel bandControls;
-    EllipticPanel ellipticPanel;
     SpectralDynamicsPanel spectralPanel;
     CorrelationComponent correlation;
     juce::ResizableCornerComponent resizer { this, &resizeConstrainer };

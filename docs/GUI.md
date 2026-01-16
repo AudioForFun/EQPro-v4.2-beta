@@ -22,10 +22,10 @@
 - Channel options are filtered to the current host layout and refresh on layout change.
 - Channel selector sits under the rotary row (not inside Dynamic section).
 - Bypass is toggled by double-clicking band buttons; active = bypass off.
-- Solo is a per-band toggle under the 1–12 band row (exclusive per channel).
+- Solo is a per-band toggle under the 1–12 band row (exclusive per channel; double-click clears).
 - Any band edit automatically un-bypasses that band.
-- Dynamic EQ: Enable, Up/Down trigger, Threshold, Attack, Release, Auto Scale + diagonal threshold display.
-- Copy/Paste band state, Reset/Default/Delete.
+- Dynamic EQ: Enable, Up/Down trigger, Threshold, Attack, Release, Auto Scale + diagonal threshold display.`n- Dynamic section greys out when disabled; threshold meter is a square with a diagonal ratio line.
+- Copy/Paste band state and Reset (no Delete).
 
 ## Processing / Global
 - Phase mode: Real-time / Natural / Linear.
@@ -48,3 +48,4 @@
 
 ## Resizing
 - Fixed size (1500x980).
+

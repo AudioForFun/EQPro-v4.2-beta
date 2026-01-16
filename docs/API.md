@@ -62,6 +62,8 @@ Usage:
 - No allocations, locks, or blocking in `processBlock`.
 - No APVTS reads in audio thread; use snapshot only.
 - Taps must be lock‑free.
+- Prefer block ramps (`applyGainRamp`) over per‑sample smoothing loops.
+- Decimate analyzer/meter updates at high sample rates to reduce CPU load.
 
 ## Processor ↔ UI Contract
 

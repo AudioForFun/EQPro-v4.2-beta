@@ -1083,14 +1083,12 @@ void EQProAudioProcessorEditor::paint(juce::Graphics& g)
         const auto phaseMode = processorRef.getParameters()
                                    .getRawParameterValue(ParamIDs::phaseMode)
                                    ->load();
-        const float cpu = processorRef.getCpuUsage() * 100.0f;
         const juce::String text = "Debug Panel\n"
             "SR: " + juce::String(sr, 0) + " Hz\n"
             "Latency: " + juce::String(latency) + " samples\n"
             "Phase Mode: " + juce::String(static_cast<int>(phaseMode)) + "\n"
             "Analyzer: " + juce::String(analyzer.getTimerHz()) + " Hz\n"
-            "OpenGL: " + juce::String(openGLContext.isAttached() ? "On" : "Off") + "\n"
-            "CPU: " + juce::String(cpu, 1) + "%";
+            "OpenGL: " + juce::String(openGLContext.isAttached() ? "On" : "Off");
         g.setColour(theme.text);
         g.setFont(12.0f);
         g.drawFittedText(text, area, juce::Justification::topLeft, 4);

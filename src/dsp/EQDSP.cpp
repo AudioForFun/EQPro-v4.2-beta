@@ -730,6 +730,32 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             float* detTempWrite = linkStereoDetectors && ch == 0 ? detectorTemp.getWritePointer(0) : nullptr;
             const float* detTempRead = linkDetector ? detectorTemp.getReadPointer(0) : nullptr;
 
+            const bool canDynamicFastPath = params.dynamicEnabled && mix >= 0.999f && detData != nullptr;
+            if (canDynamicFastPath)
+            {
+                if (isHpLp && slopeConfig.useOnePole)
+                    onePoles[ch][band].processBlock(channelData, samples);
+                for (int stage = 0; stage < stages; ++stage)
+                    filters[ch][band][stage].processBlock(channelData, samples);
+
+                for (int i = 0; i < samples; ++i)
+                {
+                    const float detInput = detData[i];
+                    const float detSample = detectorFilters[ch][band].processSample(detInput);
+                    float& env = detectorEnv[ch][band];
+                    const float absVal = std::abs(detSample);
+                    const float coeff = absVal > env ? attackCoeff : releaseCoeff;
+                    env = coeff * env + (1.0f - coeff) * absVal;
+                    const float detDb = juce::Decibels::gainToDecibels(env, -60.0f);
+                    detectorDb[ch][band].store(detDb);
+
+                    const float dynamicGainDb = computeDynamicGain(params, detDb);
+                    const float deltaDb = dynamicGainDb - staticGainDb;
+                    channelData[i] *= juce::Decibels::decibelsToGain(deltaDb);
+                }
+                continue;
+            }
+
             for (int i = 0; i < samples; ++i)
             {
                 const float dry = channelData[i];

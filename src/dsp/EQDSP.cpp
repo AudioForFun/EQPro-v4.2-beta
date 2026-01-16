@@ -673,16 +673,33 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     detData = detectorBuffer->getReadPointer(detChannel);
             }
 
+            const bool paramsMatchStereo = numChannels == 2
+                && cachedParams[0][band].frequencyHz == cachedParams[1][band].frequencyHz
+                && cachedParams[0][band].gainDb == cachedParams[1][band].gainDb
+                && cachedParams[0][band].q == cachedParams[1][band].q
+                && cachedParams[0][band].type == cachedParams[1][band].type
+                && cachedParams[0][band].slopeDb == cachedParams[1][band].slopeDb
+                && cachedParams[0][band].mix == cachedParams[1][band].mix
+                && cachedParams[0][band].dynamicEnabled == cachedParams[1][band].dynamicEnabled
+                && cachedParams[0][band].dynamicMode == cachedParams[1][band].dynamicMode
+                && cachedParams[0][band].thresholdDb == cachedParams[1][band].thresholdDb
+                && cachedParams[0][band].attackMs == cachedParams[1][band].attackMs
+                && cachedParams[0][band].releaseMs == cachedParams[1][band].releaseMs
+                && cachedParams[0][band].autoScale == cachedParams[1][band].autoScale;
             const bool canStereoSimd = numChannels == 2 && ch == 0 && rightData != nullptr
                 && linkStereoDetectors
-                && ! isHpLp
-                && ! isTilt;
+                && paramsMatchStereo;
             const bool canFastPath = ! params.dynamicEnabled && mix >= 0.999f;
             if (canFastPath && (isBell || isShelf || isHpLp || isTilt || params.type == FilterType::notch
                                 || params.type == FilterType::bandPass || params.type == FilterType::allPass))
             {
                 if (canStereoSimd)
                 {
+                    if (isHpLp && slopeConfig.useOnePole)
+                    {
+                        onePoles[0][band].processBlock(channelData, samples);
+                        onePoles[1][band].processBlock(rightData, samples);
+                    }
                     for (int stage = 0; stage < stages; ++stage)
                         processBiquadStereo(filters[0][band][stage],
                                             filters[1][band][stage],

@@ -127,6 +127,8 @@ private:
     float maxDb = 60.0f;
     int analyzerSpeedIndex = -1;
     int lastTimerHz = 0;
+    int lastCurveWidth = 0;
+    std::vector<uint64_t> perBandCurveHash;
     uint64_t lastCurveHash = 0;
     int lastCurveBand = -1;
     int lastCurveChannel = -1;

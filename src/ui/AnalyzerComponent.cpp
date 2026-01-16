@@ -61,6 +61,7 @@ AnalyzerComponent::AnalyzerComponent(EQProAudioProcessor& processor)
     selectedBands.push_back(selectedBand);
     lastTimerHz = 30;
     startTimerHz(30);
+    perBandCurveHash.assign(ParamIDs::kBandsPerChannel, 0);
 }
 
 void AnalyzerComponent::setSelectedBand(int bandIndex)
@@ -923,6 +924,14 @@ void AnalyzerComponent::updateCurves()
     if (magnitudeArea.getWidth() <= 0)
         return;
 
+    if (lastCurveWidth != magnitudeArea.getWidth())
+    {
+        lastCurveWidth = magnitudeArea.getWidth();
+        perBandCurveDb.assign(ParamIDs::kBandsPerChannel,
+                              std::vector<float>(static_cast<size_t>(lastCurveWidth), 0.0f));
+        perBandCurveHash.assign(ParamIDs::kBandsPerChannel, 0);
+    }
+
     uint64_t hash = 1469598103934665603ull;
     auto hashValue = [&hash](float value)
     {
@@ -936,8 +945,8 @@ void AnalyzerComponent::updateCurves()
         hashValue(getBandParameter(band, kParamQSuffix));
         hashValue(getBandParameter(band, kParamTypeSuffix));
         hashValue(getBandParameter(band, kParamBypassSuffix));
-    hashValue(getBandParameter(band, kParamSlopeSuffix));
-    hashValue(getBandParameter(band, kParamMixSuffix));
+        hashValue(getBandParameter(band, kParamSlopeSuffix));
+        hashValue(getBandParameter(band, kParamMixSuffix));
     }
 
     if (hash == lastCurveHash && selectedBand == lastCurveBand
@@ -951,7 +960,6 @@ void AnalyzerComponent::updateCurves()
     const int width = magnitudeArea.getWidth();
     eqCurveDb.assign(static_cast<size_t>(width), 0.0f);
     selectedBandCurveDb.assign(static_cast<size_t>(width), 0.0f);
-    perBandCurveDb.assign(ParamIDs::kBandsPerChannel, std::vector<float>(static_cast<size_t>(width), 0.0f));
     perBandActive.assign(ParamIDs::kBandsPerChannel, false);
     // Phase view removed.
 
@@ -964,6 +972,26 @@ void AnalyzerComponent::updateCurves()
         perBandActive[band] = bandActive[band];
     }
 
+    std::vector<bool> bandDirty(ParamIDs::kBandsPerChannel, false);
+    for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+    {
+        uint64_t bandHash = 1469598103934665603ull;
+        auto hashBand = [&bandHash](float value)
+        {
+            const auto bits = static_cast<uint64_t>(std::hash<float>{}(value));
+            bandHash ^= bits + 0x9e3779b97f4a7c15ull + (bandHash << 6) + (bandHash >> 2);
+        };
+        hashBand(getBandParameter(band, kParamFreqSuffix));
+        hashBand(getBandParameter(band, kParamGainSuffix));
+        hashBand(getBandParameter(band, kParamQSuffix));
+        hashBand(getBandParameter(band, kParamTypeSuffix));
+        hashBand(getBandParameter(band, kParamBypassSuffix));
+        hashBand(getBandParameter(band, kParamSlopeSuffix));
+        hashBand(getBandParameter(band, kParamMixSuffix));
+        bandDirty[static_cast<size_t>(band)] = bandHash != perBandCurveHash[static_cast<size_t>(band)];
+        perBandCurveHash[static_cast<size_t>(band)] = bandHash;
+    }
+
     for (int x = 0; x < width; ++x)
     {
         const float norm = static_cast<float>(x) / static_cast<float>(width);
@@ -972,13 +1000,27 @@ void AnalyzerComponent::updateCurves()
         std::complex<double> total = { 1.0, 0.0 };
         for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
         {
-            const auto response = computeBandResponse(band, freq);
-            total *= response;
+            std::complex<double> response { 1.0, 0.0 };
             if (bandActive[band])
             {
-                perBandCurveDb[static_cast<size_t>(band)][static_cast<size_t>(x)] =
-                    juce::Decibels::gainToDecibels(static_cast<float>(std::abs(response)), minDb);
+                if (bandDirty[static_cast<size_t>(band)])
+                {
+                    response = computeBandResponse(band, freq);
+                    perBandCurveDb[static_cast<size_t>(band)][static_cast<size_t>(x)] =
+                        juce::Decibels::gainToDecibels(static_cast<float>(std::abs(response)), minDb);
+                }
+                else
+                {
+                    const float db = perBandCurveDb[static_cast<size_t>(band)][static_cast<size_t>(x)];
+                    response = std::complex<double>(juce::Decibels::decibelsToGain(db), 0.0);
+                }
             }
+            else
+            {
+                perBandCurveDb[static_cast<size_t>(band)][static_cast<size_t>(x)] = minDb;
+            }
+
+            total *= response;
         }
 
         const auto bandResp = computeBandResponse(selectedBand, freq);

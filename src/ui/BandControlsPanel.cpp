@@ -129,7 +129,6 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     initLabel(gainLabel, "Gain");
     initLabel(qLabel, "Q");
     initLabel(typeLabel, "Type");
-    initLabel(modeLabel, "Mode");
     initLabel(msLabel, "Channel");
     initLabel(slopeLabel, "Slope");
     initLabel(mixLabel, "Band Mix");
@@ -151,6 +150,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     freqSlider.setTextValueSuffix(" Hz");
     freqSlider.onValueChange = [this]
     {
+        ensureBandActiveFromEdit();
         mirrorToLinkedChannel("freq", static_cast<float>(freqSlider.getValue()));
     };
     addAndMakeVisible(freqSlider);
@@ -162,6 +162,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     gainSlider.setDoubleClickReturnValue(true, 0.0);
     gainSlider.onValueChange = [this]
     {
+        ensureBandActiveFromEdit();
         mirrorToLinkedChannel("gain", static_cast<float>(gainSlider.getValue()));
     };
     addAndMakeVisible(gainSlider);
@@ -172,6 +173,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     qSlider.setDoubleClickReturnValue(true, 0.707f);
     qSlider.onValueChange = [this]
     {
+        ensureBandActiveFromEdit();
         mirrorToLinkedChannel("q", static_cast<float>(qSlider.getValue()));
     };
     addAndMakeVisible(qSlider);
@@ -180,8 +182,10 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     typeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     typeBox.setColour(juce::ComboBox::textColourId, theme.text);
     typeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
+    typeBox.setLookAndFeel(&compactComboLookAndFeel);
     typeBox.onChange = [this]
     {
+        ensureBandActiveFromEdit();
         const int index = typeBox.getSelectedItemIndex();
         if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "type")))
             param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(index)));
@@ -190,39 +194,17 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     };
     addAndMakeVisible(typeBox);
 
-    modeBox.addItemList(juce::StringArray("Active", "Solo", "Bypass"), 1);
-    modeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
-    modeBox.setColour(juce::ComboBox::textColourId, theme.text);
-    modeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    modeBox.onChange = [this]
-    {
-        const int index = modeBox.getSelectedItemIndex();
-        if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "bypass")))
-            bypassParam->setValueNotifyingHost(index == 2 ? 1.0f : 0.0f);
-        if (auto* soloParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "solo")))
-            soloParam->setValueNotifyingHost(index == 1 ? 1.0f : 0.0f);
-        if (index == 1)
-        {
-            for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
-            {
-                if (band == selectedBand)
-                    continue;
-                if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, band, "solo")))
-                    param->setValueNotifyingHost(param->convertTo0to1(0.0f));
-            }
-        }
-    };
-    addAndMakeVisible(modeBox);
-
     msBox.addItemList(kMsChoices, 1);
     msBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     msBox.setColour(juce::ComboBox::textColourId, theme.text);
     msBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
+    msBox.setLookAndFeel(&compactComboLookAndFeel);
     addAndMakeVisible(msBox);
     msBox.onChange = [this]
     {
         if (msChoiceMap.empty())
             return;
+        ensureBandActiveFromEdit();
         const int uiIndex = msBox.getSelectedItemIndex();
         if (uiIndex < 0 || uiIndex >= static_cast<int>(msChoiceMap.size()))
             return;
@@ -240,11 +222,13 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     slopeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     slopeBox.setColour(juce::ComboBox::textColourId, theme.text);
     slopeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
+    slopeBox.setLookAndFeel(&compactComboLookAndFeel);
     slopeBox.onChange = [this]
     {
         const int index = slopeBox.getSelectedItemIndex();
         if (index < 0)
             return;
+        ensureBandActiveFromEdit();
         const float slopeValue = static_cast<float>((index + 1) * 6);
         if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "slope")))
             param->setValueNotifyingHost(param->convertTo0to1(slopeValue));
@@ -260,12 +244,17 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     addAndMakeVisible(mixSlider);
     mixSlider.onValueChange = [this]
     {
+        ensureBandActiveFromEdit();
         mirrorToLinkedChannel("mix", static_cast<float>(mixSlider.getValue()));
     };
 
     dynEnableToggle.setButtonText("Dynamic");
     dynEnableToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     addAndMakeVisible(dynEnableToggle);
+    dynEnableToggle.onClick = [this]
+    {
+        ensureBandActiveFromEdit();
+    };
 
     dynUpButton.setButtonText("UP");
     dynDownButton.setButtonText("DOWN");
@@ -273,6 +262,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     dynDownButton.setClickingTogglesState(true);
     dynUpButton.onClick = [this]()
     {
+        ensureBandActiveFromEdit();
         if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynMode")))
             param->setValueNotifyingHost(param->convertTo0to1(0.0f));
         dynUpButton.setToggleState(true, juce::dontSendNotification);
@@ -280,6 +270,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     };
     dynDownButton.onClick = [this]()
     {
+        ensureBandActiveFromEdit();
         if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynMode")))
             param->setValueNotifyingHost(param->convertTo0to1(1.0f));
         dynUpButton.setToggleState(false, juce::dontSendNotification);
@@ -291,6 +282,10 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     dynExternalToggle.setButtonText("Ext SC");
     dynExternalToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     addAndMakeVisible(dynExternalToggle);
+    dynExternalToggle.onClick = [this]
+    {
+        ensureBandActiveFromEdit();
+    };
 
     thresholdSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     thresholdSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
@@ -298,6 +293,10 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     thresholdSlider.setTextValueSuffix(" dB");
     thresholdSlider.setDoubleClickReturnValue(true, -24.0);
     addAndMakeVisible(thresholdSlider);
+    thresholdSlider.onValueChange = [this]
+    {
+        ensureBandActiveFromEdit();
+    };
 
     attackSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     attackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
@@ -305,6 +304,10 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     attackSlider.setTextValueSuffix(" ms");
     attackSlider.setDoubleClickReturnValue(true, 20.0);
     addAndMakeVisible(attackSlider);
+    attackSlider.onValueChange = [this]
+    {
+        ensureBandActiveFromEdit();
+    };
 
     releaseSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     releaseSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
@@ -312,30 +315,41 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     releaseSlider.setTextValueSuffix(" ms");
     releaseSlider.setDoubleClickReturnValue(true, 200.0);
     addAndMakeVisible(releaseSlider);
+    releaseSlider.onValueChange = [this]
+    {
+        ensureBandActiveFromEdit();
+    };
 
     autoScaleToggle.setButtonText("Auto Scale");
     autoScaleToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     addAndMakeVisible(autoScaleToggle);
-
-    tiltDirToggle.setButtonText("High Boost");
-    tiltDirToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
-    tiltDirToggle.onClick = [this]
+    autoScaleToggle.onClick = [this]
     {
-        if (! tiltDirToggle.isVisible())
-            return;
-        auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "gain"));
-        if (param == nullptr)
-            return;
-        const float current = param->getValue();
-        const float gain = param->convertFrom0to1(current);
-        const float targetGain = tiltDirToggle.getToggleState()
-            ? (gain > 0.0f ? -gain : (gain == 0.0f ? -1.0f : gain))
-            : (gain < 0.0f ? -gain : gain);
-        param->setValueNotifyingHost(param->convertTo0to1(targetGain));
+        ensureBandActiveFromEdit();
     };
-    addAndMakeVisible(tiltDirToggle);
+
+    soloButton.setButtonText("Solo");
+    soloButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
+    addAndMakeVisible(soloButton);
+    soloButton.onClick = [this]
+    {
+        ensureBandActiveFromEdit();
+        const bool enabled = soloButton.getToggleState();
+        if (enabled)
+        {
+            for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+            {
+                if (band == selectedBand)
+                    continue;
+                if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, band, "solo")))
+                    param->setValueNotifyingHost(param->convertTo0to1(0.0f));
+            }
+        }
+        mirrorToLinkedChannel("solo", enabled ? 1.0f : 0.0f);
+    };
 
     updateAttachments();
+    updateBandKnobColours();
     if (auto* typeParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "type")))
     {
         const int typeIndex = static_cast<int>(typeParam->convertFrom0to1(typeParam->getValue()));
@@ -344,6 +358,22 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     updateTypeUi();
     updateMsChoices();
     syncMsSelectionFromParam();
+}
+
+void BandControlsPanel::ensureBandActiveFromEdit()
+{
+    if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "bypass")))
+    {
+        if (bypassParam->getValue() > 0.5f)
+            bypassParam->setValueNotifyingHost(0.0f);
+    }
+}
+
+BandControlsPanel::~BandControlsPanel()
+{
+    typeBox.setLookAndFeel(nullptr);
+    msBox.setLookAndFeel(nullptr);
+    slopeBox.setLookAndFeel(nullptr);
 }
 
 void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
@@ -398,8 +428,6 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     msBox.setColour(juce::ComboBox::textColourId, theme.text);
     msBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
     slopeBox.setColour(juce::ComboBox::textColourId, theme.text);
-    modeLabel.setColour(juce::Label::textColourId, theme.textMuted);
-    modeBox.setColour(juce::ComboBox::textColourId, theme.text);
     updateBandKnobColours();
     mixSlider.setColour(juce::Slider::textBoxTextColourId, theme.text);
     mixSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
@@ -422,7 +450,7 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
         button.setColour(juce::TextButton::textColourOffId, colour.withAlpha(0.9f));
         button.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
     }
-    tiltDirToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
+    soloButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     dynEnableToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     dynUpButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     dynDownButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
@@ -434,13 +462,20 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
 void BandControlsPanel::updateBandKnobColours()
 {
     const auto bandColour = ColorUtils::bandColour(selectedBand);
-    freqSlider.setColour(juce::Slider::trackColourId, bandColour);
-    gainSlider.setColour(juce::Slider::trackColourId, bandColour);
-    qSlider.setColour(juce::Slider::trackColourId, bandColour);
-    mixSlider.setColour(juce::Slider::trackColourId, bandColour);
-    thresholdSlider.setColour(juce::Slider::trackColourId, bandColour);
-    attackSlider.setColour(juce::Slider::trackColourId, bandColour);
-    releaseSlider.setColour(juce::Slider::trackColourId, bandColour);
+    auto applyColour = [bandColour](juce::Slider& slider)
+    {
+        slider.setColour(juce::Slider::trackColourId, bandColour);
+        slider.setColour(juce::Slider::rotarySliderFillColourId, bandColour);
+        slider.setColour(juce::Slider::rotarySliderOutlineColourId, bandColour.darker(0.6f));
+        slider.setColour(juce::Slider::thumbColourId, bandColour);
+    };
+    applyColour(freqSlider);
+    applyColour(gainSlider);
+    applyColour(qSlider);
+    applyColour(mixSlider);
+    applyColour(thresholdSlider);
+    applyColour(attackSlider);
+    applyColour(releaseSlider);
 }
 
 void BandControlsPanel::setMsEnabled(bool enabled)
@@ -464,19 +499,27 @@ void BandControlsPanel::paint(juce::Graphics& g)
         g.setColour(theme.panelOutline.withAlpha(0.6f));
         g.fillRoundedRectangle(meter, 4.0f);
 
+        const auto inner = meter.reduced(5.0f);
+        const auto start = juce::Point<float>(inner.getX(), inner.getBottom());
+        const auto end = juce::Point<float>(inner.getRight(), inner.getY());
+        g.setColour(theme.textMuted.withAlpha(0.7f));
+        g.drawLine({ start, end }, 1.2f);
+
         const float clampedDb = juce::jlimit(-60.0f, 0.0f, detectorDb);
         const float norm = (clampedDb + 60.0f) / 60.0f;
-        auto fill = meter;
-        fill.setY(meter.getBottom() - meter.getHeight() * norm);
-        fill.setHeight(meter.getBottom() - fill.getY());
-        g.setColour(ColorUtils::bandColour(selectedBand));
-        g.fillRoundedRectangle(fill.reduced(2.0f), 3.0f);
+        const auto ball = juce::Point<float>(juce::jmap(norm, start.x, end.x),
+                                             juce::jmap(norm, start.y, end.y));
+        g.setColour(ColorUtils::bandColour(selectedBand).withAlpha(0.9f));
+        g.fillEllipse(ball.x - 4.5f, ball.y - 4.5f, 9.0f, 9.0f);
+        g.setColour(theme.panel.withAlpha(0.9f));
+        g.drawEllipse(ball.x - 4.5f, ball.y - 4.5f, 9.0f, 9.0f, 1.2f);
 
         const float thresh = static_cast<float>(thresholdSlider.getValue());
         const float threshNorm = (juce::jlimit(-60.0f, 0.0f, thresh) + 60.0f) / 60.0f;
-        const float y = meter.getBottom() - meter.getHeight() * threshNorm;
+        const auto threshPoint = juce::Point<float>(juce::jmap(threshNorm, start.x, end.x),
+                                                    juce::jmap(threshNorm, start.y, end.y));
         g.setColour(theme.textMuted);
-        g.drawLine(meter.getX(), y, meter.getRight(), y, 1.2f);
+        g.drawEllipse(threshPoint.x - 3.0f, threshPoint.y - 3.0f, 6.0f, 6.0f, 1.0f);
     }
 
 }
@@ -485,6 +528,20 @@ void BandControlsPanel::timerCallback()
 {
     detectorDb = processor.getBandDetectorDb(selectedChannel, selectedBand);
     syncMsSelectionFromParam();
+    for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
+    {
+        bool bypassed = false;
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, i, "bypass")))
+            bypassed = param->getValue() > 0.5f;
+        auto baseColour = ColorUtils::bandColour(i);
+        if (bypassed)
+            baseColour = baseColour.withSaturation(0.05f).withBrightness(0.35f);
+        auto& button = bandSelectButtons[static_cast<size_t>(i)];
+        button.setColour(juce::TextButton::buttonColourId, baseColour.withAlpha(0.2f));
+        button.setColour(juce::TextButton::buttonOnColourId, baseColour.withAlpha(0.55f));
+        button.setColour(juce::TextButton::textColourOffId, baseColour.withAlpha(bypassed ? 0.45f : 0.9f));
+        button.setColour(juce::TextButton::textColourOnId, bypassed ? theme.textMuted : juce::Colours::white);
+    }
     repaint(detectorMeterBounds.getSmallestIntegerContainer());
 }
 
@@ -512,8 +569,9 @@ void BandControlsPanel::resized()
     const int gap = 6;
     const int labelHeight = 14;
     const int rowHeight = 20;
-    const int knobRowHeight = 112;
-    const int knobSize = juce::jmin(80, knobRowHeight - labelHeight - 6);
+    const int comboHeight = 18;
+    const int knobRowHeight = 120;
+    const int knobSize = juce::jmin(86, knobRowHeight - labelHeight - 6);
 
     auto left = bounds.removeFromLeft(static_cast<int>(bounds.getWidth() * 0.62f));
     auto right = bounds;
@@ -538,6 +596,11 @@ void BandControlsPanel::resized()
     }
 
     left.removeFromTop(gap);
+    auto soloRow = left.removeFromTop(rowHeight);
+    soloButton.setBounds(soloRow.removeFromLeft(70));
+    left.removeFromTop(gap);
+
+    const int eqKnobTop = left.getY();
     auto knobsRow = left.removeFromTop(knobRowHeight);
     const int knobWidth = (knobsRow.getWidth() - gap * 3) / 4;
     auto squareKnob = [](juce::Rectangle<int> area)
@@ -564,23 +627,21 @@ void BandControlsPanel::resized()
     left.removeFromTop(gap);
     auto channelRow = left.removeFromTop(labelHeight + rowHeight);
     msLabel.setBounds(channelRow.removeFromTop(labelHeight));
-    msBox.setBounds(channelRow.withHeight(rowHeight));
+    msBox.setBounds(channelRow.withHeight(comboHeight).withCentre(channelRow.getCentre()));
 
     left.removeFromTop(gap);
     auto typeRow = left.removeFromTop(labelHeight + rowHeight);
     typeLabel.setBounds(typeRow.removeFromTop(labelHeight));
-    typeBox.setBounds(typeRow.withHeight(rowHeight));
-
-    left.removeFromTop(2);
-    auto modeRow = left.removeFromTop(labelHeight + rowHeight);
-    modeLabel.setBounds(modeRow.removeFromTop(labelHeight));
-    modeBox.setBounds(modeRow.withHeight(rowHeight));
+    typeBox.setBounds(typeRow.withHeight(comboHeight).withCentre(typeRow.getCentre()));
 
     left.removeFromTop(2);
     auto togglesRow = left.removeFromTop(rowHeight);
-    tiltDirToggle.setBounds(togglesRow.removeFromLeft(120));
+    juce::ignoreUnused(togglesRow);
 
     // Dynamic panel (right column)
+    const int padBeforeDynHeader = juce::jmax(0, eqKnobTop
+                                                     - (right.getY() + labelHeight + rowHeight + 4));
+    right.removeFromTop(padBeforeDynHeader);
     auto dynHeader = right.removeFromTop(labelHeight);
     dynamicLabel.setBounds(dynHeader);
     auto dynRow = right.removeFromTop(rowHeight);
@@ -611,7 +672,7 @@ void BandControlsPanel::resized()
     left.removeFromTop(2);
     auto slopeRow = left.removeFromTop(labelHeight + rowHeight);
     slopeLabel.setBounds(slopeRow.removeFromTop(labelHeight));
-    slopeBox.setBounds(slopeRow.withHeight(rowHeight));
+    slopeBox.setBounds(slopeRow.withHeight(comboHeight).withCentre(slopeRow.getCentre()));
 
 }
 
@@ -629,6 +690,7 @@ void BandControlsPanel::updateAttachments()
     gainAttachment = std::make_unique<SliderAttachment>(parameters, gainId, gainSlider);
     qAttachment = std::make_unique<SliderAttachment>(parameters, qId, qSlider);
     mixAttachment = std::make_unique<SliderAttachment>(parameters, mixId, mixSlider);
+    soloAttachment = std::make_unique<ButtonAttachment>(parameters, soloId, soloButton);
     dynEnableAttachment = std::make_unique<ButtonAttachment>(
         parameters, ParamIDs::bandParamId(selectedChannel, selectedBand, "dynEnable"), dynEnableToggle);
     dynThresholdAttachment = std::make_unique<SliderAttachment>(
@@ -663,15 +725,6 @@ void BandControlsPanel::updateAttachments()
         typeBox.setSelectedItemIndex(typeIndex, juce::dontSendNotification);
     }
 
-    if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "bypass")))
-    {
-        const bool bypassed = bypassParam->getValue() > 0.5f;
-        bool solo = false;
-        if (auto* soloParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "solo")))
-            solo = soloParam->getValue() > 0.5f;
-        const int index = bypassed ? 2 : (solo ? 1 : 0);
-        modeBox.setSelectedItemIndex(index, juce::dontSendNotification);
-    }
 }
 
 void BandControlsPanel::resetSelectedBand(bool shouldBypass)
@@ -700,6 +753,8 @@ void BandControlsPanel::resetSelectedBand(bool shouldBypass)
 
     if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "bypass")))
         bypassParam->setValueNotifyingHost(shouldBypass ? 1.0f : 0.0f);
+    if (auto* soloParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "solo")))
+        soloParam->setValueNotifyingHost(0.0f);
 }
 
 void BandControlsPanel::updateTypeUi()
@@ -714,16 +769,7 @@ void BandControlsPanel::updateTypeUi()
     slopeBox.setEnabled(isHpLp);
     slopeBox.setAlpha(isHpLp ? 1.0f : 0.5f);
     const bool isTilt = (typeIndex == 8 || typeIndex == 9);
-    tiltDirToggle.setVisible(isTilt);
-    if (isTilt)
-    {
-        const auto gainId = ParamIDs::bandParamId(selectedChannel, selectedBand, "gain");
-        if (auto* param = parameters.getParameter(gainId))
-        {
-            const float gain = param->convertFrom0to1(param->getValue());
-            tiltDirToggle.setToggleState(gain < 0.0f, juce::dontSendNotification);
-        }
-    }
+    juce::ignoreUnused(isTilt);
     dynEnableToggle.setVisible(true);
     dynUpButton.setVisible(true);
     dynDownButton.setVisible(true);
@@ -850,12 +896,14 @@ void BandControlsPanel::copyBandState()
     state.gain = static_cast<float>(gainSlider.getValue());
     state.q = static_cast<float>(qSlider.getValue());
     state.type = static_cast<float>(getCurrentTypeIndex());
-    state.bypass = (modeBox.getSelectedItemIndex() == 2) ? 1.0f : 0.0f;
+    if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "bypass")))
+        state.bypass = (bypassParam->getValue() > 0.5f) ? 1.0f : 0.0f;
     state.ms = static_cast<float>(getMsParamValue());
     const auto slopeId = ParamIDs::bandParamId(selectedChannel, selectedBand, "slope");
     if (auto* param = parameters.getParameter(slopeId))
         state.slope = param->convertFrom0to1(param->getValue());
-    state.solo = (modeBox.getSelectedItemIndex() == 1) ? 1.0f : 0.0f;
+    if (auto* soloParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "solo")))
+        state.solo = (soloParam->getValue() > 0.5f) ? 1.0f : 0.0f;
     state.mix = static_cast<float>(mixSlider.getValue());
     state.dynEnable = dynEnableToggle.getToggleState() ? 1.0f : 0.0f;
     state.dynMode = dynUpButton.getToggleState() ? 0.0f : 1.0f;

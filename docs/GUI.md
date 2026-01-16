@@ -21,8 +21,10 @@
 - Routing: All/Mid/Side/Left/Right plus immersive channels/pairs.
 - Channel options are filtered to the current host layout and refresh on layout change.
 - Channel selector sits under the rotary row (not inside Dynamic section).
-- Solo and Bypass per band.
-- Dynamic EQ: Enable, Up/Down trigger, Threshold, Attack, Release, Auto Scale + detector meter.
+- Bypass is toggled by double-clicking band buttons; active = bypass off.
+- Solo is a per-band toggle under the 1–12 band row (exclusive per channel).
+- Any band edit automatically un-bypasses that band.
+- Dynamic EQ: Enable, Up/Down trigger, Threshold, Attack, Release, Auto Scale + diagonal threshold display.
 - Copy/Paste band state, Reset/Default/Delete.
 
 ## Processing / Global

@@ -1,4 +1,4 @@
-# EQ Pro (JUCE) - 2.0 beta
+# EQ Pro (JUCE) - 2.1 beta
 
 Work-in-progress JUCE multi-channel EQ plugin.
 

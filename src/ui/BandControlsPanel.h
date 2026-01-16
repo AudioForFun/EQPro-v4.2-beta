@@ -13,6 +13,7 @@ class BandControlsPanel final : public juce::Component,
 {
 public:
     explicit BandControlsPanel(EQProAudioProcessor& processor);
+    ~BandControlsPanel() override;
 
     void setSelectedBand(int channelIndex, int bandIndex);
     void setChannelNames(const std::vector<juce::String>& names);
@@ -26,6 +27,19 @@ public:
     void mouseDoubleClick(const juce::MouseEvent& event) override;
 
 private:
+    struct CompactComboLookAndFeel final : public juce::LookAndFeel_V4
+    {
+        juce::Font getComboBoxFont(juce::ComboBox&) override
+        {
+            return juce::Font(11.0f);
+        }
+
+        juce::Font getPopupMenuFont() override
+        {
+            return juce::Font(11.0f);
+        }
+    };
+
     void updateAttachments();
     void updateTypeUi();
     int getCurrentTypeIndex() const;
@@ -38,6 +52,7 @@ private:
     void syncMsSelectionFromParam();
     int getMsParamValue() const;
     void updateBandKnobColours();
+    void ensureBandActiveFromEdit();
 
     struct BandState
     {
@@ -77,8 +92,6 @@ private:
     juce::Slider qSlider;
     juce::Label typeLabel;
     juce::ComboBox typeBox;
-    juce::Label modeLabel;
-    juce::ComboBox modeBox;
     juce::Label msLabel;
     juce::ComboBox msBox;
     juce::Label slopeLabel;
@@ -87,7 +100,7 @@ private:
     juce::Slider mixSlider;
     juce::TextButton copyButton;
     juce::TextButton pasteButton;
-    juce::ToggleButton tiltDirToggle;
+    juce::ToggleButton soloButton;
     juce::Label dynamicLabel;
     juce::ToggleButton dynEnableToggle;
     juce::TextButton dynUpButton;
@@ -110,6 +123,7 @@ private:
     std::unique_ptr<SliderAttachment> gainAttachment;
     std::unique_ptr<SliderAttachment> qAttachment;
     std::unique_ptr<SliderAttachment> mixAttachment;
+    std::unique_ptr<ButtonAttachment> soloAttachment;
     std::unique_ptr<ButtonAttachment> dynEnableAttachment;
     std::unique_ptr<ComboBoxAttachment> dynModeAttachment;
     std::unique_ptr<SliderAttachment> dynThresholdAttachment;
@@ -119,6 +133,7 @@ private:
     std::unique_ptr<ButtonAttachment> dynExternalAttachment;
 
     ThemeColors theme = makeDarkTheme();
+    CompactComboLookAndFeel compactComboLookAndFeel;
     bool msEnabled = true;
     std::optional<BandState> clipboard;
     float detectorDb = -60.0f;

@@ -98,6 +98,8 @@ flowchart LR
   METER -->|read state| UI
 ```
 
+For larger architecture and threading diagrams, see `docs/DIAGRAMS.md`.
+
 ## Method Summary (Core API)
 
 ### `EQProAudioProcessor`

@@ -61,5 +61,8 @@ See `docs/PARAMS.md`.
 ## Signal Flow Diagrams
 See `docs/SIGNAL_FLOW.md`.
 
+## Architecture Diagrams
+See `docs/DIAGRAMS.md`.
+
 ## GUI
 See `docs/GUI.md`.

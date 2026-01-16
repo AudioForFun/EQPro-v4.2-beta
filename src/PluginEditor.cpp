@@ -316,6 +316,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     outputTrimSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 68, 18);
     outputTrimSlider.setTextBoxIsEditable(true);
     outputTrimSlider.setTextValueSuffix(" dB");
+    outputTrimSlider.setColour(juce::Slider::trackColourId, juce::Colour(0xff38bdf8));
     addAndMakeVisible(outputTrimSlider);
     outputTrimAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.getParameters(), ParamIDs::outputTrim, outputTrimSlider);

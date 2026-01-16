@@ -23,6 +23,7 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
     void timerCallback() override;
+    void mouseDoubleClick(const juce::MouseEvent& event) override;
 
 private:
     void updateAttachments();
@@ -36,6 +37,7 @@ private:
     void updateMsChoices();
     void syncMsSelectionFromParam();
     int getMsParamValue() const;
+    void updateBandKnobColours();
 
     struct BandState
     {
@@ -63,6 +65,7 @@ private:
     int selectedBand = 0;
 
     juce::Label titleLabel;
+    juce::Label eqSectionLabel;
     juce::TextButton defaultButton;
     juce::TextButton deleteButton;
     std::array<juce::TextButton, ParamIDs::kBandsPerChannel> bandSelectButtons;
@@ -74,16 +77,16 @@ private:
     juce::Slider qSlider;
     juce::Label typeLabel;
     juce::ComboBox typeBox;
+    juce::Label modeLabel;
+    juce::ComboBox modeBox;
     juce::Label msLabel;
     juce::ComboBox msBox;
     juce::Label slopeLabel;
     juce::ComboBox slopeBox;
     juce::Label mixLabel;
     juce::Slider mixSlider;
-    juce::ToggleButton bypassButton;
     juce::TextButton copyButton;
     juce::TextButton pasteButton;
-    juce::ToggleButton soloButton;
     juce::ToggleButton tiltDirToggle;
     juce::Label dynamicLabel;
     juce::ToggleButton dynEnableToggle;
@@ -107,8 +110,6 @@ private:
     std::unique_ptr<SliderAttachment> gainAttachment;
     std::unique_ptr<SliderAttachment> qAttachment;
     std::unique_ptr<SliderAttachment> mixAttachment;
-    std::unique_ptr<ButtonAttachment> bypassAttachment;
-    std::unique_ptr<ButtonAttachment> soloAttachment;
     std::unique_ptr<ButtonAttachment> dynEnableAttachment;
     std::unique_ptr<ComboBoxAttachment> dynModeAttachment;
     std::unique_ptr<SliderAttachment> dynThresholdAttachment;

@@ -5,6 +5,37 @@ namespace
 {
 constexpr float kMinDb = -60.0f;
 constexpr float kMaxDb = 6.0f;
+
+juce::String formatDolbyLabel(const juce::String& label)
+{
+    auto key = label.toUpperCase().removeCharacters(" /");
+    if (key == "L") return "L";
+    if (key == "R") return "R";
+    if (key == "C") return "C";
+    if (key == "LFE") return "LFE";
+    if (key == "LFE2") return "LFE2";
+    if (key == "LS") return "Ls";
+    if (key == "RS") return "Rs";
+    if (key == "LRS") return "Lrs";
+    if (key == "RRS") return "Rrs";
+    if (key == "LC") return "Lc";
+    if (key == "RC") return "Rc";
+    if (key == "LTF") return "Ltf";
+    if (key == "RTF") return "Rtf";
+    if (key == "TFC") return "Tfc";
+    if (key == "TM") return "Tm";
+    if (key == "LTR") return "Ltr";
+    if (key == "RTR") return "Rtr";
+    if (key == "TRC") return "Trc";
+    if (key == "LTS") return "Lts";
+    if (key == "RTS") return "Rts";
+    if (key == "LW") return "Lw";
+    if (key == "RW") return "Rw";
+    if (key == "BFL") return "Bfl";
+    if (key == "BFR") return "Bfr";
+    if (key == "BFC") return "Bfc";
+    return label;
+}
 }
 
 MetersComponent::MetersComponent(EQProAudioProcessor& processor)
@@ -45,10 +76,21 @@ void MetersComponent::paint(juce::Graphics& g)
     const auto phaseArea = meterArea.removeFromBottom(14.0f);
     const auto peakArea = meterArea.removeFromBottom(18.0f);
     const int channels = juce::jmax(1, static_cast<int>(rmsDb.size()));
-    const float gap = 4.0f;
-    const float meterWidth = (meterArea.getWidth() - gap * static_cast<float>(channels - 1))
+    const float gap = channels > 10 ? 2.0f : 4.0f;
+    const float meterWidthRaw = (meterArea.getWidth() - gap * static_cast<float>(channels - 1))
         / static_cast<float>(channels);
-    const float fontSize = channels > 8 ? 9.5f : 11.0f;
+    float meterWidth = meterWidthRaw;
+    const float maxWidth = channels > 10 ? 12.0f : 16.0f;
+    if (meterWidth > maxWidth)
+        meterWidth = maxWidth;
+    float totalWidth = meterWidth * static_cast<float>(channels)
+        + gap * static_cast<float>(channels - 1);
+    if (totalWidth > meterArea.getWidth())
+    {
+        meterWidth = meterWidthRaw;
+        totalWidth = meterArea.getWidth();
+    }
+    const float startX = meterArea.getX() + (meterArea.getWidth() - totalWidth) * 0.5f;
 
     auto drawMeter = [&](float x, float rmsDbValue, float peakDbValue, float holdDbValue,
                          const juce::String& label)
@@ -89,9 +131,12 @@ void MetersComponent::paint(juce::Graphics& g)
         g.setColour(theme.meterPeak.withAlpha(0.75f));
         g.drawLine(meterBounds.getX(), holdY, meterBounds.getRight(), holdY, 1.0f);
 
+        juce::String labelText = formatDolbyLabel(label);
+        const float labelScale = labelText.length() <= 2 ? 0.9f : 0.75f;
+        const float labelFont = juce::jlimit(6.0f, 11.0f, meterWidth * labelScale);
         g.setColour(theme.textMuted);
-        g.setFont(fontSize);
-        g.drawFittedText(label, meterBounds.toNearestInt().withHeight(16),
+        g.setFont(labelFont);
+        g.drawFittedText(labelText, meterBounds.toNearestInt().withHeight(14),
                          juce::Justification::centred, 1);
     };
 
@@ -101,7 +146,7 @@ void MetersComponent::paint(juce::Graphics& g)
             channelLabels.size() > ch
                 ? channelLabels[ch]
                 : ("Ch " + juce::String(ch + 1));
-        const float x = meterArea.getX() + ch * (meterWidth + gap);
+        const float x = startX + ch * (meterWidth + gap);
         const float holdValue = peakHoldDb.size() > static_cast<size_t>(ch)
             ? peakHoldDb[static_cast<size_t>(ch)]
             : peakDb[static_cast<size_t>(ch)];

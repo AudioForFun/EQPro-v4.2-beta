@@ -955,6 +955,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     refreshPresetsButton.setVisible(false);
     applyLabel.setVisible(false);
     applyTargetBox.setVisible(false);
+    presetDeltaToggle.setVisible(true);
     snapshotSectionLabel.setVisible(true);
     undoButton.setVisible(true);
     redoButton.setVisible(true);
@@ -1063,6 +1064,10 @@ void EQProAudioProcessorEditor::resized()
     const int mixSliderWidth = static_cast<int>(140 * uiScale);
     globalMixSlider.setBounds(topBar.removeFromLeft(mixSliderWidth)
                                   .withSizeKeepingCentre(mixSliderWidth, globalBypassHeight + 8));
+    topBar.removeFromLeft(static_cast<int>(10 * uiScale));
+    const int deltaWidth = static_cast<int>(70 * uiScale);
+    presetDeltaToggle.setBounds(topBar.removeFromLeft(deltaWidth)
+                                    .withSizeKeepingCentre(deltaWidth, globalBypassHeight));
 
     auto content = bounds;
     const int metersWidth = static_cast<int>(kRightPanelWidth * uiScale);

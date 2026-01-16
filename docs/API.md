@@ -83,3 +83,54 @@ Usage:
 3. `processBlock` reads stable snapshot and processes via `EqEngine`.
 4. `AnalyzerTap`/`MeterTap` provide data to UI via lock‑free reads.
 
+## Call Flow Diagram (Mermaid)
+```mermaid
+flowchart LR
+  UI[PluginEditor + UI] -->|APVTS attachments| APVTS[AudioProcessorValueTreeState]
+  APVTS -->|timerCallback| SNAP[ParamSnapshot (double buffer)]
+  SNAP -->|atomic swap| PROC[EQProAudioProcessor::processBlock]
+  PROC -->|process()| ENG[EqEngine]
+  ENG -->|push()| PRE[AnalyzerTap (pre)]
+  ENG -->|push()| POST[AnalyzerTap (post)]
+  ENG -->|process()| METER[MeterTap]
+  PRE -->|read FIFO| UI
+  POST -->|read FIFO| UI
+  METER -->|read state| UI
+```
+
+## Method Summary (Core API)
+
+### `EQProAudioProcessor`
+| Method | Thread | Purpose |
+| --- | --- | --- |
+| `prepareToPlay()` | audio | Initializes DSP engine and taps. |
+| `processBlock()` | audio | Processes audio using a stable `ParamSnapshot`. |
+| `timerCallback()` | message | Builds next snapshot and updates linear phase. |
+| `getAnalyzerPreFifo()` | UI | Read-only access to pre analyzer FIFO. |
+| `getAnalyzerPostFifo()` | UI | Read-only access to post analyzer FIFO. |
+| `getMeterState()` | UI | Read-only access to meter state. |
+| `getCorrelation()` | UI | Read-only access to correlation. |
+
+### `EqEngine`
+| Method | Thread | Purpose |
+| --- | --- | --- |
+| `prepare()` | audio | Preallocates DSP state. |
+| `reset()` | audio | Clears DSP state. |
+| `process()` | audio | Processes buffer using snapshot. |
+| `updateLinearPhase()` | message | Rebuilds FIR when params change. |
+
+### `AnalyzerTap`
+| Method | Thread | Purpose |
+| --- | --- | --- |
+| `prepare()` | message | Preallocates FIFO. |
+| `push()` | audio | Writes analyzer samples (lock-free). |
+| `getFifo()` | UI | Read-only FIFO access. |
+
+### `MeterTap`
+| Method | Thread | Purpose |
+| --- | --- | --- |
+| `prepare()` | message | Preallocates meter state. |
+| `process()` | audio | Updates meter values. |
+| `getState()` | UI | Read-only meter values. |
+| `getCorrelation()` | UI | Read-only correlation value. |
+

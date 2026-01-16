@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <JuceHeader.h>
 #include "EQBand.h"
 
 namespace eqdsp
@@ -14,6 +15,9 @@ public:
 
     float processSample(float x);
     void processBlock(float* data, int numSamples);
+    void getCoefficients(float& b0Out, float& b1Out, float& b2Out, float& a1Out, float& a2Out) const;
+    void getState(float& z1Out, float& z2Out) const;
+    void setState(float z1In, float z2In);
 
 private:
     void setCoefficients(const BandParams& params);

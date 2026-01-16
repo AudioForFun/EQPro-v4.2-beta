@@ -87,6 +87,27 @@ void Biquad::processBlock(float* data, int numSamples)
     z2 = z2l;
 }
 
+void Biquad::getCoefficients(float& b0Out, float& b1Out, float& b2Out, float& a1Out, float& a2Out) const
+{
+    b0Out = static_cast<float>(b0);
+    b1Out = static_cast<float>(b1);
+    b2Out = static_cast<float>(b2);
+    a1Out = static_cast<float>(a1);
+    a2Out = static_cast<float>(a2);
+}
+
+void Biquad::getState(float& z1Out, float& z2Out) const
+{
+    z1Out = static_cast<float>(z1);
+    z2Out = static_cast<float>(z2);
+}
+
+void Biquad::setState(float z1In, float z2In)
+{
+    z1 = z1In;
+    z2 = z2In;
+}
+
 void Biquad::setCoefficients(const BandParams& params)
 {
     const double nyquist = sampleRateHz * 0.5;

@@ -37,6 +37,50 @@ float computeDynamicGain(const eqdsp::BandParams& params, float detectorDb)
         return params.gainDb * (1.0f - amount);
     return params.gainDb * amount;
 }
+
+void processBiquadStereo(eqdsp::Biquad& left,
+                         eqdsp::Biquad& right,
+                         float* leftData,
+                         float* rightData,
+                         int numSamples)
+{
+    if (leftData == nullptr || rightData == nullptr || numSamples <= 0)
+        return;
+
+    float b0 = 0.0f, b1 = 0.0f, b2 = 0.0f, a1 = 0.0f, a2 = 0.0f;
+    left.getCoefficients(b0, b1, b2, a1, a2);
+    float z1L = 0.0f, z2L = 0.0f, z1R = 0.0f, z2R = 0.0f;
+    left.getState(z1L, z2L);
+    right.getState(z1R, z2R);
+
+    alignas (sizeof (juce::dsp::SIMDRegister<float>)) float z1Arr[juce::dsp::SIMDRegister<float>::SIMDNumElements] {};
+    alignas (sizeof (juce::dsp::SIMDRegister<float>)) float z2Arr[juce::dsp::SIMDRegister<float>::SIMDNumElements] {};
+    z1Arr[0] = z1L; z1Arr[1] = z1R;
+    z2Arr[0] = z2L; z2Arr[1] = z2R;
+    auto z1 = juce::dsp::SIMDRegister<float>::fromRawArray(z1Arr);
+    auto z2 = juce::dsp::SIMDRegister<float>::fromRawArray(z2Arr);
+    const auto vb0 = juce::dsp::SIMDRegister<float>::expand(b0);
+    const auto vb1 = juce::dsp::SIMDRegister<float>::expand(b1);
+    const auto vb2 = juce::dsp::SIMDRegister<float>::expand(b2);
+    const auto va1 = juce::dsp::SIMDRegister<float>::expand(a1);
+    const auto va2 = juce::dsp::SIMDRegister<float>::expand(a2);
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        alignas (sizeof (juce::dsp::SIMDRegister<float>)) float xArr[juce::dsp::SIMDRegister<float>::SIMDNumElements] {};
+        xArr[0] = leftData[i];
+        xArr[1] = rightData[i];
+        const auto x = juce::dsp::SIMDRegister<float>::fromRawArray(xArr);
+        const auto y = vb0 * x + z1;
+        z1 = vb1 * x - va1 * y + z2;
+        z2 = vb2 * x - va2 * y;
+        leftData[i] = y.get(0);
+        rightData[i] = y.get(1);
+    }
+
+    left.setState(z1.get(0), z2.get(0));
+    right.setState(z1.get(1), z2.get(1));
+}
 eqdsp::BandParams makeTiltParams(const eqdsp::BandParams& params, bool highShelf, float qOverride = -1.0f)
 {
     auto tiltParams = params;
@@ -548,6 +592,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
     for (int ch = 0; ch < numChannels; ++ch)
     {
         auto* channelData = buffer.getWritePointer(ch);
+        auto* rightData = (numChannels >= 2) ? buffer.getWritePointer(1) : nullptr;
         for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
         {
             const int target = (ch < 2) ? msTargets[band] : 0;
@@ -628,10 +673,23 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     detData = detectorBuffer->getReadPointer(detChannel);
             }
 
+            const bool canStereoSimd = numChannels == 2 && ch == 0 && rightData != nullptr
+                && linkStereoDetectors
+                && ! isHpLp
+                && ! isTilt;
             const bool canFastPath = ! params.dynamicEnabled && mix >= 0.999f;
             if (canFastPath && (isBell || isShelf || isHpLp || isTilt || params.type == FilterType::notch
                                 || params.type == FilterType::bandPass || params.type == FilterType::allPass))
             {
+                if (canStereoSimd)
+                {
+                    for (int stage = 0; stage < stages; ++stage)
+                        processBiquadStereo(filters[0][band][stage],
+                                            filters[1][band][stage],
+                                            channelData, rightData, samples);
+                    continue;
+                }
+
                 if (isHpLp && slopeConfig.useOnePole)
                     onePoles[ch][band].processBlock(channelData, samples);
                 for (int stage = 0; stage < stages; ++stage)

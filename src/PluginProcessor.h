@@ -103,7 +103,7 @@ private:
 
     void initializeParamPointers();
     void timerCallback() override;
-    void buildSnapshot(eqdsp::ParamSnapshot& snapshot);
+    uint64_t buildSnapshot(eqdsp::ParamSnapshot& snapshot);
 
     juce::AudioProcessorValueTreeState parameters;
     juce::UndoManager undoManager;
@@ -165,6 +165,12 @@ private:
 
     double lastSampleRate = 0.0;
     int lastMaxBlockSize = 0;
+    uint64_t lastSnapshotHash = 0;
+    int snapshotTick = 0;
+    int lastLinearRebuildTick = -100;
+    int lastLinearPhaseMode = 0;
+    int lastLinearQuality = 0;
+    int lastLinearWindow = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EQProAudioProcessor)
 };

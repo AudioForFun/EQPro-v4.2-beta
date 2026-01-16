@@ -7,6 +7,7 @@ namespace eqdsp
 {
 void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
 {
+    sampleRateHz = sampleRate;
     eqDsp.prepare(sampleRate, maxBlockSize, numChannels);
     eqDsp.reset();
     linearPhaseEq.prepare(sampleRate, maxBlockSize, numChannels);
@@ -25,6 +26,13 @@ void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
     globalMixSmoothed.setCurrentAndTargetValue(1.0f);
     outputTrimGainSmoothed.reset(sampleRate, 0.02);
     outputTrimGainSmoothed.setCurrentAndTargetValue(1.0f);
+
+    meterSkipFactor = 1;
+    if (sampleRateHz >= 256000.0)
+        meterSkipFactor = 3;
+    else if (sampleRateHz >= 192000.0)
+        meterSkipFactor = 2;
+    meterSkipCounter = 0;
 }
 
 void EqEngine::reset()
@@ -53,7 +61,39 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     eqDspOversampled.setQModeAmount(snapshot.qModeAmount);
 
     if (buffer.getNumChannels() > 0)
-        preTap.push(buffer.getReadPointer(0), buffer.getNumSamples());
+    {
+        const float* data = buffer.getReadPointer(0);
+        const int samples = buffer.getNumSamples();
+        int stride = 1;
+        if (sampleRateHz >= 192000.0)
+            stride = 4;
+        else if (sampleRateHz >= 96000.0)
+            stride = 2;
+        if (samples > 4096)
+            stride = juce::jmax(stride, samples / 2048);
+
+        if (stride == 1)
+        {
+            preTap.push(data, samples);
+        }
+        else
+        {
+            constexpr int kChunk = 512;
+            float temp[kChunk];
+            int idx = 0;
+            for (int i = 0; i < samples; i += stride)
+            {
+                temp[idx++] = data[i];
+                if (idx == kChunk)
+                {
+                    preTap.push(temp, idx);
+                    idx = 0;
+                }
+            }
+            if (idx > 0)
+                preTap.push(temp, idx);
+        }
+    }
 
     globalMixSmoothed.setTargetValue(snapshot.globalMix);
     const bool applyGlobalMix = globalMixSmoothed.isSmoothing()
@@ -234,9 +274,15 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     if (applyGlobalMix)
     {
         const int mixChannels = juce::jmin(numChannels, dryBuffer.getNumChannels());
-        for (int i = 0; i < buffer.getNumSamples(); ++i)
+        const int numSamples = buffer.getNumSamples();
+        const float wetStart = globalMixSmoothed.getCurrentValue();
+        globalMixSmoothed.skip(numSamples);
+        const float wetEnd = globalMixSmoothed.getCurrentValue();
+        const float wetStep = (wetEnd - wetStart) / static_cast<float>(numSamples);
+
+        float wet = wetStart;
+        for (int i = 0; i < numSamples; ++i)
         {
-            const float wet = globalMixSmoothed.getNextValue();
             const float dryGain = 1.0f - wet;
             for (int ch = 0; ch < mixChannels; ++ch)
             {
@@ -244,6 +290,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                 const float dry = dryBuffer.getReadPointer(ch)[i];
                 data[i] = dry * dryGain + data[i] * wet;
             }
+            wet += wetStep;
         }
     }
 
@@ -254,18 +301,54 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     if (outputTrimGainSmoothed.isSmoothing()
         || std::abs(snapshot.outputTrimDb) > 0.001f)
     {
+        const int numSamples = buffer.getNumSamples();
+        const float startGain = outputTrimGainSmoothed.getCurrentValue();
+        outputTrimGainSmoothed.skip(numSamples);
+        const float endGain = outputTrimGainSmoothed.getCurrentValue();
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-        {
-            auto* data = buffer.getWritePointer(ch);
-            for (int i = 0; i < buffer.getNumSamples(); ++i)
-                data[i] *= outputTrimGainSmoothed.getNextValue();
-        }
+            buffer.applyGainRamp(ch, 0, numSamples, startGain, endGain);
     }
 
-    meterTap.process(buffer, numChannels);
+    if (++meterSkipCounter >= meterSkipFactor)
+    {
+        meterTap.process(buffer, numChannels);
+        meterSkipCounter = 0;
+    }
 
     if (buffer.getNumChannels() > 0)
-        postTap.push(buffer.getReadPointer(0), buffer.getNumSamples());
+    {
+        const float* data = buffer.getReadPointer(0);
+        const int samples = buffer.getNumSamples();
+        int stride = 1;
+        if (sampleRateHz >= 192000.0)
+            stride = 4;
+        else if (sampleRateHz >= 96000.0)
+            stride = 2;
+        if (samples > 4096)
+            stride = juce::jmax(stride, samples / 2048);
+
+        if (stride == 1)
+        {
+            postTap.push(data, samples);
+        }
+        else
+        {
+            constexpr int kChunk = 512;
+            float temp[kChunk];
+            int idx = 0;
+            for (int i = 0; i < samples; i += stride)
+            {
+                temp[idx++] = data[i];
+                if (idx == kChunk)
+                {
+                    postTap.push(temp, idx);
+                    idx = 0;
+                }
+            }
+            if (idx > 0)
+                postTap.push(temp, idx);
+        }
+    }
 }
 
 void EqEngine::setOversampling(int index)

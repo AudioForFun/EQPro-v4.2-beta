@@ -137,7 +137,7 @@ void EQProAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     analyzerExternalTap.prepare(analyzerBufferSize);
 
     cachedChannelNames = getCurrentChannelNames();
-    buildSnapshot(snapshots[0]);
+    lastSnapshotHash = buildSnapshot(snapshots[0]);
     activeSnapshot.store(0);
 }
 
@@ -863,16 +863,35 @@ void EQProAudioProcessor::timerCallback()
 {
     cachedChannelNames = getCurrentChannelNames();
     const int nextIndex = 1 - activeSnapshot.load();
-    buildSnapshot(snapshots[nextIndex]);
+    const uint64_t hash = buildSnapshot(snapshots[nextIndex]);
+    ++snapshotTick;
 
     const auto sampleRate = getSampleRate();
-    if (sampleRate > 0.0)
+    if (sampleRate > 0.0 && hash != lastSnapshotHash)
     {
-        eqEngine.updateLinearPhase(snapshots[nextIndex], sampleRate);
-        setLatencySamples(eqEngine.getLatencySamples());
+        const auto& snapshot = snapshots[nextIndex];
+        const bool phaseConfigChanged = snapshot.phaseMode != lastLinearPhaseMode
+            || snapshot.linearQuality != lastLinearQuality
+            || snapshot.linearWindow != lastLinearWindow;
+        const bool allowRebuild = phaseConfigChanged
+            || (snapshotTick - lastLinearRebuildTick) >= 2;
+
+        if (allowRebuild)
+        {
+            eqEngine.updateLinearPhase(snapshot, sampleRate);
+            setLatencySamples(eqEngine.getLatencySamples());
+            lastLinearRebuildTick = snapshotTick;
+            lastLinearPhaseMode = snapshot.phaseMode;
+            lastLinearQuality = snapshot.linearQuality;
+            lastLinearWindow = snapshot.linearWindow;
+        }
     }
 
-    activeSnapshot.store(nextIndex);
+    if (hash != lastSnapshotHash)
+    {
+        lastSnapshotHash = hash;
+        activeSnapshot.store(nextIndex);
+    }
 }
 
 
@@ -1259,7 +1278,7 @@ void EQProAudioProcessor::updateOversampling()
 }
 #endif
 
-void EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
+uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
 {
     const int numChannels = juce::jmin(getTotalNumInputChannels(), ParamIDs::kMaxChannels);
     snapshot.numChannels = numChannels;
@@ -1390,4 +1409,69 @@ void EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
         snapshot.msTargets[band] = msTarget;
         snapshot.bandChannelMasks[band] = mask;
     }
+
+    auto hash = uint64_t { 1469598103934665603ull };
+    const auto hashFloat = [&hash](float value)
+    {
+        uint32_t bits = 0;
+        std::memcpy(&bits, &value, sizeof(bits));
+        hash ^= bits;
+        hash *= 1099511628211ull;
+    };
+    const auto hashBool = [&hashFloat](bool value)
+    {
+        hashFloat(value ? 1.0f : 0.0f);
+    };
+
+    hashFloat(static_cast<float>(snapshot.numChannels));
+    hashBool(snapshot.globalBypass);
+    hashFloat(snapshot.globalMix);
+    hashFloat(static_cast<float>(snapshot.phaseMode));
+    hashFloat(static_cast<float>(snapshot.linearQuality));
+    hashFloat(static_cast<float>(snapshot.linearWindow));
+    hashFloat(snapshot.outputTrimDb);
+    hashFloat(static_cast<float>(snapshot.characterMode));
+    hashBool(snapshot.smartSolo);
+    hashFloat(static_cast<float>(snapshot.qMode));
+    hashFloat(snapshot.qModeAmount);
+    hashBool(snapshot.spectralEnabled);
+    hashFloat(snapshot.spectralThresholdDb);
+    hashFloat(snapshot.spectralRatio);
+    hashFloat(snapshot.spectralAttackMs);
+    hashFloat(snapshot.spectralReleaseMs);
+    hashFloat(snapshot.spectralMix);
+    hashBool(snapshot.autoGainEnabled);
+    hashFloat(snapshot.gainScale);
+    hashBool(snapshot.phaseInvert);
+
+    for (int ch = 0; ch < snapshot.numChannels; ++ch)
+    {
+        for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+        {
+            const auto& b = snapshot.bands[ch][band];
+            hashFloat(b.frequencyHz);
+            hashFloat(b.gainDb);
+            hashFloat(b.q);
+            hashFloat(static_cast<float>(b.type));
+            hashBool(b.bypassed);
+            hashFloat(static_cast<float>(b.msTarget));
+            hashFloat(b.slopeDb);
+            hashBool(b.solo);
+            hashFloat(b.mix);
+            hashBool(b.dynEnabled);
+            hashFloat(static_cast<float>(b.dynMode));
+            hashFloat(b.dynThresholdDb);
+            hashFloat(b.dynAttackMs);
+            hashFloat(b.dynReleaseMs);
+            hashBool(b.dynAuto);
+        }
+    }
+
+    for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+    {
+        hashFloat(static_cast<float>(snapshot.msTargets[band]));
+        hashFloat(static_cast<float>(snapshot.bandChannelMasks[band]));
+    }
+
+    return hash;
 }

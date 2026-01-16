@@ -48,6 +48,9 @@ private:
     juce::SmoothedValue<float> outputTrimGainSmoothed;
 
     int oversamplingIndex = 0;
+    double sampleRateHz = 48000.0;
+    int meterSkipFactor = 1;
+    int meterSkipCounter = 0;
     int lastPhaseMode = 0;
     int lastLinearQuality = 0;
     int lastTaps = 0;

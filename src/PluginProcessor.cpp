@@ -16,6 +16,7 @@ constexpr const char* kParamBypassSuffix = "bypass";
 constexpr const char* kParamMsSuffix = "ms";
 constexpr const char* kParamSlopeSuffix = "slope";
 constexpr const char* kParamSoloSuffix = "solo";
+constexpr const char* kParamMixSuffix = "mix";
 
 const juce::StringArray kFilterTypeChoices {
     "Bell",
@@ -101,6 +102,11 @@ void EQProAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     outputTrimGainSmoothed.reset(sampleRate, 0.02);
     outputTrimGainSmoothed.setCurrentAndTargetValue(1.0f);
+    globalMixSmoothed.reset(sampleRate, 0.02);
+    globalMixSmoothed.setCurrentAndTargetValue(1.0f);
+
+    dryBuffer.setSize(getTotalNumInputChannels(), samplesPerBlock);
+    dryBuffer.clear();
 
     constexpr int analyzerBufferSize = 16384;
     analyzerPreFifo.prepare(analyzerBufferSize);
@@ -204,6 +210,19 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     if (buffer.getNumChannels() > 0)
         analyzerPreFifo.push(buffer.getReadPointer(0), buffer.getNumSamples());
 
+    const float globalMixTarget = globalMixParam != nullptr ? (globalMixParam->load() / 100.0f) : 1.0f;
+    globalMixSmoothed.setTargetValue(globalMixTarget);
+    const bool applyGlobalMix = globalMixParam != nullptr
+        && (globalMixSmoothed.isSmoothing() || std::abs(globalMixTarget - 1.0f) > 0.0001f);
+    if (applyGlobalMix)
+    {
+        const int copyChannels = juce::jmin(numChannels, dryBuffer.getNumChannels());
+        for (int ch = 0; ch < copyChannels; ++ch)
+            juce::FloatVectorOperations::copy(dryBuffer.getWritePointer(ch),
+                                              buffer.getReadPointer(ch),
+                                              buffer.getNumSamples());
+    }
+
     std::array<int, ParamIDs::kBandsPerChannel> msTargets {};
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
         msTargets[band] = 0;
@@ -224,6 +243,7 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             params.slopeDb = ptrs.slope != nullptr ? ptrs.slope->load() : 12.0f;
             params.bypassed = ptrs.bypass->load() > 0.5f;
             params.solo = ptrs.solo != nullptr && ptrs.solo->load() > 0.5f;
+            params.mix = ptrs.mix != nullptr ? (ptrs.mix->load() / 100.0f) : 1.0f;
 
             eqDsp.updateBandParams(ch, band, params);
 
@@ -387,6 +407,22 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             const float scale = gainScaleParam != nullptr ? (gainScaleParam->load() / 100.0f) : 1.0f;
             const float autoGainDb = juce::jlimit(-12.0f, 12.0f, -avgDb * scale);
             buffer.applyGain(juce::Decibels::decibelsToGain(autoGainDb));
+        }
+    }
+
+    if (applyGlobalMix)
+    {
+        const int mixChannels = juce::jmin(numChannels, dryBuffer.getNumChannels());
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+        {
+            const float wet = globalMixSmoothed.getNextValue();
+            const float dryGain = 1.0f - wet;
+            for (int ch = 0; ch < mixChannels; ++ch)
+            {
+                auto* data = buffer.getWritePointer(ch);
+                const float dry = dryBuffer.getReadPointer(ch)[i];
+                data[i] = dry * dryGain + data[i] * wet;
+            }
         }
     }
 
@@ -782,6 +818,7 @@ int EQProAudioProcessor::getSelectedChannelIndex() const
 void EQProAudioProcessor::initializeParamPointers()
 {
     globalBypassParam = parameters.getRawParameterValue(ParamIDs::globalBypass);
+    globalMixParam = parameters.getRawParameterValue(ParamIDs::globalMix);
     phaseModeParam = parameters.getRawParameterValue(ParamIDs::phaseMode);
     linearQualityParam = parameters.getRawParameterValue(ParamIDs::linearQuality);
     linearWindowParam = parameters.getRawParameterValue(ParamIDs::linearWindow);
@@ -824,6 +861,8 @@ void EQProAudioProcessor::initializeParamPointers()
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamSlopeSuffix));
             bandParamPointers[ch][band].solo =
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamSoloSuffix));
+            bandParamPointers[ch][band].mix =
+                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamMixSuffix));
         }
     }
 }
@@ -831,10 +870,14 @@ void EQProAudioProcessor::initializeParamPointers()
 juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
-    params.reserve(ParamIDs::kMaxChannels * ParamIDs::kBandsPerChannel * 14 + 7);
+    params.reserve(ParamIDs::kMaxChannels * ParamIDs::kBandsPerChannel * 15 + 8);
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         ParamIDs::globalBypass, "Global Bypass", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        ParamIDs::globalMix, "Global Mix",
+        juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f),
+        100.0f));
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         ParamIDs::phaseMode, "Phase Mode",
         kPhaseModeChoices, 0));
@@ -979,6 +1022,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
                 ParamIDs::bandParamName(ch, band, "Solo"),
                 false));
 
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(
+                ParamIDs::bandParamId(ch, band, kParamMixSuffix),
+                ParamIDs::bandParamName(ch, band, "Mix"),
+                juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f),
+                100.0f));
+
         }
     }
 
@@ -1107,6 +1156,8 @@ uint64_t EQProAudioProcessor::computeParamsHash(int channels) const
             hashFloat(ptrs.q->load());
             hashFloat(ptrs.type->load());
             hashFloat(ptrs.bypass->load());
+            if (ptrs.mix != nullptr)
+                hashFloat(ptrs.mix->load());
             if (ptrs.slope != nullptr)
                 hashFloat(ptrs.slope->load());
 
@@ -1171,7 +1222,10 @@ void EQProAudioProcessor::rebuildLinearPhase(int taps, double sampleRate, int ch
                 if (ptrs.bypass->load() > 0.5f)
                     continue;
 
-                const double gainDb = ptrs.gain->load();
+                const double mix = ptrs.mix != nullptr ? juce::jlimit(0.0f, 100.0f, ptrs.mix->load()) / 100.0f : 1.0;
+                if (mix <= 0.0001)
+                    continue;
+                const double gainDb = ptrs.gain->load() * mix;
                 const double q = std::max(0.1f, ptrs.q->load());
                 const double freqParam = ptrs.frequency->load();
                 const int type = static_cast<int>(ptrs.type->load());

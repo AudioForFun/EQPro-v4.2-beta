@@ -37,6 +37,7 @@ private:
         float ms = 0.0f;
         float slope = 1.0f;
         float solo = 0.0f;
+        float mix = 100.0f;
     };
 
     EQProAudioProcessor& processor;
@@ -46,6 +47,7 @@ private:
 
     juce::Label titleLabel;
     juce::TextButton resetButton;
+    juce::TextButton defaultButton;
     juce::TextButton deleteButton;
     juce::TextButton prevBandButton;
     juce::TextButton nextBandButton;
@@ -56,7 +58,7 @@ private:
     juce::Slider gainSlider;
     juce::Slider qSlider;
     juce::Label qModeLabel;
-    juce::ComboBox qModeBox;
+    juce::ToggleButton qModeToggle;
     juce::Label qAmountLabel;
     juce::Slider qAmountSlider;
     juce::Label typeLabel;
@@ -65,6 +67,8 @@ private:
     juce::ComboBox msBox;
     juce::Label slopeLabel;
     juce::Slider slopeSlider;
+    juce::Label mixLabel;
+    juce::Slider mixSlider;
     juce::ToggleButton bypassButton;
     juce::TextButton copyButton;
     juce::TextButton pasteButton;
@@ -80,9 +84,9 @@ private:
     std::unique_ptr<ComboBoxAttachment> typeAttachment;
     std::unique_ptr<ComboBoxAttachment> msAttachment;
     std::unique_ptr<SliderAttachment> slopeAttachment;
+    std::unique_ptr<SliderAttachment> mixAttachment;
     std::unique_ptr<ButtonAttachment> bypassAttachment;
     std::unique_ptr<ButtonAttachment> soloAttachment;
-    std::unique_ptr<ComboBoxAttachment> qModeAttachment;
     std::unique_ptr<SliderAttachment> qAmountAttachment;
 
     ThemeColors theme = makeDarkTheme();
@@ -90,4 +94,5 @@ private:
     std::optional<BandState> clipboard;
 
     void resetSelectedBand(bool shouldBypass);
+    void syncQModeToggle();
 };

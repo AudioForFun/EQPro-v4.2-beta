@@ -48,6 +48,10 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     resetButton.onClick = [this] { resetSelectedBand(false); };
     addAndMakeVisible(resetButton);
 
+    defaultButton.setButtonText("Default");
+    defaultButton.onClick = [this] { resetSelectedBand(false); };
+    addAndMakeVisible(defaultButton);
+
     deleteButton.setButtonText("Delete");
     deleteButton.onClick = [this] { resetSelectedBand(true); };
     addAndMakeVisible(deleteButton);
@@ -83,11 +87,12 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     initLabel(freqLabel, "Freq");
     initLabel(gainLabel, "Gain");
     initLabel(qLabel, "Q");
-    initLabel(qModeLabel, "Q Mode");
-    initLabel(qAmountLabel, "Q Amt");
+    initLabel(qModeLabel, "Variable Q");
+    initLabel(qAmountLabel, "Var Q");
     initLabel(typeLabel, "Type");
-    initLabel(msLabel, "Mode");
+    initLabel(msLabel, "Channel");
     initLabel(slopeLabel, "Slope");
+    initLabel(mixLabel, "Mix");
 
     freqSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     freqSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 20);
@@ -119,13 +124,17 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     };
     addAndMakeVisible(qSlider);
 
-    qModeBox.addItemList(juce::StringArray("Constant", "Proportional"), 1);
-    qModeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
-    qModeBox.setColour(juce::ComboBox::textColourId, theme.text);
-    qModeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    addAndMakeVisible(qModeBox);
+    qModeToggle.setButtonText("On");
+    qModeToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
+    qModeToggle.onClick = [this]
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::qMode))
+            param->setValueNotifyingHost(qModeToggle.getToggleState() ? 1.0f : 0.0f);
+        updateTypeUi();
+    };
+    addAndMakeVisible(qModeToggle);
 
-    qAmountSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    qAmountSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     qAmountSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
     qAmountSlider.setTextBoxIsEditable(true);
     qAmountSlider.setTextValueSuffix(" %");
@@ -160,6 +169,16 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     slopeSlider.onValueChange = [this]
     {
         mirrorToLinkedChannel("slope", static_cast<float>(slopeSlider.getValue()));
+    };
+
+    mixSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    mixSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+    mixSlider.setTextBoxIsEditable(true);
+    mixSlider.setTextValueSuffix(" %");
+    addAndMakeVisible(mixSlider);
+    mixSlider.onValueChange = [this]
+    {
+        mirrorToLinkedChannel("mix", static_cast<float>(mixSlider.getValue()));
     };
 
     bypassButton.setButtonText("Bypass");
@@ -199,8 +218,14 @@ void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
     selectedBand = juce::jlimit(0, ParamIDs::kBandsPerChannel - 1, bandIndex);
 
     titleLabel.setText("Band " + juce::String(selectedBand + 1), juce::dontSendNotification);
-    titleLabel.setColour(juce::Label::textColourId, ColorUtils::bandColour(selectedBand));
+    const auto bandColour = ColorUtils::bandColour(selectedBand);
+    titleLabel.setColour(juce::Label::textColourId, bandColour);
+    freqSlider.setColour(juce::Slider::trackColourId, bandColour);
+    gainSlider.setColour(juce::Slider::trackColourId, bandColour);
+    qSlider.setColour(juce::Slider::trackColourId, bandColour);
+    qAmountSlider.setColour(juce::Slider::trackColourId, bandColour);
     updateAttachments();
+    syncQModeToggle();
     updateTypeUi();
 }
 
@@ -216,6 +241,7 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     typeLabel.setColour(juce::Label::textColourId, theme.textMuted);
     msLabel.setColour(juce::Label::textColourId, theme.textMuted);
     slopeLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    mixLabel.setColour(juce::Label::textColourId, theme.textMuted);
     typeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     typeBox.setColour(juce::ComboBox::textColourId, theme.text);
     typeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
@@ -225,20 +251,23 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     slopeSlider.setColour(juce::Slider::trackColourId, theme.accent);
     slopeSlider.setColour(juce::Slider::textBoxTextColourId, theme.text);
     slopeSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
+    mixSlider.setColour(juce::Slider::trackColourId, theme.accent);
+    mixSlider.setColour(juce::Slider::textBoxTextColourId, theme.text);
+    mixSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
     bypassButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     copyButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     pasteButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     resetButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     deleteButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
+    defaultButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     prevBandButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     nextBandButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     soloButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
-    qModeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
-    qModeBox.setColour(juce::ComboBox::textColourId, theme.text);
-    qModeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
+    qModeToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     qAmountSlider.setColour(juce::Slider::trackColourId, theme.accent);
     qAmountSlider.setColour(juce::Slider::textBoxTextColourId, theme.text);
     qAmountSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
+    syncQModeToggle();
     repaint();
 }
 
@@ -265,7 +294,7 @@ void BandControlsPanel::resized()
     const int gap = 6;
     const int labelHeight = 16;
     const int rowHeight = 22;
-    const int knobRowHeight = 110;
+    const int knobRowHeight = 120;
 
     auto left = bounds.removeFromLeft(static_cast<int>(bounds.getWidth() * 0.75f));
     auto right = bounds;
@@ -274,14 +303,16 @@ void BandControlsPanel::resized()
     titleLabel.setBounds(headerRow.removeFromLeft(70));
     prevBandButton.setBounds(headerRow.removeFromLeft(24));
     nextBandButton.setBounds(headerRow.removeFromLeft(24));
-    copyButton.setBounds(headerRow.removeFromLeft(48));
-    pasteButton.setBounds(headerRow.removeFromLeft(48));
-    resetButton.setBounds(headerRow.removeFromLeft(52));
+    const int btnW = 58;
+    copyButton.setBounds(headerRow.removeFromLeft(btnW));
+    pasteButton.setBounds(headerRow.removeFromLeft(btnW));
+    resetButton.setBounds(headerRow.removeFromLeft(btnW));
+    defaultButton.setBounds(headerRow.removeFromLeft(btnW));
     deleteButton.setBounds(headerRow);
 
     left.removeFromTop(gap);
     auto knobsRow = left.removeFromTop(knobRowHeight);
-    const int knobWidth = (knobsRow.getWidth() - gap * 2) / 3;
+    const int knobWidth = (knobsRow.getWidth() - gap * 3) / 4;
     auto freqArea = knobsRow.removeFromLeft(knobWidth);
     freqLabel.setBounds(freqArea.removeFromTop(labelHeight));
     freqSlider.setBounds(freqArea);
@@ -293,18 +324,22 @@ void BandControlsPanel::resized()
     auto qArea = knobsRow.removeFromLeft(knobWidth);
     qLabel.setBounds(qArea.removeFromTop(labelHeight));
     qSlider.setBounds(qArea);
+    knobsRow.removeFromLeft(gap);
+    auto qAmountArea = knobsRow.removeFromLeft(knobWidth);
+    qAmountLabel.setBounds(qAmountArea.removeFromTop(labelHeight));
+    qAmountSlider.setBounds(qAmountArea);
 
     left.removeFromTop(gap);
     auto qModeRow = left.removeFromTop(labelHeight + rowHeight);
-    qModeLabel.setBounds(qModeRow.removeFromLeft(60));
-    qModeBox.setBounds(qModeRow.removeFromLeft(140));
-    qAmountLabel.setBounds(qModeRow.removeFromLeft(50));
-    qAmountSlider.setBounds(qModeRow);
+    qModeLabel.setBounds(qModeRow.removeFromLeft(90));
+    qModeToggle.setBounds(qModeRow.removeFromLeft(60));
+    typeLabel.setBounds(qModeRow.removeFromLeft(50));
+    typeBox.setBounds(qModeRow);
 
-    left.removeFromTop(gap);
-    auto typeRow = left.removeFromTop(labelHeight + rowHeight);
-    typeLabel.setBounds(typeRow.removeFromTop(labelHeight));
-    typeBox.setBounds(typeRow);
+    left.removeFromTop(2);
+    auto togglesRow = left.removeFromTop(rowHeight);
+    bypassButton.setBounds(togglesRow.removeFromLeft(70));
+    soloButton.setBounds(togglesRow.removeFromLeft(60));
 
     left.removeFromTop(2);
     auto msRow = left.removeFromTop(labelHeight + rowHeight);
@@ -317,9 +352,9 @@ void BandControlsPanel::resized()
     slopeSlider.setBounds(slopeRow);
 
     left.removeFromTop(2);
-    auto togglesRow = left.removeFromTop(rowHeight);
-    bypassButton.setBounds(togglesRow.removeFromLeft(70));
-    soloButton.setBounds(togglesRow.removeFromLeft(60));
+    auto mixRow = left.removeFromTop(labelHeight + rowHeight);
+    mixLabel.setBounds(mixRow.removeFromTop(labelHeight));
+    mixSlider.setBounds(mixRow);
 }
 
 void BandControlsPanel::updateAttachments()
@@ -332,6 +367,7 @@ void BandControlsPanel::updateAttachments()
     const auto msId = ParamIDs::bandParamId(selectedChannel, selectedBand, "ms");
     const auto slopeId = ParamIDs::bandParamId(selectedChannel, selectedBand, "slope");
     const auto soloId = ParamIDs::bandParamId(selectedChannel, selectedBand, "solo");
+    const auto mixId = ParamIDs::bandParamId(selectedChannel, selectedBand, "mix");
 
     freqAttachment = std::make_unique<SliderAttachment>(parameters, freqId, freqSlider);
     gainAttachment = std::make_unique<SliderAttachment>(parameters, gainId, gainSlider);
@@ -339,10 +375,18 @@ void BandControlsPanel::updateAttachments()
     typeAttachment = std::make_unique<ComboBoxAttachment>(parameters, typeId, typeBox);
     msAttachment = std::make_unique<ComboBoxAttachment>(parameters, msId, msBox);
     slopeAttachment = std::make_unique<SliderAttachment>(parameters, slopeId, slopeSlider);
+    mixAttachment = std::make_unique<SliderAttachment>(parameters, mixId, mixSlider);
     bypassAttachment = std::make_unique<ButtonAttachment>(parameters, bypassId, bypassButton);
     soloAttachment = std::make_unique<ButtonAttachment>(parameters, soloId, soloButton);
-    qModeAttachment = std::make_unique<ComboBoxAttachment>(parameters, ParamIDs::qMode, qModeBox);
     qAmountAttachment = std::make_unique<SliderAttachment>(parameters, ParamIDs::qModeAmount, qAmountSlider);
+}
+
+void BandControlsPanel::syncQModeToggle()
+{
+    if (auto* value = parameters.getRawParameterValue(ParamIDs::qMode))
+        qModeToggle.setToggleState(value->load() > 0.5f, juce::dontSendNotification);
+    qAmountSlider.setEnabled(qModeToggle.getToggleState());
+    qAmountSlider.setAlpha(qModeToggle.getToggleState() ? 1.0f : 0.4f);
 }
 
 void BandControlsPanel::resetSelectedBand(bool shouldBypass)
@@ -360,6 +404,7 @@ void BandControlsPanel::resetSelectedBand(bool shouldBypass)
     resetParam("ms");
     resetParam("slope");
     resetParam("solo");
+    resetParam("mix");
 
     if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "bypass")))
         bypassParam->setValueNotifyingHost(shouldBypass ? 1.0f : 0.0f);
@@ -377,6 +422,8 @@ void BandControlsPanel::updateTypeUi()
     slopeSlider.setEnabled(isHpLp);
     slopeSlider.setAlpha(isHpLp ? 1.0f : 0.5f);
 
+    syncQModeToggle();
+
     // No dynamic EQ controls in this revision.
 }
 
@@ -391,6 +438,7 @@ void BandControlsPanel::copyBandState()
     state.ms = static_cast<float>(msBox.getSelectedItemIndex());
     state.slope = static_cast<float>(slopeSlider.getValue());
     state.solo = soloButton.getToggleState() ? 1.0f : 0.0f;
+    state.mix = static_cast<float>(mixSlider.getValue());
     clipboard = state;
 }
 
@@ -414,6 +462,7 @@ void BandControlsPanel::pasteBandState()
     setParam("ms", state.ms);
     setParam("slope", state.slope);
     setParam("solo", state.solo);
+    setParam("mix", state.mix);
 }
 
 void BandControlsPanel::mirrorToLinkedChannel(const juce::String& suffix, float value)

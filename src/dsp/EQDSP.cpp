@@ -56,6 +56,7 @@ void EQDSP::prepare(double sampleRate, int maxBlockSize, int channels)
             cachedParams[ch][band].type = FilterType::bell;
             cachedParams[ch][band].slopeDb = 12.0f;
             cachedParams[ch][band].bypassed = false;
+            cachedParams[ch][band].mix = 1.0f;
             smoothFreq[ch][band].reset(sampleRateHz, 0.02);
             smoothGain[ch][band].reset(sampleRateHz, 0.02);
             smoothQ[ch][band].reset(sampleRateHz, 0.02);
@@ -262,6 +263,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             params.gainDb = smoothGain[0][band].getCurrentValue();
             params.q = smoothQ[0][band].getCurrentValue();
             params.q = applyQMode(params);
+            const float mix = juce::jlimit(0.0f, 1.0f, params.mix);
 
             const int stages = isTilt ? 2 : (isHpLp ? slopeConfig.stages : 1);
 
@@ -298,8 +300,10 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
 
                 for (int i = 0; i < samples; ++i)
                 {
-                    float m = mid[i];
-                    float s = side[i];
+                    const float dryM = mid[i];
+                    const float dryS = side[i];
+                    float m = dryM;
+                    float s = dryS;
 
                     if (isHpLp && slopeConfig.useOnePole)
                     {
@@ -311,6 +315,12 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     {
                         m = msFilters[0][band][stage].processSample(m);
                         s = msFilters[1][band][stage].processSample(s);
+                    }
+
+                    if (mix < 1.0f)
+                    {
+                        m = dryM + (m - dryM) * mix;
+                        s = dryS + (s - dryS) * mix;
                     }
 
                     mid[i] = m;
@@ -329,7 +339,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
 
                 for (int i = 0; i < samples; ++i)
                 {
-                    float m = mid[i];
+                    const float dryM = mid[i];
+                    float m = dryM;
                     if (isHpLp && slopeConfig.useOnePole)
                         m = msOnePoles[0][band].processSample(m);
 
@@ -338,6 +349,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                         m = msFilters[0][band][stage].processSample(m);
                     }
 
+                    if (mix < 1.0f)
+                        m = dryM + (m - dryM) * mix;
                     mid[i] = m;
                 }
             }
@@ -353,7 +366,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
 
                 for (int i = 0; i < samples; ++i)
                 {
-                    float s = side[i];
+                    const float dryS = side[i];
+                    float s = dryS;
                     if (isHpLp && slopeConfig.useOnePole)
                         s = msOnePoles[1][band].processSample(s);
 
@@ -362,6 +376,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                         s = msFilters[1][band][stage].processSample(s);
                     }
 
+                    if (mix < 1.0f)
+                        s = dryS + (s - dryS) * mix;
                     side[i] = s;
                 }
             }
@@ -402,6 +418,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             params.gainDb = smoothGain[ch][band].getCurrentValue();
                 params.q = smoothQ[ch][band].getCurrentValue();
                 params.q = applyQMode(params);
+            const float mix = juce::jlimit(0.0f, 1.0f, params.mix);
 
             const int stages = isTilt ? 2 : (isHpLp ? slopeConfig.stages : 1);
             if (isTilt)
@@ -427,7 +444,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
 
             for (int i = 0; i < samples; ++i)
             {
-                float sample = channelData[i];
+                const float dry = channelData[i];
+                float sample = dry;
 
                 if (isHpLp && slopeConfig.useOnePole)
                     sample = onePoles[ch][band].processSample(sample);
@@ -435,6 +453,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 for (int stage = 0; stage < stages; ++stage)
                     sample = filters[ch][band][stage].processSample(sample);
 
+                if (mix < 1.0f)
+                    sample = dry + (sample - dry) * mix;
                 channelData[i] = sample;
             }
         }

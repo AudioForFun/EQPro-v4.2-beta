@@ -25,5 +25,6 @@ struct BandParams
     float slopeDb = 12.0f;
     bool bypassed = false;
     bool solo = false;
+    float mix = 1.0f;
 };
 } // namespace eqdsp

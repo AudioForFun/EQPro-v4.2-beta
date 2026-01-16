@@ -136,14 +136,37 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         }
     }
 
-    g.setColour(theme.accentAlt.withAlpha(0.25f));
-    g.strokePath(postPath, juce::PathStrokeType(3.0f * scale));
-    g.setColour(theme.accentAlt.withAlpha(0.85f));
-    g.strokePath(postPath, juce::PathStrokeType(1.5f * scale));
+    bool hasPre = false;
+    bool hasPost = false;
+    for (int i = 0; i < fftBins; ++i)
+    {
+        if (preMagnitudes[i] > kAnalyzerMinDb + 2.0f)
+            hasPre = true;
+        if (postMagnitudes[i] > kAnalyzerMinDb + 2.0f)
+            hasPost = true;
+        if (hasPre && hasPost)
+            break;
+    }
+
+    if (hasPre)
+    {
+        g.setColour(theme.accent.withAlpha(0.2f));
+        g.strokePath(prePath, juce::PathStrokeType(3.0f * scale));
+        g.setColour(theme.accent.withAlpha(0.75f));
+        g.strokePath(prePath, juce::PathStrokeType(1.4f * scale));
+    }
+
+    if (hasPost)
+    {
+        g.setColour(theme.accentAlt.withAlpha(0.25f));
+        g.strokePath(postPath, juce::PathStrokeType(3.0f * scale));
+        g.setColour(theme.accentAlt.withAlpha(0.85f));
+        g.strokePath(postPath, juce::PathStrokeType(1.5f * scale));
+    }
 
     const bool showExternal = parameters.getRawParameterValue(ParamIDs::analyzerExternal) != nullptr
         && parameters.getRawParameterValue(ParamIDs::analyzerExternal)->load() > 0.5f;
-    if (showExternal)
+    if (showExternal && hasPost)
     {
         juce::Path extPath;
         extPath.startNewSubPath(plotArea.getX(), gainToY(externalMagnitudes.front()));
@@ -333,12 +356,6 @@ void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
     if (! plotArea.contains(event.position))
         return;
 
-    if (event.mods.isAltDown() && event.mods.isLeftButtonDown())
-    {
-        startAltSolo(event.position);
-        return;
-    }
-
     for (int i = 0; i < static_cast<int>(bypassIcons.size()); ++i)
     {
         if (bypassIcons[static_cast<size_t>(i)].contains(event.position))
@@ -363,6 +380,21 @@ void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
             closest = distance;
             closestBand = i;
         }
+    }
+
+    if (event.mods.isAltDown() && event.mods.isLeftButtonDown())
+    {
+        if (closestBand >= 0)
+        {
+            resetBandToDefaults(closestBand, true);
+            setSelectedBand(closestBand);
+            if (onBandSelected)
+                onBandSelected(closestBand);
+            repaint();
+            return;
+        }
+        startAltSolo(event.position);
+        return;
     }
 
     if (closestBand >= 0)
@@ -876,6 +908,8 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
     const float freqs[] { 20.0f, 30.0f, 40.0f, 50.0f, 60.0f, 80.0f, 100.0f, 200.0f, 300.0f,
                           400.0f, 500.0f, 600.0f, 800.0f, 1000.0f, 2000.0f, 3000.0f, 4000.0f,
                           5000.0f, 6000.0f, 8000.0f, 10000.0f, 12000.0f, 16000.0f, 20000.0f };
+    float lastLabelX = -1.0e6f;
+    const float minLabelSpacing = 40.0f * scale;
     for (float f : freqs)
     {
         if (f < kMinFreq || f > maxFreq)
@@ -886,8 +920,9 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
         g.setColour(major ? theme.grid.withAlpha(0.6f) : theme.grid.withAlpha(0.25f));
         g.drawVerticalLine(static_cast<int>(x), static_cast<float>(area.getY()),
                            static_cast<float>(area.getBottom()));
-        if (major)
+        if (major && (x - lastLabelX) >= minLabelSpacing)
         {
+            lastLabelX = x;
             g.setColour(theme.textMuted);
             const juce::String text = f >= 1000.0f ? juce::String(f / 1000.0f, 1) + "k" : juce::String(f, 0);
             g.drawFittedText(text,

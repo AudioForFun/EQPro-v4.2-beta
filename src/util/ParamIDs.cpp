@@ -3,6 +3,7 @@
 namespace ParamIDs
 {
 const juce::String globalBypass = "globalBypass";
+const juce::String globalMix = "globalMix";
 const juce::String phaseMode = "phaseMode";
 const juce::String linearQuality = "linearQuality";
 const juce::String linearWindow = "linearWindow";

@@ -92,6 +92,7 @@ private:
         std::atomic<float>* msTarget = nullptr;
         std::atomic<float>* slope = nullptr;
         std::atomic<float>* solo = nullptr;
+        std::atomic<float>* mix = nullptr;
     };
 
     void initializeParamPointers();
@@ -108,6 +109,7 @@ private:
         bandParamPointers {};
 
     std::atomic<float>* globalBypassParam = nullptr;
+    std::atomic<float>* globalMixParam = nullptr;
     std::atomic<float>* phaseModeParam = nullptr;
     std::atomic<float>* linearQualityParam = nullptr;
     std::atomic<float>* linearWindowParam = nullptr;
@@ -129,6 +131,9 @@ private:
     std::atomic<float>* midiLearnParam = nullptr;
     std::atomic<float>* midiTargetParam = nullptr;
     std::atomic<float>* smartSoloParam = nullptr;
+
+    juce::AudioBuffer<float> dryBuffer;
+    juce::SmoothedValue<float> globalMixSmoothed;
 
     eqdsp::EQDSP eqDsp;
     eqdsp::EQDSP eqDspOversampled;

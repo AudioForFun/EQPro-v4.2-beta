@@ -3,8 +3,8 @@
 
 namespace
 {
-constexpr int kEditorWidth = 900;
-constexpr int kEditorHeight = 620;
+constexpr int kEditorWidth = 1400;
+constexpr int kEditorHeight = 900;
 constexpr int kOuterMargin = 16;
 constexpr int kLeftPanelWidth = 0;
 constexpr int kRightPanelWidth = 160;
@@ -44,6 +44,23 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     globalBypassAttachment =
         std::make_unique<ButtonAttachment>(processorRef.getParameters(), ParamIDs::globalBypass,
                                            globalBypassButton);
+
+    globalMixLabel.setText("Mix", juce::dontSendNotification);
+    globalMixLabel.setJustificationType(juce::Justification::centredLeft);
+    globalMixLabel.setFont(kLabelFontSize);
+    globalMixLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
+    addAndMakeVisible(globalMixLabel);
+
+    globalMixSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    globalMixSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 52, 18);
+    globalMixSlider.setTextBoxIsEditable(true);
+    globalMixSlider.setTextValueSuffix(" %");
+    globalMixSlider.setColour(juce::Slider::trackColourId, juce::Colour(0xff38bdf8));
+    globalMixSlider.setColour(juce::Slider::textBoxTextColourId, juce::Colour(0xffe2e8f0));
+    globalMixSlider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colour(0xff1f2937));
+    addAndMakeVisible(globalMixSlider);
+    globalMixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        processorRef.getParameters(), ParamIDs::globalMix, globalMixSlider);
 
     phaseLabel.setText("Mode", juce::dontSendNotification);
     phaseLabel.setJustificationType(juce::Justification::centredLeft);
@@ -245,20 +262,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
 
 
-    showCorrelationToggle.setButtonText("v");
-    showCorrelationToggle.setClickingTogglesState(true);
-    showCorrelationToggle.setToggleState(true, juce::dontSendNotification);
-    showCorrelationToggle.setColour(juce::TextButton::textColourOffId, juce::Colour(0xffcbd5e1));
-    showCorrelationToggle.setColour(juce::TextButton::textColourOnId, juce::Colour(0xffe2e8f0));
-    showCorrelationToggle.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff10151d));
-    showCorrelationToggle.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff0f172a));
-    addAndMakeVisible(showCorrelationToggle);
-    showCorrelationToggle.onClick = [this]()
-    {
-        correlation.setVisible(showCorrelationToggle.getToggleState());
-        showCorrelationToggle.setButtonText(showCorrelationToggle.getToggleState() ? "v" : "^");
-        resized();
-    };
+    correlation.setVisible(true);
 
     midiLearnToggle.setButtonText("Learn");
     midiLearnToggle.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffcbd5e1));
@@ -342,6 +346,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         headerLabel.setColour(juce::Label::textColourId, newTheme.text);
         versionLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         globalBypassButton.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
+        globalMixLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         themeLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         phaseLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         qualityLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
@@ -374,13 +379,12 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         autoGainToggle.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
         midiLearnToggle.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
         phaseInvertToggle.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
-        showCorrelationToggle.setColour(juce::TextButton::textColourOffId, newTheme.textMuted);
-        showCorrelationToggle.setColour(juce::TextButton::textColourOnId, newTheme.text);
-        showCorrelationToggle.setColour(juce::TextButton::buttonColourId, newTheme.panel.darker(0.1f));
-        showCorrelationToggle.setColour(juce::TextButton::buttonOnColourId, newTheme.panel.darker(0.3f));
         gainScaleSlider.setColour(juce::Slider::trackColourId, newTheme.accent);
         gainScaleSlider.setColour(juce::Slider::textBoxTextColourId, newTheme.text);
         gainScaleSlider.setColour(juce::Slider::textBoxOutlineColourId, newTheme.panelOutline);
+        globalMixSlider.setColour(juce::Slider::trackColourId, newTheme.accent);
+        globalMixSlider.setColour(juce::Slider::textBoxTextColourId, newTheme.text);
+        globalMixSlider.setColour(juce::Slider::textBoxOutlineColourId, newTheme.panelOutline);
         qModeLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         qAmountLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         qAmountSlider.setColour(juce::Slider::trackColourId, newTheme.accent);
@@ -961,9 +965,9 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     correlationLabel.setVisible(false);
     correlationBox.setVisible(false);
 
-    resizeConstrainer.setSizeLimits(900, 600, 3840, 2160);
+    resizeConstrainer.setSizeLimits(1200, 800, 2600, 1600);
     setResizable(true, true);
-    setResizeLimits(900, 600, 3840, 2160);
+    setResizeLimits(1200, 800, 2600, 1600);
     addAndMakeVisible(resizer);
 
     setSize(kEditorWidth, kEditorHeight);
@@ -1000,40 +1004,46 @@ void EQProAudioProcessorEditor::resized()
     headerLabel.setBounds({0, 0, 0, 0});
     versionLabel.setBounds({0, 0, 0, 0});
 
+    const int topBarHeight = static_cast<int>(32 * uiScale);
+    auto topBar = bounds.removeFromTop(topBarHeight);
+    const int globalBypassWidth = static_cast<int>(120 * uiScale);
+    const int globalBypassHeight = static_cast<int>(24 * uiScale);
+    globalBypassButton.setBounds(topBar.removeFromLeft(globalBypassWidth)
+                                     .withSizeKeepingCentre(globalBypassWidth, globalBypassHeight));
+    topBar.removeFromLeft(static_cast<int>(12 * uiScale));
+    const int mixLabelWidth = static_cast<int>(36 * uiScale);
+    globalMixLabel.setBounds(topBar.removeFromLeft(mixLabelWidth)
+                                 .withSizeKeepingCentre(mixLabelWidth, globalBypassHeight));
+    const int mixSliderWidth = static_cast<int>(140 * uiScale);
+    globalMixSlider.setBounds(topBar.removeFromLeft(mixSliderWidth)
+                                  .withSizeKeepingCentre(mixSliderWidth, globalBypassHeight + 8));
+
     auto content = bounds;
-    const int analyzerHeight = static_cast<int>(content.getHeight() * 0.80f);
-    auto analyzerArea = content.removeFromTop(analyzerHeight);
+    const int metersWidth = static_cast<int>(200 * uiScale);
+    auto rightPanel = content.removeFromRight(metersWidth);
+    auto leftContent = content;
+    const int analyzerHeight = static_cast<int>(leftContent.getHeight() * 0.70f);
+    auto analyzerArea = leftContent.removeFromTop(analyzerHeight);
     analyzer.setBounds(analyzerArea);
 
-    auto controlsArea = content;
-    const int toggleSize = static_cast<int>(26 * uiScale);
-    showCorrelationToggle.setBounds(
-        controlsArea.getX() + (controlsArea.getWidth() - toggleSize) / 2,
-        controlsArea.getY() + static_cast<int>(6 * uiScale),
-        toggleSize,
-        toggleSize);
-    const int metersWidth = static_cast<int>(190 * uiScale);
-    auto metersArea = controlsArea.removeFromRight(metersWidth);
+    auto controlsArea = leftContent;
+    auto metersArea = rightPanel;
     const int trimSize = static_cast<int>(86 * uiScale);
     const int trimLabelHeight = static_cast<int>(14 * uiScale);
-    auto trimArea = metersArea.removeFromBottom(trimSize + trimLabelHeight);
-    outputTrimLabel.setBounds(trimArea.removeFromTop(trimLabelHeight));
-    outputTrimSlider.setBounds(trimArea.withSizeKeepingCentre(trimSize, trimSize));
+    auto trimArea = metersArea.removeFromBottom(trimSize + trimLabelHeight + static_cast<int>(10 * uiScale));
+    auto outputArea = trimArea.removeFromLeft(trimArea.getWidth() / 2);
+    outputTrimLabel.setBounds(outputArea.removeFromTop(trimLabelHeight));
+    outputTrimSlider.setBounds(outputArea.withSizeKeepingCentre(trimSize, trimSize));
+    autoGainLabel.setBounds(trimArea.removeFromTop(trimLabelHeight));
+    autoGainToggle.setBounds(trimArea.withSizeKeepingCentre(static_cast<int>(60 * uiScale),
+                                                            static_cast<int>(22 * uiScale)));
 
     auto meterTop = metersArea;
-    const bool showCorr = showCorrelationToggle.getToggleState();
-    if (showCorr)
-    {
-        auto corrArea = meterTop.removeFromBottom(static_cast<int>(meterTop.getHeight() * 0.45f));
-        correlation.setBounds(corrArea);
-    }
-    else
-    {
-        correlation.setBounds({0, 0, 0, 0});
-    }
+    auto corrArea = meterTop.removeFromBottom(static_cast<int>(meterTop.getHeight() * 0.40f));
+    correlation.setBounds(corrArea);
     meters.setBounds(meterTop);
     const int processingRowHeight = static_cast<int>(28 * uiScale);
-    auto processingRow = controlsArea.removeFromTop(processingRowHeight);
+    auto processingRow = controlsArea.removeFromBottom(processingRowHeight);
     phaseLabel.setBounds(processingRow.removeFromLeft(static_cast<int>(70 * uiScale)));
     phaseModeBox.setBounds(processingRow.removeFromLeft(static_cast<int>(140 * uiScale)));
     qualityLabel.setBounds(processingRow.removeFromLeft(static_cast<int>(70 * uiScale)));
@@ -1051,8 +1061,6 @@ void EQProAudioProcessorEditor::resized()
     channelLabel.setBounds({0, 0, 0, 0});
     channelSelector.setBounds({0, 0, 0, 0});
     msViewToggle.setBounds({0, 0, 0, 0});
-    autoGainLabel.setBounds({0, 0, 0, 0});
-    autoGainToggle.setBounds({0, 0, 0, 0});
     gainScaleSlider.setBounds({0, 0, 0, 0});
     phaseInvertToggle.setBounds({0, 0, 0, 0});
     analyzerRangeLabel.setBounds({0, 0, 0, 0});

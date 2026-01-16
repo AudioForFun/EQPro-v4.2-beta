@@ -24,6 +24,8 @@ private:
     EQProAudioProcessor& processorRef;
 
     juce::ToggleButton globalBypassButton;
+    juce::Label globalMixLabel;
+    juce::Slider globalMixSlider;
     juce::Label headerLabel;
     juce::Label versionLabel;
     juce::ComboBox channelSelector;
@@ -66,7 +68,6 @@ private:
     juce::ToggleButton analyzerExternalToggle;
     juce::ToggleButton smartSoloToggle;
     juce::ToggleButton showSpectralToggle;
-    juce::TextButton showCorrelationToggle;
     juce::Label midiSectionLabel;
     juce::ToggleButton midiLearnToggle;
     juce::ComboBox midiTargetBox;
@@ -117,6 +118,7 @@ private:
 
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::unique_ptr<ButtonAttachment> globalBypassAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> globalMixAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> phaseModeAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> linearQualityAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> linearWindowAttachment;

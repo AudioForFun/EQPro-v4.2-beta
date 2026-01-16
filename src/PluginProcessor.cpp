@@ -41,10 +41,12 @@ const juce::StringArray kMsChoices {
     "All",
     "Mid",
     "Side",
+    "L/R",
     "Left",
     "Right",
-    "L/R",
     "Mono",
+    "L",
+    "R",
     "C",
     "LFE",
     "Ls",
@@ -68,10 +70,6 @@ const juce::StringArray kMsChoices {
     "Bfl",
     "Bfr",
     "Bfc",
-    "W",
-    "X",
-    "Y",
-    "Z",
     "Ls/Rs",
     "Lrs/Rrs",
     "Lc/Rc",
@@ -348,54 +346,52 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 msTarget = 2;
                 mask = maskForPair("L", "R");
                 break;
-            case 3: // Left
+            case 3: // L/R
+                mask = maskForPair("L", "R");
+                break;
+            case 4: // Left
                 mask = maskFor("L");
                 break;
-            case 4: // Right
+            case 5: // Right
                 mask = maskFor("R");
-                break;
-            case 5: // L/R
-                mask = maskForPair("L", "R");
                 break;
             case 6: // Mono
                 msTarget = 1;
                 mask = maskForPair("L", "R");
                 break;
-            case 7: mask = maskFor("C"); break;
-            case 8: mask = maskFor("LFE"); break;
-            case 9: mask = maskFor("Ls"); break;
-            case 10: mask = maskFor("Rs"); break;
-            case 11: mask = maskFor("Lrs"); break;
-            case 12: mask = maskFor("Rrs"); break;
-            case 13: mask = maskFor("Lc"); break;
-            case 14: mask = maskFor("Rc"); break;
-            case 15: mask = maskFor("Ltf"); break;
-            case 16: mask = maskFor("Rtf"); break;
-            case 17: mask = maskFor("Tfc"); break;
-            case 18: mask = maskFor("Tm"); break;
-            case 19: mask = maskFor("Ltr"); break;
-            case 20: mask = maskFor("Rtr"); break;
-            case 21: mask = maskFor("Trc"); break;
-            case 22: mask = maskFor("Lts"); break;
-            case 23: mask = maskFor("Rts"); break;
-            case 24: mask = maskFor("Lw"); break;
-            case 25: mask = maskFor("Rw"); break;
-            case 26: mask = maskFor("LFE2"); break;
-            case 27: mask = maskFor("Bfl"); break;
-            case 28: mask = maskFor("Bfr"); break;
-            case 29: mask = maskFor("Bfc"); break;
-            case 30: mask = maskFor("W"); break;
-            case 31: mask = maskFor("X"); break;
-            case 32: mask = maskFor("Y"); break;
-            case 33: mask = maskFor("Z"); break;
-            case 34: mask = maskForPair("Ls", "Rs"); break;
-            case 35: mask = maskForPair("Lrs", "Rrs"); break;
-            case 36: mask = maskForPair("Lc", "Rc"); break;
-            case 37: mask = maskForPair("Ltf", "Rtf"); break;
-            case 38: mask = maskForPair("Ltr", "Rtr"); break;
-            case 39: mask = maskForPair("Lts", "Rts"); break;
-            case 40: mask = maskForPair("Lw", "Rw"); break;
-            case 41: mask = maskForPair("Bfl", "Bfr"); break;
+            case 7: mask = maskFor("L"); break;
+            case 8: mask = maskFor("R"); break;
+            case 9: mask = maskFor("C"); break;
+            case 10: mask = maskFor("LFE"); break;
+            case 11: mask = maskFor("Ls"); break;
+            case 12: mask = maskFor("Rs"); break;
+            case 13: mask = maskFor("Lrs"); break;
+            case 14: mask = maskFor("Rrs"); break;
+            case 15: mask = maskFor("Lc"); break;
+            case 16: mask = maskFor("Rc"); break;
+            case 17: mask = maskFor("Ltf"); break;
+            case 18: mask = maskFor("Rtf"); break;
+            case 19: mask = maskFor("Tfc"); break;
+            case 20: mask = maskFor("Tm"); break;
+            case 21: mask = maskFor("Ltr"); break;
+            case 22: mask = maskFor("Rtr"); break;
+            case 23: mask = maskFor("Trc"); break;
+            case 24: mask = maskFor("Lts"); break;
+            case 25: mask = maskFor("Rts"); break;
+            case 26: mask = maskFor("Lw"); break;
+            case 27: mask = maskFor("Rw"); break;
+            case 28: mask = maskFor("LFE2"); break;
+            case 29: mask = maskFor("Bfl"); break;
+            case 30: mask = maskFor("Bfr"); break;
+            case 31: mask = maskFor("Bfc"); break;
+            case 32: mask = maskForPair("Ls", "Rs"); break;
+            case 33: mask = maskForPair("Lrs", "Rrs"); break;
+            case 34: mask = maskForPair("Lc", "Rc"); break;
+            case 35: mask = maskForPair("Ltf", "Rtf"); break;
+            case 36: mask = maskForPair("Ltr", "Rtr"); break;
+            case 37: mask = maskForPair("Lts", "Rts"); break;
+            case 38: mask = maskForPair("Lw", "Rw"); break;
+            case 39: mask = maskForPair("Bfl", "Bfr"); break;
             default:
                 mask = maskAll;
                 break;
@@ -1062,7 +1058,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
         kOversamplingChoices, 0));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         ParamIDs::outputTrim, "Output Trim",
-        juce::NormalisableRange<float>(-24.0f, 24.0f, 0.01f),
+        juce::NormalisableRange<float>(-100.0f, 24.0f, 0.01f),
         0.0f));
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         ParamIDs::spectralEnable, "Spectral Enable",
@@ -1184,7 +1180,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
             params.push_back(std::make_unique<juce::AudioParameterFloat>(
                 ParamIDs::bandParamId(ch, band, kParamSlopeSuffix),
                 ParamIDs::bandParamName(ch, band, "Slope"),
-                juce::NormalisableRange<float>(6.0f, 96.0f, 0.1f),
+                juce::NormalisableRange<float>(6.0f, 96.0f, 6.0f),
                 12.0f));
 
             params.push_back(std::make_unique<juce::AudioParameterBool>(

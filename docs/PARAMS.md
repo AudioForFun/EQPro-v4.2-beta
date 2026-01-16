@@ -21,7 +21,7 @@
   - Off
   - 2x
   - 4x
-- `outputTrim` (float, dB, -24..+24)
+- `outputTrim` (float, dB, -inf..+24)
 - `spectralEnable` (bool)
 - `spectralThreshold` (float, dB, -60..0)
 - `spectralRatio` (float, 1..20)
@@ -114,7 +114,7 @@ For channels 1..16 and bands 1..12:
   - Lts/Rts
   - Lw/Rw
   - Bfl/Bfr
-- `ch{C}_b{B}_slope` (float, dB/oct, 6..96)
+- `ch{C}_b{B}_slope` (float, dB/oct, 6..96 step 6)
 - `ch{C}_b{B}_mix` (float, %, 0..100)
 - `ch{C}_b{B}_dynEnable` (bool)
 - `ch{C}_b{B}_dynMode` (choice)

@@ -3,11 +3,11 @@
 
 namespace
 {
-constexpr int kEditorWidth = 1400;
-constexpr int kEditorHeight = 900;
+constexpr int kEditorWidth = 1200;
+constexpr int kEditorHeight = 800;
 constexpr int kOuterMargin = 16;
 constexpr int kLeftPanelWidth = 0;
-constexpr int kRightPanelWidth = 160;
+constexpr int kRightPanelWidth = 180;
 constexpr float kLabelFontSize = 12.0f;
 constexpr float kHeaderFontSize = 20.0f;
 } // namespace
@@ -24,6 +24,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     setLookAndFeel(&lookAndFeel);
     openGLContext.setContinuousRepainting(false);
     openGLContext.attachTo(*this);
+    analyzer.setInteractive(false);
 
     headerLabel.setText("EQ Pro", juce::dontSendNotification);
     headerLabel.setJustificationType(juce::Justification::centredLeft);
@@ -45,7 +46,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         std::make_unique<ButtonAttachment>(processorRef.getParameters(), ParamIDs::globalBypass,
                                            globalBypassButton);
 
-    globalMixLabel.setText("Mix", juce::dontSendNotification);
+    globalMixLabel.setText("Para General Mix", juce::dontSendNotification);
     globalMixLabel.setJustificationType(juce::Justification::centredLeft);
     globalMixLabel.setFont(kLabelFontSize);
     globalMixLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
@@ -62,7 +63,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     globalMixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.getParameters(), ParamIDs::globalMix, globalMixSlider);
 
-    phaseLabel.setText("Mode", juce::dontSendNotification);
+    phaseLabel.setText("Processing Mode", juce::dontSendNotification);
     phaseLabel.setJustificationType(juce::Justification::centredLeft);
     phaseLabel.setFont(kLabelFontSize);
     phaseLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
@@ -965,10 +966,8 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     correlationLabel.setVisible(false);
     correlationBox.setVisible(false);
 
-    resizeConstrainer.setSizeLimits(1200, 800, 2600, 1600);
-    setResizable(true, true);
-    setResizeLimits(1200, 800, 2600, 1600);
-    addAndMakeVisible(resizer);
+    setResizable(false, false);
+    setResizeLimits(kEditorWidth, kEditorHeight, kEditorWidth, kEditorHeight);
 
     setSize(kEditorWidth, kEditorHeight);
 }
@@ -1019,7 +1018,7 @@ void EQProAudioProcessorEditor::resized()
                                   .withSizeKeepingCentre(mixSliderWidth, globalBypassHeight + 8));
 
     auto content = bounds;
-    const int metersWidth = static_cast<int>(200 * uiScale);
+    const int metersWidth = static_cast<int>(kRightPanelWidth * uiScale);
     auto rightPanel = content.removeFromRight(metersWidth);
     auto leftContent = content;
     const int analyzerHeight = static_cast<int>(leftContent.getHeight() * 0.70f);
@@ -1080,6 +1079,5 @@ void EQProAudioProcessorEditor::resized()
     correlationBox.setBounds({0, 0, 0, 0});
     themeLabel.setBounds({0, 0, 0, 0});
     themeBox.setBounds({0, 0, 0, 0});
-    resizer.setBounds(getLocalBounds().removeFromBottom(static_cast<int>(16 * uiScale))
-                          .removeFromRight(static_cast<int>(16 * uiScale)));
+    resizer.setBounds({0, 0, 0, 0});
 }

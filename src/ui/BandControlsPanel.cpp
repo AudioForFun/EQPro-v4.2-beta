@@ -21,10 +21,12 @@ const juce::StringArray kMsChoices {
     "All",
     "Mid",
     "Side",
+    "L/R",
     "Left",
     "Right",
-    "L/R",
     "Mono",
+    "L",
+    "R",
     "C",
     "LFE",
     "Ls",
@@ -48,10 +50,6 @@ const juce::StringArray kMsChoices {
     "Bfl",
     "Bfr",
     "Bfc",
-    "W",
-    "X",
-    "Y",
-    "Z",
     "Ls/Rs",
     "Lrs/Rrs",
     "Lc/Rc",
@@ -84,11 +82,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     pasteButton.onClick = [this] { pasteBandState(); };
     addAndMakeVisible(pasteButton);
 
-    resetButton.setButtonText("Reset");
-    resetButton.onClick = [this] { resetSelectedBand(false); };
-    addAndMakeVisible(resetButton);
-
-    defaultButton.setButtonText("Default");
+    defaultButton.setButtonText("Reset");
     defaultButton.onClick = [this] { resetSelectedBand(false); };
     addAndMakeVisible(defaultButton);
 
@@ -96,23 +90,18 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     deleteButton.onClick = [this] { resetSelectedBand(true); };
     addAndMakeVisible(deleteButton);
 
-    prevBandButton.setButtonText("<");
-    prevBandButton.onClick = [this]
+    for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
     {
-        const int next = findNextExisting(selectedBand, -1);
-        if (onBandNavigate && next != selectedBand)
-            onBandNavigate(next);
-    };
-    addAndMakeVisible(prevBandButton);
-
-    nextBandButton.setButtonText(">");
-    nextBandButton.onClick = [this]
-    {
-        const int next = findNextExisting(selectedBand, 1);
-        if (onBandNavigate && next != selectedBand)
-            onBandNavigate(next);
-    };
-    addAndMakeVisible(nextBandButton);
+        auto& button = bandSelectButtons[static_cast<size_t>(i)];
+        button.setButtonText(juce::String(i + 1));
+        button.setClickingTogglesState(true);
+        button.onClick = [this, index = i]()
+        {
+            if (onBandNavigate)
+                onBandNavigate(index);
+        };
+        addAndMakeVisible(button);
+    }
 
 
     auto initLabel = [this](juce::Label& label, const juce::String& text)
@@ -130,7 +119,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     initLabel(typeLabel, "Type");
     initLabel(msLabel, "Channel");
     initLabel(slopeLabel, "Slope");
-    initLabel(mixLabel, "Mix");
+    initLabel(mixLabel, "Band Mix");
     dynamicLabel.setText("DYNAMIC / CHANNEL", juce::dontSendNotification);
     dynamicLabel.setJustificationType(juce::Justification::centredLeft);
     dynamicLabel.setFont(juce::Font(11.0f, juce::Font::bold));
@@ -202,15 +191,24 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         mirrorToLinkedChannel("ms", static_cast<float>(msBox.getSelectedItemIndex()));
     };
 
-    slopeSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    slopeSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-    slopeSlider.setTextBoxIsEditable(true);
-    slopeSlider.setTextValueSuffix(" dB/oct");
-    addAndMakeVisible(slopeSlider);
-    slopeSlider.onValueChange = [this]
+    for (int i = 0; i < static_cast<int>(slopeButtons.size()); ++i)
     {
-        mirrorToLinkedChannel("slope", static_cast<float>(slopeSlider.getValue()));
-    };
+        const int slopeValue = 6 * (i + 1);
+        auto& button = slopeButtons[static_cast<size_t>(i)];
+        button.setButtonText(juce::String(slopeValue));
+        button.setClickingTogglesState(true);
+        button.onClick = [this, slopeValue, index = i]()
+        {
+            if (! slopeButtons[static_cast<size_t>(index)].getToggleState())
+                return;
+            if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "slope")))
+                param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(slopeValue)));
+            mirrorToLinkedChannel("slope", static_cast<float>(slopeValue));
+            for (int j = 0; j < static_cast<int>(slopeButtons.size()); ++j)
+                slopeButtons[static_cast<size_t>(j)].setToggleState(j == index, juce::dontSendNotification);
+        };
+        addAndMakeVisible(button);
+    }
 
     mixSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     mixSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
@@ -327,6 +325,8 @@ void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
     titleLabel.setText("Band " + juce::String(selectedBand + 1)
                            + " / " + juce::String(ParamIDs::kBandsPerChannel),
                        juce::dontSendNotification);
+    for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
+        bandSelectButtons[static_cast<size_t>(i)].setToggleState(i == selectedBand, juce::dontSendNotification);
     const auto bandColour = ColorUtils::bandColour(selectedBand);
     titleLabel.setColour(juce::Label::textColourId, bandColour);
     freqSlider.setColour(juce::Slider::trackColourId, bandColour);
@@ -354,9 +354,8 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     msBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     msBox.setColour(juce::ComboBox::textColourId, theme.text);
     msBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    slopeSlider.setColour(juce::Slider::trackColourId, theme.accent);
-    slopeSlider.setColour(juce::Slider::textBoxTextColourId, theme.text);
-    slopeSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
+    for (auto& button : slopeButtons)
+        button.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     mixSlider.setColour(juce::Slider::trackColourId, ColorUtils::bandColour(selectedBand));
     mixSlider.setColour(juce::Slider::textBoxTextColourId, theme.text);
     mixSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
@@ -372,11 +371,10 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     bypassButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     copyButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     pasteButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
-    resetButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     deleteButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     defaultButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
-    prevBandButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
-    nextBandButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
+    for (auto& button : bandSelectButtons)
+        button.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     soloButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     tiltDirToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     dynEnableToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
@@ -403,22 +401,23 @@ void BandControlsPanel::paint(juce::Graphics& g)
 
     if (detectorMeterBounds.getWidth() > 1.0f && detectorMeterBounds.getHeight() > 1.0f)
     {
+        const auto meter = detectorMeterBounds;
         g.setColour(theme.panelOutline.withAlpha(0.6f));
-        g.fillRoundedRectangle(detectorMeterBounds, 3.0f);
+        g.fillRoundedRectangle(meter, 4.0f);
 
         const float clampedDb = juce::jlimit(-60.0f, 0.0f, detectorDb);
         const float norm = (clampedDb + 60.0f) / 60.0f;
-        auto fill = detectorMeterBounds;
-        fill.setY(detectorMeterBounds.getBottom() - detectorMeterBounds.getHeight() * norm);
-        fill.setHeight(detectorMeterBounds.getBottom() - fill.getY());
+        auto fill = meter;
+        fill.setY(meter.getBottom() - meter.getHeight() * norm);
+        fill.setHeight(meter.getBottom() - fill.getY());
         g.setColour(ColorUtils::bandColour(selectedBand));
-        g.fillRoundedRectangle(fill, 3.0f);
+        g.fillRoundedRectangle(fill.reduced(2.0f), 3.0f);
 
         const float thresh = static_cast<float>(thresholdSlider.getValue());
         const float threshNorm = (juce::jlimit(-60.0f, 0.0f, thresh) + 60.0f) / 60.0f;
-        const float y = detectorMeterBounds.getBottom() - detectorMeterBounds.getHeight() * threshNorm;
+        const float y = meter.getBottom() - meter.getHeight() * threshNorm;
         g.setColour(theme.textMuted);
-        g.drawLine(detectorMeterBounds.getX(), y, detectorMeterBounds.getRight(), y, 1.0f);
+        g.drawLine(meter.getX(), y, meter.getRight(), y, 1.2f);
     }
 
 }
@@ -442,15 +441,22 @@ void BandControlsPanel::resized()
     auto right = bounds;
 
     auto headerRow = left.removeFromTop(rowHeight);
-    titleLabel.setBounds(headerRow.removeFromLeft(70));
-    prevBandButton.setBounds(headerRow.removeFromLeft(24));
-    nextBandButton.setBounds(headerRow.removeFromLeft(24));
+    titleLabel.setBounds(headerRow.removeFromLeft(90));
     const int btnW = 58;
     copyButton.setBounds(headerRow.removeFromLeft(btnW));
     pasteButton.setBounds(headerRow.removeFromLeft(btnW));
-    resetButton.setBounds(headerRow.removeFromLeft(btnW));
     defaultButton.setBounds(headerRow.removeFromLeft(btnW));
     deleteButton.setBounds(headerRow.removeFromLeft(btnW));
+
+    left.removeFromTop(2);
+    auto bandRow = left.removeFromTop(rowHeight);
+    const int bandBtnWidth = std::max(18, (bandRow.getWidth() - gap * 11) / 12);
+    for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
+    {
+        bandSelectButtons[static_cast<size_t>(i)].setBounds(
+            bandRow.removeFromLeft(bandBtnWidth));
+        bandRow.removeFromLeft(gap);
+    }
 
     left.removeFromTop(gap);
     auto knobsRow = left.removeFromTop(knobRowHeight);
@@ -525,7 +531,7 @@ void BandControlsPanel::resized()
     releaseSlider.setBounds(squareKnob(releaseArea).withSizeKeepingCentre(knobSize, knobSize));
 
     right.removeFromTop(6);
-    detectorMeterBounds = right.removeFromTop(18).toFloat();
+    detectorMeterBounds = right.removeFromTop(64).toFloat();
 
     right.removeFromTop(6);
     auto msRow = right.removeFromTop(labelHeight + rowHeight);
@@ -533,9 +539,20 @@ void BandControlsPanel::resized()
     msBox.setBounds(msRow.withHeight(rowHeight));
 
     left.removeFromTop(2);
-    auto slopeRow = left.removeFromTop(labelHeight + rowHeight);
+    auto slopeRow = left.removeFromTop(labelHeight + rowHeight * 2 + 4);
     slopeLabel.setBounds(slopeRow.removeFromTop(labelHeight));
-    slopeSlider.setBounds(slopeRow);
+    const int perRowSlope = 8;
+    const int slopeGap = 6;
+    const int slopeButtonWidth = (slopeRow.getWidth() - slopeGap * (perRowSlope - 1)) / perRowSlope;
+    auto slopeRow1 = slopeRow.removeFromTop(rowHeight);
+    auto slopeRow2 = slopeRow.removeFromTop(rowHeight);
+    for (int i = 0; i < static_cast<int>(slopeButtons.size()); ++i)
+    {
+        auto& row = (i < perRowSlope) ? slopeRow1 : slopeRow2;
+        const int col = i % perRowSlope;
+        const int x = row.getX() + col * (slopeButtonWidth + slopeGap);
+        slopeButtons[static_cast<size_t>(i)].setBounds(x, row.getY(), slopeButtonWidth, rowHeight);
+    }
 
 }
 
@@ -554,7 +571,6 @@ void BandControlsPanel::updateAttachments()
     gainAttachment = std::make_unique<SliderAttachment>(parameters, gainId, gainSlider);
     qAttachment = std::make_unique<SliderAttachment>(parameters, qId, qSlider);
     msAttachment = std::make_unique<ComboBoxAttachment>(parameters, msId, msBox);
-    slopeAttachment = std::make_unique<SliderAttachment>(parameters, slopeId, slopeSlider);
     mixAttachment = std::make_unique<SliderAttachment>(parameters, mixId, mixSlider);
     bypassAttachment = std::make_unique<ButtonAttachment>(parameters, bypassId, bypassButton);
     soloAttachment = std::make_unique<ButtonAttachment>(parameters, soloId, soloButton);
@@ -574,6 +590,15 @@ void BandControlsPanel::updateAttachments()
         const int mode = static_cast<int>(param->convertFrom0to1(param->getValue()));
         dynUpButton.setToggleState(mode == 0, juce::dontSendNotification);
         dynDownButton.setToggleState(mode == 1, juce::dontSendNotification);
+    }
+
+    if (auto* slopeParam = parameters.getParameter(slopeId))
+    {
+        const float slopeValue = slopeParam->convertFrom0to1(slopeParam->getValue());
+        const int slopeIndex = juce::jlimit(0, static_cast<int>(slopeButtons.size()) - 1,
+                                            static_cast<int>(std::round(slopeValue / 6.0f)) - 1);
+        for (int i = 0; i < static_cast<int>(slopeButtons.size()); ++i)
+            slopeButtons[static_cast<size_t>(i)].setToggleState(i == slopeIndex, juce::dontSendNotification);
     }
 }
 
@@ -613,8 +638,11 @@ void BandControlsPanel::updateTypeUi()
     gainSlider.setAlpha(isAllPass ? 0.5f : 1.0f);
     msBox.setEnabled(msEnabled);
     msBox.setAlpha(msEnabled ? 1.0f : 0.5f);
-    slopeSlider.setEnabled(isHpLp);
-    slopeSlider.setAlpha(isHpLp ? 1.0f : 0.5f);
+    for (auto& button : slopeButtons)
+    {
+        button.setEnabled(isHpLp);
+        button.setAlpha(isHpLp ? 1.0f : 0.5f);
+    }
     updateFilterButtonsFromType(typeIndex);
     const bool isTilt = (typeIndex == 8 || typeIndex == 9);
     tiltDirToggle.setVisible(isTilt);
@@ -659,7 +687,9 @@ void BandControlsPanel::copyBandState()
     state.type = static_cast<float>(getCurrentTypeIndex());
     state.bypass = bypassButton.getToggleState() ? 1.0f : 0.0f;
     state.ms = static_cast<float>(msBox.getSelectedItemIndex());
-    state.slope = static_cast<float>(slopeSlider.getValue());
+    const auto slopeId = ParamIDs::bandParamId(selectedChannel, selectedBand, "slope");
+    if (auto* param = parameters.getParameter(slopeId))
+        state.slope = param->convertFrom0to1(param->getValue());
     state.solo = soloButton.getToggleState() ? 1.0f : 0.0f;
     state.mix = static_cast<float>(mixSlider.getValue());
     state.dynEnable = dynEnableToggle.getToggleState() ? 1.0f : 0.0f;

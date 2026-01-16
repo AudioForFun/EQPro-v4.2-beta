@@ -28,7 +28,7 @@ inline ThemeColors makeDarkTheme()
         juce::Colour(0xffb6c2cf),
         juce::Colour(0xff22d3ee),
         juce::Colour(0xffa78bfa),
-        juce::Colour(0xff0a0c10),
+        juce::Colour(0xff1a2230),
         juce::Colour(0xff040506),
         juce::Colour(0xff0b0f15),
         juce::Colour(0xff22c55e),

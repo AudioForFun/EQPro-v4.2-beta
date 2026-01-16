@@ -59,11 +59,9 @@ private:
     int selectedBand = 0;
 
     juce::Label titleLabel;
-    juce::TextButton resetButton;
     juce::TextButton defaultButton;
     juce::TextButton deleteButton;
-    juce::TextButton prevBandButton;
-    juce::TextButton nextBandButton;
+    std::array<juce::TextButton, ParamIDs::kBandsPerChannel> bandSelectButtons;
     juce::Label freqLabel;
     juce::Label gainLabel;
     juce::Label qLabel;
@@ -75,7 +73,7 @@ private:
     juce::Label msLabel;
     juce::ComboBox msBox;
     juce::Label slopeLabel;
-    juce::Slider slopeSlider;
+    std::array<juce::ToggleButton, 16> slopeButtons;
     juce::Label mixLabel;
     juce::Slider mixSlider;
     juce::ToggleButton bypassButton;
@@ -104,7 +102,6 @@ private:
     std::unique_ptr<SliderAttachment> gainAttachment;
     std::unique_ptr<SliderAttachment> qAttachment;
     std::unique_ptr<ComboBoxAttachment> msAttachment;
-    std::unique_ptr<SliderAttachment> slopeAttachment;
     std::unique_ptr<SliderAttachment> mixAttachment;
     std::unique_ptr<ButtonAttachment> bypassAttachment;
     std::unique_ptr<ButtonAttachment> soloAttachment;

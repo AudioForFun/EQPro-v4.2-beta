@@ -17,6 +17,7 @@ public:
     void setSelectedChannel(int channelIndex);
     void setTheme(const ThemeColors& newTheme);
     void setUiScale(float scale);
+    void setInteractive(bool shouldAllow);
 
     std::function<void(int)> onBandSelected;
 
@@ -39,6 +40,7 @@ private:
     juce::Rectangle<int> getPlotArea() const;
     juce::Rectangle<int> getMagnitudeArea() const;
     void drawLabels(juce::Graphics& g, const juce::Rectangle<int>& area);
+    float getMaxFreq() const;
 
     float xToFrequency(float x) const;
     float yToGain(float y) const;
@@ -93,6 +95,7 @@ private:
     };
     std::vector<int> selectedBands;
     std::vector<DragBandState> dragBands;
+    bool allowInteraction = false;
 
     static constexpr int fftOrder = 12;
     static constexpr int fftSize = 1 << fftOrder;

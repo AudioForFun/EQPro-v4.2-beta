@@ -89,6 +89,11 @@ void AnalyzerComponent::setUiScale(float scale)
     repaint();
 }
 
+void AnalyzerComponent::setInteractive(bool shouldAllow)
+{
+    allowInteraction = shouldAllow;
+}
+
 void AnalyzerComponent::paint(juce::Graphics& g)
 {
     auto plotArea = getPlotArea();
@@ -107,7 +112,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
     drawLabels(g, magnitudeArea);
 
-    const float maxFreq = std::min(60000.0f, lastSampleRate * 0.5f);
+    const float maxFreq = getMaxFreq();
 
     juce::Path prePath;
     juce::Path postPath;
@@ -206,8 +211,8 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
             const auto bandColour = ColorUtils::bandColour(band);
             const bool isSelected = band == selectedBand;
-            g.setColour(bandColour.withAlpha(isSelected ? 0.65f : 0.45f));
-            g.strokePath(bandPath, juce::PathStrokeType((isSelected ? 1.8f : 1.3f) * scale));
+            g.setColour(bandColour.withAlpha(isSelected ? 0.9f : 0.65f));
+            g.strokePath(bandPath, juce::PathStrokeType((isSelected ? 2.0f : 1.6f) * scale));
         }
 
         juce::Path eqPath;
@@ -218,10 +223,10 @@ void AnalyzerComponent::paint(juce::Graphics& g)
             eqPath.lineTo(plotArea.getX() + x,
                           gainToY(eqCurveDb[static_cast<size_t>(x)]));
 
-        g.setColour(theme.text.withAlpha(0.35f));
-        g.strokePath(eqPath, juce::PathStrokeType(3.0f * scale));
-        g.setColour(theme.text.withAlpha(0.9f));
-        g.strokePath(eqPath, juce::PathStrokeType(1.6f * scale));
+        g.setColour(theme.text.withAlpha(0.25f));
+        g.strokePath(eqPath, juce::PathStrokeType(3.2f * scale));
+        g.setColour(theme.text.withAlpha(0.85f));
+        g.strokePath(eqPath, juce::PathStrokeType(1.8f * scale));
     }
 
     if (! selectedBandCurveDb.empty())
@@ -244,6 +249,8 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     bypassIcons.reserve(ParamIDs::kBandsPerChannel);
     hasQHandles = false;
 
+    std::vector<juce::Rectangle<float>> labelRects;
+    labelRects.reserve(ParamIDs::kBandsPerChannel);
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
     {
         const float freq = getBandParameter(band, kParamFreqSuffix);
@@ -329,14 +336,40 @@ void AnalyzerComponent::paint(juce::Graphics& g)
             }
         }
 
-        g.setColour(colour.withAlpha(0.9f));
-        g.setFont(12.0f * scale);
-        g.drawFittedText(juce::String(band + 1),
-                         juce::Rectangle<int>(static_cast<int>(point.x + radius + 2.0f * scale),
-                                              static_cast<int>(point.y - 7.0f * scale),
-                                              static_cast<int>(20 * scale),
-                                              static_cast<int>(14 * scale)),
-                         juce::Justification::left, 1);
+        if (isSelected && ! bypassed)
+        {
+            g.setColour(colour.withAlpha(0.9f));
+            g.setFont(12.0f * scale);
+            const float labelW = 20.0f * scale;
+            const float labelH = 14.0f * scale;
+            juce::Rectangle<float> labelRect(point.x + radius + 2.0f * scale,
+                                             point.y - 7.0f * scale,
+                                             labelW, labelH);
+            const float offsetStep = labelH;
+            const int offsets[] { 0, -1, 1, -2, 2, -3, 3 };
+            for (int offset : offsets)
+            {
+                auto candidate = labelRect;
+                candidate.setY(labelRect.getY() + offset * offsetStep);
+                candidate.setY(juce::jlimit(static_cast<float>(plotArea.getY()),
+                                            static_cast<float>(plotArea.getBottom()) - labelH,
+                                            candidate.getY()));
+                const bool overlaps = std::any_of(labelRects.begin(), labelRects.end(),
+                                                  [&candidate](const juce::Rectangle<float>& other)
+                                                  {
+                                                      return candidate.intersects(other);
+                                                  });
+                if (! overlaps)
+                {
+                    labelRect = candidate;
+                    break;
+                }
+            }
+            labelRects.push_back(labelRect);
+            g.drawFittedText(juce::String(band + 1),
+                             labelRect.toNearestInt(),
+                             juce::Justification::left, 1);
+        }
     }
 
     if (hoverBand >= 0 && hoverBand < ParamIDs::kBandsPerChannel)
@@ -381,6 +414,8 @@ void AnalyzerComponent::resized()
 
 void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
 {
+    if (! allowInteraction)
+        return;
     draggingBand = -1;
     draggingQ = false;
     const auto plotArea = getMagnitudeArea().toFloat();
@@ -512,6 +547,8 @@ void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
 
 void AnalyzerComponent::mouseDrag(const juce::MouseEvent& event)
 {
+    if (! allowInteraction)
+        return;
     if (isAltSoloing)
     {
         updateAltSolo(event.position);
@@ -569,6 +606,8 @@ void AnalyzerComponent::mouseDrag(const juce::MouseEvent& event)
 
 void AnalyzerComponent::mouseUp(const juce::MouseEvent& event)
 {
+    if (! allowInteraction)
+        return;
     juce::ignoreUnused(event);
     if (isAltSoloing)
         stopAltSolo();
@@ -587,6 +626,8 @@ void AnalyzerComponent::mouseUp(const juce::MouseEvent& event)
 
 void AnalyzerComponent::mouseDoubleClick(const juce::MouseEvent& event)
 {
+    if (! allowInteraction)
+        return;
     const auto plotArea = getMagnitudeArea().toFloat();
     if (! plotArea.contains(event.position))
         return;
@@ -629,6 +670,8 @@ void AnalyzerComponent::mouseExit(const juce::MouseEvent& event)
 void AnalyzerComponent::mouseWheelMove(const juce::MouseEvent& event,
                                        const juce::MouseWheelDetails& wheel)
 {
+    if (! allowInteraction)
+        return;
     juce::ignoreUnused(event);
     const float delta = wheel.deltaY != 0.0f ? wheel.deltaY : wheel.deltaX;
     if (delta == 0.0f)
@@ -891,7 +934,7 @@ void AnalyzerComponent::updateCurves()
     perBandActive.assign(ParamIDs::kBandsPerChannel, false);
     // Phase view removed.
 
-    const float maxFreq = std::min(60000.0f, lastSampleRate * 0.5f);
+    const float maxFreq = getMaxFreq();
     std::array<bool, ParamIDs::kBandsPerChannel> bandActive {};
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
     {
@@ -947,9 +990,9 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
                                    static_cast<float>(labelArea.getBottom()),
                                    static_cast<float>(labelArea.getY()));
         const bool major = (static_cast<int>(db) % 12 == 0);
-        g.setColour(theme.grid.withAlpha(major ? 0.55f : 0.28f));
+        g.setColour(theme.grid.withAlpha(major ? 0.7f : 0.45f));
         g.drawLine(static_cast<float>(area.getX()), y,
-                   static_cast<float>(area.getRight()), y, major ? 1.2f : 0.8f);
+                   static_cast<float>(area.getRight()), y, major ? 1.4f : 1.0f);
         if (major)
         {
             g.setColour(theme.textMuted.withAlpha(0.8f));
@@ -962,13 +1005,15 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
         }
     }
 
-    const float maxFreq = std::min(60000.0f, lastSampleRate * 0.5f);
+    const float maxFreq = getMaxFreq();
     const float freqs[] { 10.0f, 12.5f, 16.0f, 20.0f, 25.0f, 31.5f, 40.0f, 50.0f, 63.0f, 80.0f, 100.0f, 125.0f,
                           160.0f, 200.0f, 250.0f, 315.0f, 400.0f, 500.0f, 630.0f, 800.0f, 1000.0f, 1250.0f, 1600.0f,
                           2000.0f, 2500.0f, 3150.0f, 4000.0f, 5000.0f, 6300.0f, 8000.0f, 10000.0f, 12500.0f, 16000.0f,
                           20000.0f, 25000.0f, 31500.0f, 40000.0f, 50000.0f, 60000.0f };
     float lastLabelX = -1.0e6f;
-    const float minLabelSpacing = 34.0f * scale;
+    const float minLabelSpacing = 28.0f * scale;
+    const int labelWidth = static_cast<int>(42 * scale);
+    const int labelHeight = static_cast<int>(14 * scale);
     for (float f : freqs)
     {
         if (f < kMinFreq || f > maxFreq)
@@ -977,10 +1022,10 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
         const bool major = (f == 10.0f || f == 20.0f || f == 50.0f || f == 100.0f || f == 200.0f || f == 500.0f
             || f == 1000.0f || f == 2000.0f || f == 5000.0f || f == 10000.0f || f == 20000.0f || f == 40000.0f
             || f == 60000.0f);
-        g.setColour(major ? theme.grid.withAlpha(0.7f) : theme.grid.withAlpha(0.35f));
+        g.setColour(major ? theme.grid.withAlpha(0.8f) : theme.grid.withAlpha(0.45f));
         g.drawVerticalLine(static_cast<int>(x), static_cast<float>(area.getY()),
                            static_cast<float>(area.getBottom()));
-        if (major && (x - lastLabelX) >= minLabelSpacing)
+        if (major && x + labelWidth <= area.getRight() && (x - lastLabelX) >= minLabelSpacing)
         {
             lastLabelX = x;
             g.setColour(theme.textMuted);
@@ -990,8 +1035,8 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
             g.drawFittedText(text,
                              juce::Rectangle<int>(static_cast<int>(x + 3.0f * scale),
                                                   static_cast<int>(area.getBottom() - bottomGutter),
-                                                  static_cast<int>(44 * scale),
-                                                  static_cast<int>(14 * scale)),
+                                                  labelWidth,
+                                                  labelHeight),
                              juce::Justification::left, 1);
         }
     }
@@ -1039,7 +1084,7 @@ juce::Rectangle<int> AnalyzerComponent::getMagnitudeArea() const
 float AnalyzerComponent::xToFrequency(float x) const
 {
     const auto plotArea = getMagnitudeArea();
-    const float maxFreq = std::min(20000.0f, lastSampleRate * 0.5f);
+    const float maxFreq = getMaxFreq();
     const float norm = (x - plotArea.getX()) / static_cast<float>(plotArea.getWidth());
     return FFTUtils::normToFreq(norm, kMinFreq, maxFreq);
 }
@@ -1057,7 +1102,7 @@ float AnalyzerComponent::yToGain(float y) const
 float AnalyzerComponent::frequencyToX(float freq) const
 {
     const auto plotArea = getMagnitudeArea();
-    const float maxFreq = std::min(20000.0f, lastSampleRate * 0.5f);
+    const float maxFreq = getMaxFreq();
     const float norm = FFTUtils::freqToNorm(freq, kMinFreq, maxFreq);
     return plotArea.getX() + norm * plotArea.getWidth();
 }
@@ -1068,6 +1113,11 @@ float AnalyzerComponent::gainToY(float gainDb) const
     return juce::jmap(gainDb, minDb, maxDb,
                       static_cast<float>(plotArea.getBottom()),
                       static_cast<float>(plotArea.getY()));
+}
+
+float AnalyzerComponent::getMaxFreq() const
+{
+    return std::max(kMinFreq * 1.1f, std::min(60000.0f, lastSampleRate * 0.5f));
 }
 
 

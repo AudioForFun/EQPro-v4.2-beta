@@ -7,6 +7,13 @@
 - `AnalyzerTap` and `MeterTap` are DSP-side, lock-free bridges for UI visualization.
 - `PluginEditor` talks to DSP only via APVTS attachments and read-only tap accessors.
 
+## Performance Notes
+- Snapshot swaps are hashed and applied only when parameters change.
+- Linear-phase rebuilds are debounced to avoid repeated FIR regeneration during automation.
+- Analyzer taps decimate at high sample rates / large buffers to reduce FIFO pressure.
+- Metering updates are decimated at very high sample rates to lower CPU.
+- Global mix and output trim use block ramps instead of per-sample smoothing loops.
+
 ## DSP Pipeline (Milestone 1)
 - Per-channel processing pipeline with 12 fixed bands each.
 - Each band is a minimum-phase IIR biquad (RBJ formulas).

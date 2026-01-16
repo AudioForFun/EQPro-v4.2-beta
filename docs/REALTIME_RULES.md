@@ -6,3 +6,5 @@
 - Preallocate all DSP state in `prepareToPlay`.
 - Use lock-free communication for UI ↔ DSP (`AnalyzerTap`/`MeterTap`).
 - Read a stable `ParamSnapshot` once per block; no APVTS reads in the audio thread.
+- Prefer block ramps (e.g., `applyGainRamp`) over per-sample smoothing loops.
+- Decimate analyzer/meter updates at high sample rates to reduce CPU load.

@@ -410,11 +410,11 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
         if (isSelected || isActive)
         {
-            const float labelAlpha = bypassed ? 0.35f : (isSelected ? 0.95f : 0.6f);
+            const float labelAlpha = bypassed ? 0.35f : (isSelected ? 0.98f : 0.7f);
             g.setColour(colour.withAlpha(labelAlpha));
-            g.setFont((isSelected ? 12.0f : 11.0f) * scale);
-            const float labelW = 22.0f * scale;
-            const float labelH = 14.0f * scale;
+            g.setFont(juce::Font((isSelected ? 14.0f : 13.0f) * scale, juce::Font::bold));
+            const float labelW = 26.0f * scale;
+            const float labelH = 16.0f * scale;
             juce::Rectangle<float> labelRect(point.x + radius + 2.0f * scale,
                                              point.y - 7.0f * scale,
                                              labelW, labelH);

@@ -28,7 +28,6 @@ private:
     void updateAttachments();
     void updateTypeUi();
     int getCurrentTypeIndex() const;
-    void updateFilterButtonsFromType(int typeIndex);
     void copyBandState();
     void pasteBandState();
     void mirrorToLinkedChannel(const juce::String& suffix, float value);
@@ -74,11 +73,11 @@ private:
     juce::Slider gainSlider;
     juce::Slider qSlider;
     juce::Label typeLabel;
-    std::array<juce::ToggleButton, 10> filterButtons;
+    juce::ComboBox typeBox;
     juce::Label msLabel;
     juce::ComboBox msBox;
     juce::Label slopeLabel;
-    std::array<juce::ToggleButton, 16> slopeButtons;
+    juce::ComboBox slopeBox;
     juce::Label mixLabel;
     juce::Slider mixSlider;
     juce::ToggleButton bypassButton;

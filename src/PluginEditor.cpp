@@ -8,8 +8,8 @@ juce::AudioProcessorEditor* EQProAudioProcessor::createEditor()
 
 namespace
 {
-constexpr int kEditorWidth = 1600;
-constexpr int kEditorHeight = 1280;
+constexpr int kEditorWidth = 1500;
+constexpr int kEditorHeight = 980;
 constexpr int kOuterMargin = 16;
 constexpr int kLeftPanelWidth = 0;
 constexpr int kRightPanelWidth = 180;
@@ -1144,7 +1144,7 @@ void EQProAudioProcessorEditor::resized()
     const int metersWidth = static_cast<int>(kRightPanelWidth * uiScale);
     auto rightPanel = content.removeFromRight(metersWidth);
     auto leftContent = content;
-    const int analyzerHeight = static_cast<int>(leftContent.getHeight() * 0.45f);
+    const int analyzerHeight = static_cast<int>(leftContent.getHeight() * 0.52f);
     auto analyzerArea = leftContent.removeFromTop(analyzerHeight);
     analyzer.setBounds(analyzerArea);
 

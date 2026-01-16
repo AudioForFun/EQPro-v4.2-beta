@@ -16,10 +16,11 @@
 - The plot shows a small legend for Pre/Post/Ext.
 
 ## Band Controls
-- Per-band: Frequency, Gain, Q, Mix, Filter Type (button grid), Slope.
+- Per-band: Frequency, Gain, Q, Mix, Filter Type (dropdown), Slope (dropdown).
 - Band Mix is parallel dry/wet per band (dry + wet delta).
 - Routing: All/Mid/Side/Left/Right plus immersive channels/pairs.
 - Channel options are filtered to the current host layout and refresh on layout change.
+- Channel selector sits under the rotary row (not inside Dynamic section).
 - Solo and Bypass per band.
 - Dynamic EQ: Enable, Up/Down trigger, Threshold, Attack, Release, Auto Scale + detector meter.
 - Copy/Paste band state, Reset/Default/Delete.

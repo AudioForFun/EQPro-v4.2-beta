@@ -488,7 +488,42 @@ void AnalyzerComponent::resized()
 void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
 {
     if (! allowInteraction)
+    {
+        if (event.mods.isRightButtonDown())
+        {
+            float closest = kHitRadius * uiScale;
+            int closestBand = -1;
+            for (int i = 0; i < static_cast<int>(bandPoints.size()); ++i)
+            {
+                const float distance = bandPoints[static_cast<size_t>(i)].getDistanceFrom(event.position);
+                if (distance < closest)
+                {
+                    closest = distance;
+                    closestBand = i;
+                }
+            }
+            if (closestBand >= 0)
+            {
+                juce::PopupMenu menu;
+                menu.addItem("Reset to Default", [this, closestBand]()
+                {
+                    resetBandToDefaults(closestBand, false);
+                    setSelectedBand(closestBand);
+                    if (onBandSelected)
+                        onBandSelected(closestBand);
+                });
+                menu.addItem("Delete Band", [this, closestBand]()
+                {
+                    resetBandToDefaults(closestBand, true);
+                    setSelectedBand(closestBand);
+                    if (onBandSelected)
+                        onBandSelected(closestBand);
+                });
+                menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(*this));
+            }
+        }
         return;
+    }
     draggingBand = -1;
     draggingQ = false;
     const auto plotArea = getMagnitudeArea().toFloat();

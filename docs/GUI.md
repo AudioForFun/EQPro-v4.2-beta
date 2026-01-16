@@ -17,6 +17,7 @@
 
 ## Band Controls
 - Per-band: Frequency, Gain, Q, Mix, Filter Type (button grid), Slope.
+- Band Mix is parallel dry/wet per band (dry + wet delta).
 - Routing: All/Mid/Side/Left/Right plus immersive channels/pairs.
 - Channel options are filtered to the current host layout and refresh on layout change.
 - Solo and Bypass per band.
@@ -43,4 +44,4 @@
 - MIDI Learn toggle and target selector.
 
 ## Resizing
-- Fixed size (1600x1280).
+- Fixed size (1500x980).

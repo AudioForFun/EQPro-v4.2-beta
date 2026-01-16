@@ -1085,10 +1085,12 @@ void AnalyzerComponent::updateCurves()
 
     const float maxFreq = getMaxFreq();
     std::array<bool, ParamIDs::kBandsPerChannel> bandActive {};
+    std::array<float, ParamIDs::kBandsPerChannel> bandMix {};
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
     {
         const float mix = getBandParameter(band, kParamMixSuffix) / 100.0f;
-        bandActive[band] = ! getBandBypassed(band) && mix > 0.0005f;
+        bandMix[band] = juce::jlimit(0.0f, 1.0f, mix);
+        bandActive[band] = ! getBandBypassed(band) && bandMix[band] > 0.0005f;
         perBandActive[band] = bandActive[band];
     }
 
@@ -1125,7 +1127,9 @@ void AnalyzerComponent::updateCurves()
             {
                 if (bandDirty[static_cast<size_t>(band)])
                 {
-                    response = computeBandResponse(band, freq);
+                    const auto raw = computeBandResponse(band, freq);
+                    response = std::complex<double>(1.0, 0.0)
+                        + (raw - std::complex<double>(1.0, 0.0)) * static_cast<double>(bandMix[band]);
                     perBandCurveDb[static_cast<size_t>(band)][static_cast<size_t>(x)] =
                         juce::Decibels::gainToDecibels(static_cast<float>(std::abs(response)), minDb);
                 }
@@ -1140,10 +1144,12 @@ void AnalyzerComponent::updateCurves()
                 perBandCurveDb[static_cast<size_t>(band)][static_cast<size_t>(x)] = minDb;
             }
 
-            total *= response;
+            total += (response - std::complex<double>(1.0, 0.0));
         }
 
-        const auto bandResp = computeBandResponse(selectedBand, freq);
+        const auto rawSelected = computeBandResponse(selectedBand, freq);
+        const auto bandResp = std::complex<double>(1.0, 0.0)
+            + (rawSelected - std::complex<double>(1.0, 0.0)) * static_cast<double>(bandMix[selectedBand]);
         const double mag = std::abs(total);
         eqCurveDb[static_cast<size_t>(x)] =
             juce::Decibels::gainToDecibels(static_cast<float>(mag), minDb);

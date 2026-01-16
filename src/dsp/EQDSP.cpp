@@ -106,6 +106,8 @@ void EQDSP::prepare(double sampleRate, int maxBlockSize, int channels)
 
     msBuffer.setSize(2, maxBlockSize);
     msBuffer.clear();
+    msDryBuffer.setSize(2, maxBlockSize);
+    msDryBuffer.clear();
     detectorMsBuffer.setSize(2, maxBlockSize);
     detectorMsBuffer.clear();
     detectorTemp.setSize(1, maxBlockSize);
@@ -363,6 +365,9 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
         juce::FloatVectorOperations::subtract(side, right, samples);
         juce::FloatVectorOperations::multiply(side, 0.5f, samples);
 
+        juce::FloatVectorOperations::copy(msDryBuffer.getWritePointer(0), mid, samples);
+        juce::FloatVectorOperations::copy(msDryBuffer.getWritePointer(1), side, samples);
+
         if (anyExternalMs)
         {
             auto* detMid = detectorMsBuffer.getWritePointer(0);
@@ -451,10 +456,12 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     }
                 }
 
+                const auto* dryMid = msDryBuffer.getReadPointer(0);
+                const auto* drySide = msDryBuffer.getReadPointer(1);
                 for (int i = 0; i < samples; ++i)
                 {
-                    const float dryM = mid[i];
-                    const float dryS = side[i];
+                    const float dryM = dryMid[i];
+                    const float dryS = drySide[i];
                     float m = dryM;
                     float s = dryS;
 
@@ -496,14 +503,10 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                         s *= deltaGain;
                     }
 
-                    if (mix < 1.0f)
-                    {
-                        m = dryM + (m - dryM) * mix;
-                        s = dryS + (s - dryS) * mix;
-                    }
-
-                    mid[i] = m;
-                    side[i] = s;
+                    const float mDelta = (m - dryM) * mix;
+                    const float sDelta = (s - dryS) * mix;
+                    mid[i] += mDelta;
+                    side[i] += sDelta;
                 }
             }
             else if (target == 1)
@@ -516,9 +519,10 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                         msOnePoles[0][band].setHighPass(params.frequencyHz);
                 }
 
+                const auto* dryMid = msDryBuffer.getReadPointer(0);
                 for (int i = 0; i < samples; ++i)
                 {
-                    const float dryM = mid[i];
+                    const float dryM = dryMid[i];
                     float m = dryM;
                     const float detInput = bandUseExternal
                         ? detectorMsBuffer.getReadPointer(0)[i]
@@ -545,9 +549,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                         m *= juce::Decibels::decibelsToGain(deltaDb);
                     }
 
-                    if (mix < 1.0f)
-                        m = dryM + (m - dryM) * mix;
-                    mid[i] = m;
+                    const float mDelta = (m - dryM) * mix;
+                    mid[i] += mDelta;
                 }
             }
             else if (target == 2)
@@ -560,9 +563,10 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                         msOnePoles[1][band].setHighPass(params.frequencyHz);
                 }
 
+                const auto* drySide = msDryBuffer.getReadPointer(1);
                 for (int i = 0; i < samples; ++i)
                 {
-                    const float dryS = side[i];
+                    const float dryS = drySide[i];
                     float s = dryS;
                     const float detInput = bandUseExternal
                         ? detectorMsBuffer.getReadPointer(1)[i]
@@ -589,9 +593,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                         s *= juce::Decibels::decibelsToGain(deltaDb);
                     }
 
-                    if (mix < 1.0f)
-                        s = dryS + (s - dryS) * mix;
-                    side[i] = s;
+                    const float sDelta = (s - dryS) * mix;
+                    side[i] += sDelta;
                 }
             }
         }
@@ -604,7 +607,14 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
 
     for (int ch = 0; ch < numChannels; ++ch)
     {
+        scratchBuffer.copyFrom(ch, 0, buffer, ch, 0, samples);
+    }
+
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
         auto* channelData = buffer.getWritePointer(ch);
+        const auto* dryData = scratchBuffer.getReadPointer(ch);
+        juce::FloatVectorOperations::copy(channelData, dryData, samples);
         auto* rightData = (numChannels >= 2) ? buffer.getWritePointer(1) : nullptr;
         for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
         {
@@ -679,7 +689,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     onePoles[ch][band].setHighPass(params.frequencyHz);
             }
 
-            const float* detData = channelData;
+            const float* detData = dryData;
             if (bandUseExternal)
             {
                 const int detChannel = juce::jmin(ch, detectorBuffer->getNumChannels() - 1);
@@ -704,30 +714,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             const bool canStereoSimd = numChannels == 2 && ch == 0 && rightData != nullptr
                 && linkStereoDetectors
                 && paramsMatchStereo;
-            const bool canFastPath = ! params.dynamicEnabled && mix >= 0.999f;
-            if (canFastPath && (isBell || isShelf || isHpLp || isTilt || params.type == FilterType::notch
-                                || params.type == FilterType::bandPass || params.type == FilterType::allPass))
-            {
-                if (canStereoSimd)
-                {
-                    if (isHpLp && slopeConfig.useOnePole)
-                    {
-                        onePoles[0][band].processBlock(channelData, samples);
-                        onePoles[1][band].processBlock(rightData, samples);
-                    }
-                    for (int stage = 0; stage < stages; ++stage)
-                        processBiquadStereo(filters[0][band][stage],
-                                            filters[1][band][stage],
-                                            channelData, rightData, samples);
-                    continue;
-                }
-
-                if (isHpLp && slopeConfig.useOnePole)
-                    onePoles[ch][band].processBlock(channelData, samples);
-                for (int stage = 0; stage < stages; ++stage)
-                    filters[ch][band][stage].processBlock(channelData, samples);
-                continue;
-            }
+            juce::ignoreUnused(canStereoSimd);
 
             const bool linkDetector = linkStereoDetectors && ch == 1
                 && cachedParams[0][band].frequencyHz == params.frequencyHz
@@ -746,35 +733,11 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             float* detTempWrite = linkStereoDetectors && ch == 0 ? detectorTemp.getWritePointer(0) : nullptr;
             const float* detTempRead = linkDetector ? detectorTemp.getReadPointer(0) : nullptr;
 
-            const bool canDynamicFastPath = params.dynamicEnabled && mix >= 0.999f && detData != nullptr;
-            if (canDynamicFastPath)
-            {
-                if (isHpLp && slopeConfig.useOnePole)
-                    onePoles[ch][band].processBlock(channelData, samples);
-                for (int stage = 0; stage < stages; ++stage)
-                    filters[ch][band][stage].processBlock(channelData, samples);
-
-                for (int i = 0; i < samples; ++i)
-                {
-                    const float detInput = detData[i];
-                    const float detSample = detectorFilters[ch][band].processSample(detInput);
-                    float& env = detectorEnv[ch][band];
-                    const float absVal = std::abs(detSample);
-                    const float coeff = absVal > env ? attackCoeff : releaseCoeff;
-                    env = coeff * env + (1.0f - coeff) * absVal;
-                    const float detDb = juce::Decibels::gainToDecibels(env, -60.0f);
-                    detectorDb[ch][band].store(detDb);
-
-                    const float dynamicGainDb = computeDynamicGain(params, detDb);
-                    const float deltaDb = dynamicGainDb - staticGainDb;
-                    channelData[i] *= juce::Decibels::decibelsToGain(deltaDb);
-                }
-                continue;
-            }
+            juce::ignoreUnused(detData);
 
             for (int i = 0; i < samples; ++i)
             {
-                const float dry = channelData[i];
+                const float dry = dryData[i];
                 float sample = dry;
 
                 float detDb = 0.0f;
@@ -812,9 +775,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     sample *= juce::Decibels::decibelsToGain(deltaDb);
                 }
 
-                if (mix < 1.0f)
-                    sample = dry + (sample - dry) * mix;
-                channelData[i] = sample;
+                channelData[i] += (sample - dry) * mix;
             }
         }
     }

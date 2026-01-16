@@ -1139,7 +1139,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
         false));
 
     const juce::NormalisableRange<float> freqRange(20.0f, 192000.0f, 0.01f, 0.5f);
-    const juce::NormalisableRange<float> gainRange(-24.0f, 24.0f, 0.01f);
+    const juce::NormalisableRange<float> gainRange(-48.0f, 48.0f, 0.01f);
     const juce::NormalisableRange<float> qRange(0.1f, 18.0f, 0.01f, 0.5f);
 
     for (int ch = 0; ch < ParamIDs::kMaxChannels; ++ch)

@@ -131,7 +131,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     initLabel(msLabel, "Channel");
     initLabel(slopeLabel, "Slope");
     initLabel(mixLabel, "Mix");
-    dynamicLabel.setText("DYNAMIC", juce::dontSendNotification);
+    dynamicLabel.setText("DYNAMIC / CHANNEL", juce::dontSendNotification);
     dynamicLabel.setJustificationType(juce::Justification::centredLeft);
     dynamicLabel.setFont(juce::Font(11.0f, juce::Font::bold));
     dynamicLabel.setColour(juce::Label::textColourId, theme.accent);
@@ -141,7 +141,9 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     initLabel(releaseLabel, "Release");
 
     freqSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    freqSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 20);
+    const int knobTextW = 68;
+    const int knobTextH = 18;
+    freqSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     freqSlider.setTextBoxIsEditable(true);
     freqSlider.setSkewFactorFromMidPoint(1000.0);
     freqSlider.setTextValueSuffix(" Hz");
@@ -152,7 +154,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     addAndMakeVisible(freqSlider);
 
     gainSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    gainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 20);
+    gainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     gainSlider.setTextBoxIsEditable(true);
     gainSlider.setTextValueSuffix(" dB");
     gainSlider.onValueChange = [this]
@@ -162,7 +164,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     addAndMakeVisible(gainSlider);
 
     qSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    qSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 20);
+    qSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     qSlider.setTextBoxIsEditable(true);
     qSlider.onValueChange = [this]
     {
@@ -211,7 +213,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     };
 
     mixSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    mixSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+    mixSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     mixSlider.setTextBoxIsEditable(true);
     mixSlider.setTextValueSuffix(" %");
     addAndMakeVisible(mixSlider);
@@ -246,19 +248,19 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     addAndMakeVisible(dynDownButton);
 
     thresholdSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    thresholdSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+    thresholdSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     thresholdSlider.setTextBoxIsEditable(true);
     thresholdSlider.setTextValueSuffix(" dB");
     addAndMakeVisible(thresholdSlider);
 
     attackSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    attackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+    attackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     attackSlider.setTextBoxIsEditable(true);
     attackSlider.setTextValueSuffix(" ms");
     addAndMakeVisible(attackSlider);
 
     releaseSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    releaseSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+    releaseSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     releaseSlider.setTextBoxIsEditable(true);
     releaseSlider.setTextValueSuffix(" ms");
     addAndMakeVisible(releaseSlider);
@@ -331,6 +333,9 @@ void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
     gainSlider.setColour(juce::Slider::trackColourId, bandColour);
     qSlider.setColour(juce::Slider::trackColourId, bandColour);
     mixSlider.setColour(juce::Slider::trackColourId, bandColour);
+    thresholdSlider.setColour(juce::Slider::trackColourId, bandColour);
+    attackSlider.setColour(juce::Slider::trackColourId, bandColour);
+    releaseSlider.setColour(juce::Slider::trackColourId, bandColour);
     updateAttachments();
     updateTypeUi();
 }
@@ -352,16 +357,16 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     slopeSlider.setColour(juce::Slider::trackColourId, theme.accent);
     slopeSlider.setColour(juce::Slider::textBoxTextColourId, theme.text);
     slopeSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
-    mixSlider.setColour(juce::Slider::trackColourId, theme.accent);
+    mixSlider.setColour(juce::Slider::trackColourId, ColorUtils::bandColour(selectedBand));
     mixSlider.setColour(juce::Slider::textBoxTextColourId, theme.text);
     mixSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
-    thresholdSlider.setColour(juce::Slider::trackColourId, theme.accent);
+    thresholdSlider.setColour(juce::Slider::trackColourId, ColorUtils::bandColour(selectedBand));
     thresholdSlider.setColour(juce::Slider::textBoxTextColourId, theme.text);
     thresholdSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
-    attackSlider.setColour(juce::Slider::trackColourId, theme.accent);
+    attackSlider.setColour(juce::Slider::trackColourId, ColorUtils::bandColour(selectedBand));
     attackSlider.setColour(juce::Slider::textBoxTextColourId, theme.text);
     attackSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
-    releaseSlider.setColour(juce::Slider::trackColourId, theme.accent);
+    releaseSlider.setColour(juce::Slider::trackColourId, ColorUtils::bandColour(selectedBand));
     releaseSlider.setColour(juce::Slider::textBoxTextColourId, theme.text);
     releaseSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
     bypassButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
@@ -406,7 +411,7 @@ void BandControlsPanel::paint(juce::Graphics& g)
         auto fill = detectorMeterBounds;
         fill.setY(detectorMeterBounds.getBottom() - detectorMeterBounds.getHeight() * norm);
         fill.setHeight(detectorMeterBounds.getBottom() - fill.getY());
-        g.setColour(theme.accent);
+        g.setColour(ColorUtils::bandColour(selectedBand));
         g.fillRoundedRectangle(fill, 3.0f);
 
         const float thresh = static_cast<float>(thresholdSlider.getValue());
@@ -431,6 +436,7 @@ void BandControlsPanel::resized()
     const int labelHeight = 16;
     const int rowHeight = 22;
     const int knobRowHeight = 120;
+    const int knobSize = 90;
 
     auto left = bounds.removeFromLeft(static_cast<int>(bounds.getWidth() * 0.70f));
     auto right = bounds;
@@ -449,21 +455,26 @@ void BandControlsPanel::resized()
     left.removeFromTop(gap);
     auto knobsRow = left.removeFromTop(knobRowHeight);
     const int knobWidth = (knobsRow.getWidth() - gap * 3) / 4;
+    auto squareKnob = [](juce::Rectangle<int> area)
+    {
+        const int size = std::min(area.getWidth(), area.getHeight());
+        return juce::Rectangle<int>(size, size).withCentre(area.getCentre());
+    };
     auto freqArea = knobsRow.removeFromLeft(knobWidth);
     freqLabel.setBounds(freqArea.removeFromTop(labelHeight));
-    freqSlider.setBounds(freqArea);
+    freqSlider.setBounds(squareKnob(freqArea).withSizeKeepingCentre(knobSize, knobSize));
     knobsRow.removeFromLeft(gap);
     auto gainArea = knobsRow.removeFromLeft(knobWidth);
     gainLabel.setBounds(gainArea.removeFromTop(labelHeight));
-    gainSlider.setBounds(gainArea);
+    gainSlider.setBounds(squareKnob(gainArea).withSizeKeepingCentre(knobSize, knobSize));
     knobsRow.removeFromLeft(gap);
     auto qArea = knobsRow.removeFromLeft(knobWidth);
     qLabel.setBounds(qArea.removeFromTop(labelHeight));
-    qSlider.setBounds(qArea);
+    qSlider.setBounds(squareKnob(qArea).withSizeKeepingCentre(knobSize, knobSize));
     knobsRow.removeFromLeft(gap);
     auto mixArea = knobsRow.removeFromLeft(knobWidth);
     mixLabel.setBounds(mixArea.removeFromTop(labelHeight));
-    mixSlider.setBounds(mixArea);
+    mixSlider.setBounds(squareKnob(mixArea).withSizeKeepingCentre(knobSize, knobSize));
 
     left.removeFromTop(gap);
     auto typeRow = left.removeFromTop(labelHeight + rowHeight * 2 + 4);
@@ -484,8 +495,9 @@ void BandControlsPanel::resized()
 
     left.removeFromTop(2);
     auto togglesRow = left.removeFromTop(rowHeight);
-    bypassButton.setBounds(togglesRow.removeFromLeft(70));
-    soloButton.setBounds(togglesRow.removeFromLeft(60));
+    const int toggleW = 74;
+    bypassButton.setBounds(togglesRow.removeFromLeft(toggleW));
+    soloButton.setBounds(togglesRow.removeFromLeft(toggleW));
     tiltDirToggle.setBounds(togglesRow.removeFromLeft(120));
 
     // Dynamic panel (right column)
@@ -498,27 +510,27 @@ void BandControlsPanel::resized()
     autoScaleToggle.setBounds(dynRow);
 
     right.removeFromTop(4);
-    auto dynKnobs = right.removeFromTop(knobRowHeight - 20);
+    auto dynKnobs = right.removeFromTop(knobRowHeight);
     const int dynKnobWidth = (dynKnobs.getWidth() - gap * 2) / 3;
     auto threshArea = dynKnobs.removeFromLeft(dynKnobWidth);
     thresholdLabel.setBounds(threshArea.removeFromTop(labelHeight));
-    thresholdSlider.setBounds(threshArea);
+    thresholdSlider.setBounds(squareKnob(threshArea).withSizeKeepingCentre(knobSize, knobSize));
     dynKnobs.removeFromLeft(gap);
     auto attackArea = dynKnobs.removeFromLeft(dynKnobWidth);
     attackLabel.setBounds(attackArea.removeFromTop(labelHeight));
-    attackSlider.setBounds(attackArea);
+    attackSlider.setBounds(squareKnob(attackArea).withSizeKeepingCentre(knobSize, knobSize));
     dynKnobs.removeFromLeft(gap);
     auto releaseArea = dynKnobs.removeFromLeft(dynKnobWidth);
     releaseLabel.setBounds(releaseArea.removeFromTop(labelHeight));
-    releaseSlider.setBounds(releaseArea);
+    releaseSlider.setBounds(squareKnob(releaseArea).withSizeKeepingCentre(knobSize, knobSize));
 
     right.removeFromTop(6);
     detectorMeterBounds = right.removeFromTop(18).toFloat();
 
-    left.removeFromTop(2);
-    auto msRow = left.removeFromTop(labelHeight + rowHeight);
+    right.removeFromTop(6);
+    auto msRow = right.removeFromTop(labelHeight + rowHeight);
     msLabel.setBounds(msRow.removeFromTop(labelHeight));
-    msBox.setBounds(msRow);
+    msBox.setBounds(msRow.withHeight(rowHeight));
 
     left.removeFromTop(2);
     auto slopeRow = left.removeFromTop(labelHeight + rowHeight);

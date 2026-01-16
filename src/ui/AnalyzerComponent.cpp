@@ -28,6 +28,12 @@ const juce::String kParamSlopeSuffix = "slope";
 const juce::String kParamMsSuffix = "ms";
 const juce::String kParamSoloSuffix = "solo";
 const juce::String kParamMixSuffix = "mix";
+const juce::String kParamDynEnableSuffix = "dynEnable";
+const juce::String kParamDynModeSuffix = "dynMode";
+const juce::String kParamDynThreshSuffix = "dynThresh";
+const juce::String kParamDynAttackSuffix = "dynAttack";
+const juce::String kParamDynReleaseSuffix = "dynRelease";
+const juce::String kParamDynAutoSuffix = "dynAuto";
 const juce::StringArray kFilterTypeLabels {
     "Bell",
     "Low Shelf",
@@ -680,6 +686,12 @@ void AnalyzerComponent::resetBandToDefaults(int bandIndex, bool shouldBypass)
     resetParam(kParamSlopeSuffix);
     resetParam(kParamSoloSuffix);
     resetParam(kParamMixSuffix);
+    resetParam(kParamDynEnableSuffix);
+    resetParam(kParamDynModeSuffix);
+    resetParam(kParamDynThreshSuffix);
+    resetParam(kParamDynAttackSuffix);
+    resetParam(kParamDynReleaseSuffix);
+    resetParam(kParamDynAutoSuffix);
 
     if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, bandIndex, kParamBypassSuffix)))
         bypassParam->setValueNotifyingHost(shouldBypass ? 1.0f : 0.0f);
@@ -758,14 +770,8 @@ void AnalyzerComponent::stopAltSolo()
 
 void AnalyzerComponent::timerCallback()
 {
-    const int rangeIndex = parameters.getRawParameterValue(ParamIDs::analyzerRange) != nullptr
-        ? static_cast<int>(parameters.getRawParameterValue(ParamIDs::analyzerRange)->load())
-        : 2;
-    const float rangeDb = (rangeIndex == 0 ? 3.0f
-        : (rangeIndex == 1 ? 6.0f
-            : (rangeIndex == 2 ? 12.0f : 30.0f)));
-    minDb = -rangeDb;
-    maxDb = rangeDb;
+    minDb = kMinDb;
+    maxDb = kMaxDb;
 
     const int speedIndex = parameters.getRawParameterValue(ParamIDs::analyzerSpeed) != nullptr
         ? static_cast<int>(parameters.getRawParameterValue(ParamIDs::analyzerSpeed)->load())
@@ -1041,10 +1047,11 @@ float AnalyzerComponent::xToFrequency(float x) const
 float AnalyzerComponent::yToGain(float y) const
 {
     const auto plotArea = getMagnitudeArea();
-    return juce::jmap(y,
-                      static_cast<float>(plotArea.getBottom()),
-                      static_cast<float>(plotArea.getY()),
-                      minDb, maxDb);
+    const float mapped = juce::jmap(y,
+                                    static_cast<float>(plotArea.getBottom()),
+                                    static_cast<float>(plotArea.getY()),
+                                    minDb, maxDb);
+    return juce::jlimit(-48.0f, 48.0f, mapped);
 }
 
 float AnalyzerComponent::frequencyToX(float freq) const

@@ -21,10 +21,11 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
         }
     }
 
-    const auto bounds = juce::Rectangle<float>(static_cast<float>(x), static_cast<float>(y),
-                                               static_cast<float>(width), static_cast<float>(height))
-                            .reduced(4.0f);
-    const auto radius = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f;
+    const float size = static_cast<float>(juce::jmin(width, height)) - 8.0f;
+    const auto bounds = juce::Rectangle<float>(0.0f, 0.0f, size, size)
+                            .withCentre(juce::Point<float>(static_cast<float>(x + width / 2),
+                                                          static_cast<float>(y + height / 2)));
+    const auto radius = size * 0.5f;
     const auto centre = bounds.getCentre();
     const auto angle = rotaryStartAngle
         + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);

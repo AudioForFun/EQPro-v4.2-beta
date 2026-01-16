@@ -2,9 +2,7 @@
 
 ## Global
 - `globalBypass` (bool)
-- `ellipticBypass` (bool)
-- `ellipticFreq` (float, Hz, 20..500)
-- `ellipticAmount` (float, 0..1)
+- `globalMix` (float, %, 0..100)
 - `phaseMode` (choice)
   - Real-time
   - Natural
@@ -15,11 +13,11 @@
   - High
   - Very High
   - Intensive
-- `linearWindow` (choice)
+- `linearWindow` (choice, hidden in UI)
   - Hann
   - Blackman
   - Kaiser
-- `oversampling` (choice)
+- `oversampling` (choice, currently disabled)
   - Off
   - 2x
   - 4x
@@ -56,7 +54,7 @@
 - `smartSolo` (bool)
 
 ## Per Channel / Band
-For channels 1..16 and bands 1..24:
+For channels 1..16 and bands 1..12:
 - `ch{C}_b{B}_freq` (float, Hz, 20..192000)
 - `ch{C}_b{B}_gain` (float, dB, -24..+24)
 - `ch{C}_b{B}_q` (float, 0.1..18)
@@ -74,21 +72,55 @@ For channels 1..16 and bands 1..24:
 - `ch{C}_b{B}_bypass` (bool)
 - `ch{C}_b{B}_solo` (bool)
 - `ch{C}_b{B}_ms` (choice)
-  - Stereo
+  - All
   - Mid
   - Side
   - Left
   - Right
+  - L/R
+  - Mono
+  - C
+  - LFE
+  - Ls
+  - Rs
+  - Lrs
+  - Rrs
+  - Lc
+  - Rc
+  - Ltf
+  - Rtf
+  - Tfc
+  - Tm
+  - Ltr
+  - Rtr
+  - Trc
+  - Lts
+  - Rts
+  - Lw
+  - Rw
+  - LFE2
+  - Bfl
+  - Bfr
+  - Bfc
+  - W
+  - X
+  - Y
+  - Z
+  - Ls/Rs
+  - Lrs/Rrs
+  - Lc/Rc
+  - Ltf/Rtf
+  - Ltr/Rtr
+  - Lts/Rts
+  - Lw/Rw
+  - Bfl/Bfr
 - `ch{C}_b{B}_slope` (float, dB/oct, 6..96)
+- `ch{C}_b{B}_mix` (float, %, 0..100)
 - `ch{C}_b{B}_dynEnable` (bool)
 - `ch{C}_b{B}_dynMode` (choice)
-  - Down
   - Up
+  - Down
 - `ch{C}_b{B}_dynThresh` (float, dB, -60..0)
 - `ch{C}_b{B}_dynAttack` (float, ms, 1..200)
 - `ch{C}_b{B}_dynRelease` (float, ms, 5..1000)
-- `ch{C}_b{B}_dynMix` (float, %, 0..100)
-- `ch{C}_b{B}_dynSource` (choice)
-  - Internal
-  - External
-- `ch{C}_b{B}_dynFilter` (bool)
+- `ch{C}_b{B}_dynAuto` (bool)

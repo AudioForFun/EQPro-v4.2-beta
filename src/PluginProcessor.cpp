@@ -17,6 +17,12 @@ constexpr const char* kParamMsSuffix = "ms";
 constexpr const char* kParamSlopeSuffix = "slope";
 constexpr const char* kParamSoloSuffix = "solo";
 constexpr const char* kParamMixSuffix = "mix";
+constexpr const char* kParamDynEnableSuffix = "dynEnable";
+constexpr const char* kParamDynModeSuffix = "dynMode";
+constexpr const char* kParamDynThreshSuffix = "dynThresh";
+constexpr const char* kParamDynAttackSuffix = "dynAttack";
+constexpr const char* kParamDynReleaseSuffix = "dynRelease";
+constexpr const char* kParamDynAutoSuffix = "dynAuto";
 
 const juce::StringArray kFilterTypeChoices {
     "Bell",
@@ -32,11 +38,48 @@ const juce::StringArray kFilterTypeChoices {
 };
 
 const juce::StringArray kMsChoices {
-    "Stereo",
+    "All",
     "Mid",
     "Side",
     "Left",
-    "Right"
+    "Right",
+    "L/R",
+    "Mono",
+    "C",
+    "LFE",
+    "Ls",
+    "Rs",
+    "Lrs",
+    "Rrs",
+    "Lc",
+    "Rc",
+    "Ltf",
+    "Rtf",
+    "Tfc",
+    "Tm",
+    "Ltr",
+    "Rtr",
+    "Trc",
+    "Lts",
+    "Rts",
+    "Lw",
+    "Rw",
+    "LFE2",
+    "Bfl",
+    "Bfr",
+    "Bfc",
+    "W",
+    "X",
+    "Y",
+    "Z",
+    "Ls/Rs",
+    "Lrs/Rrs",
+    "Lc/Rc",
+    "Ltf/Rtf",
+    "Ltr/Rtr",
+    "Lts/Rts",
+    "Lw/Rw",
+    "Bfl/Bfr"
 };
 
 
@@ -224,8 +267,33 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     }
 
     std::array<int, ParamIDs::kBandsPerChannel> msTargets {};
+    std::array<uint32_t, ParamIDs::kBandsPerChannel> bandChannelMasks {};
+    const uint32_t maskAll = (numChannels >= 32)
+        ? 0xFFFFFFFFu
+        : (numChannels > 0 ? ((1u << static_cast<uint32_t>(numChannels)) - 1u) : 0u);
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+    {
         msTargets[band] = 0;
+        bandChannelMasks[band] = maskAll;
+    }
+
+    const auto& channelNames = cachedChannelNames;
+    auto findIndex = [&channelNames](const juce::String& name) -> int
+    {
+        for (int i = 0; i < static_cast<int>(channelNames.size()); ++i)
+            if (channelNames[static_cast<size_t>(i)] == name)
+                return i;
+        return -1;
+    };
+    auto maskFor = [&](const juce::String& name) -> uint32_t
+    {
+        const int idx = findIndex(name);
+        return idx >= 0 ? (1u << static_cast<uint32_t>(idx)) : 0u;
+    };
+    auto maskForPair = [&](const juce::String& left, const juce::String& right) -> uint32_t
+    {
+        return maskFor(left) | maskFor(right);
+    };
 
     for (int ch = 0; ch < numChannels; ++ch)
     {
@@ -244,16 +312,97 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             params.bypassed = ptrs.bypass->load() > 0.5f;
             params.solo = ptrs.solo != nullptr && ptrs.solo->load() > 0.5f;
             params.mix = ptrs.mix != nullptr ? (ptrs.mix->load() / 100.0f) : 1.0f;
+            params.dynamicEnabled = ptrs.dynEnable != nullptr && ptrs.dynEnable->load() > 0.5f;
+            params.dynamicMode = ptrs.dynMode != nullptr ? static_cast<int>(ptrs.dynMode->load()) : 0;
+            params.thresholdDb = ptrs.dynThreshold != nullptr ? ptrs.dynThreshold->load() : -24.0f;
+            params.attackMs = ptrs.dynAttack != nullptr ? ptrs.dynAttack->load() : 20.0f;
+            params.releaseMs = ptrs.dynRelease != nullptr ? ptrs.dynRelease->load() : 200.0f;
+            params.autoScale = ptrs.dynAuto != nullptr && ptrs.dynAuto->load() > 0.5f;
 
             eqDsp.updateBandParams(ch, band, params);
 
             if (ch == 0)
             {
                 eqDsp.updateMsBandParams(band, params);
-                if (ptrs.msTarget != nullptr)
-                    msTargets[band] = static_cast<int>(ptrs.msTarget->load());
             }
         }
+    }
+
+    for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+    {
+        const auto& ptrs = bandParamPointers[0][band];
+        const int target = ptrs.msTarget != nullptr ? static_cast<int>(ptrs.msTarget->load()) : 0;
+        int msTarget = 0;
+        uint32_t mask = maskAll;
+
+        switch (target)
+        {
+            case 0: // All
+                mask = maskAll;
+                break;
+            case 1: // Mid
+                msTarget = 1;
+                mask = maskForPair("L", "R");
+                break;
+            case 2: // Side
+                msTarget = 2;
+                mask = maskForPair("L", "R");
+                break;
+            case 3: // Left
+                mask = maskFor("L");
+                break;
+            case 4: // Right
+                mask = maskFor("R");
+                break;
+            case 5: // L/R
+                mask = maskForPair("L", "R");
+                break;
+            case 6: // Mono
+                msTarget = 1;
+                mask = maskForPair("L", "R");
+                break;
+            case 7: mask = maskFor("C"); break;
+            case 8: mask = maskFor("LFE"); break;
+            case 9: mask = maskFor("Ls"); break;
+            case 10: mask = maskFor("Rs"); break;
+            case 11: mask = maskFor("Lrs"); break;
+            case 12: mask = maskFor("Rrs"); break;
+            case 13: mask = maskFor("Lc"); break;
+            case 14: mask = maskFor("Rc"); break;
+            case 15: mask = maskFor("Ltf"); break;
+            case 16: mask = maskFor("Rtf"); break;
+            case 17: mask = maskFor("Tfc"); break;
+            case 18: mask = maskFor("Tm"); break;
+            case 19: mask = maskFor("Ltr"); break;
+            case 20: mask = maskFor("Rtr"); break;
+            case 21: mask = maskFor("Trc"); break;
+            case 22: mask = maskFor("Lts"); break;
+            case 23: mask = maskFor("Rts"); break;
+            case 24: mask = maskFor("Lw"); break;
+            case 25: mask = maskFor("Rw"); break;
+            case 26: mask = maskFor("LFE2"); break;
+            case 27: mask = maskFor("Bfl"); break;
+            case 28: mask = maskFor("Bfr"); break;
+            case 29: mask = maskFor("Bfc"); break;
+            case 30: mask = maskFor("W"); break;
+            case 31: mask = maskFor("X"); break;
+            case 32: mask = maskFor("Y"); break;
+            case 33: mask = maskFor("Z"); break;
+            case 34: mask = maskForPair("Ls", "Rs"); break;
+            case 35: mask = maskForPair("Lrs", "Rrs"); break;
+            case 36: mask = maskForPair("Lc", "Rc"); break;
+            case 37: mask = maskForPair("Ltf", "Rtf"); break;
+            case 38: mask = maskForPair("Ltr", "Rtr"); break;
+            case 39: mask = maskForPair("Lts", "Rts"); break;
+            case 40: mask = maskForPair("Lw", "Rw"); break;
+            case 41: mask = maskForPair("Bfl", "Bfr"); break;
+            default:
+                mask = maskAll;
+                break;
+        }
+
+        msTargets[band] = msTarget;
+        bandChannelMasks[band] = mask;
     }
 
     const int phaseMode = phaseModeParam != nullptr
@@ -274,6 +423,7 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                               upBlock.getChannelPointer(ch), upSamples);
 
         eqDspOversampled.setMsTargets(msTargets);
+        eqDspOversampled.setBandChannelMasks(bandChannelMasks);
         eqDspOversampled.process(oversampledBuffer, nullptr);
 
 
@@ -305,6 +455,7 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     else if (phaseMode == 0)
     {
         eqDsp.setMsTargets(msTargets);
+        eqDsp.setBandChannelMasks(bandChannelMasks);
         eqDsp.process(buffer, detectorBuffer);
     }
     else
@@ -335,6 +486,8 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 left[i] = mid + side;
                 right[i] = mid - side;
             }
+
+            linearPhaseEq.processRange(buffer, 0, 2);
 
             if (numChannels > 2)
                 linearPhaseEq.processRange(buffer, 2, numChannels - 2);
@@ -815,6 +968,11 @@ int EQProAudioProcessor::getSelectedChannelIndex() const
     return selectedChannelIndex.load();
 }
 
+float EQProAudioProcessor::getBandDetectorDb(int channelIndex, int bandIndex) const
+{
+    return eqDsp.getDetectorDb(channelIndex, bandIndex);
+}
+
 void EQProAudioProcessor::initializeParamPointers()
 {
     globalBypassParam = parameters.getRawParameterValue(ParamIDs::globalBypass);
@@ -863,6 +1021,18 @@ void EQProAudioProcessor::initializeParamPointers()
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamSoloSuffix));
             bandParamPointers[ch][band].mix =
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamMixSuffix));
+            bandParamPointers[ch][band].dynEnable =
+                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynEnableSuffix));
+            bandParamPointers[ch][band].dynMode =
+                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynModeSuffix));
+            bandParamPointers[ch][band].dynThreshold =
+                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynThreshSuffix));
+            bandParamPointers[ch][band].dynAttack =
+                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynAttackSuffix));
+            bandParamPointers[ch][band].dynRelease =
+                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynReleaseSuffix));
+            bandParamPointers[ch][band].dynAuto =
+                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynAutoSuffix));
         }
     }
 }
@@ -870,7 +1040,7 @@ void EQProAudioProcessor::initializeParamPointers()
 juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
-    params.reserve(ParamIDs::kMaxChannels * ParamIDs::kBandsPerChannel * 15 + 8);
+    params.reserve(ParamIDs::kMaxChannels * ParamIDs::kBandsPerChannel * 21 + 8);
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         ParamIDs::globalBypass, "Global Bypass", false));
@@ -1028,6 +1198,40 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
                 juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f),
                 100.0f));
 
+            params.push_back(std::make_unique<juce::AudioParameterBool>(
+                ParamIDs::bandParamId(ch, band, kParamDynEnableSuffix),
+                ParamIDs::bandParamName(ch, band, "Dyn Enable"),
+                false));
+
+            params.push_back(std::make_unique<juce::AudioParameterChoice>(
+                ParamIDs::bandParamId(ch, band, kParamDynModeSuffix),
+                ParamIDs::bandParamName(ch, band, "Dyn Mode"),
+                juce::StringArray("Up", "Down"),
+                0));
+
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(
+                ParamIDs::bandParamId(ch, band, kParamDynThreshSuffix),
+                ParamIDs::bandParamName(ch, band, "Dyn Threshold"),
+                juce::NormalisableRange<float>(-60.0f, 0.0f, 0.1f),
+                -24.0f));
+
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(
+                ParamIDs::bandParamId(ch, band, kParamDynAttackSuffix),
+                ParamIDs::bandParamName(ch, band, "Dyn Attack"),
+                juce::NormalisableRange<float>(1.0f, 200.0f, 0.1f),
+                20.0f));
+
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(
+                ParamIDs::bandParamId(ch, band, kParamDynReleaseSuffix),
+                ParamIDs::bandParamName(ch, band, "Dyn Release"),
+                juce::NormalisableRange<float>(5.0f, 1000.0f, 0.1f),
+                200.0f));
+
+            params.push_back(std::make_unique<juce::AudioParameterBool>(
+                ParamIDs::bandParamId(ch, band, kParamDynAutoSuffix),
+                ParamIDs::bandParamName(ch, band, "Dyn Auto Scale"),
+                true));
+
         }
     }
 
@@ -1041,6 +1245,7 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 
 void EQProAudioProcessor::timerCallback()
 {
+    cachedChannelNames = getCurrentChannelNames();
     const int phaseMode = phaseModeParam != nullptr
         ? static_cast<int>(phaseModeParam->load())
         : 0;
@@ -1196,6 +1401,80 @@ void EQProAudioProcessor::rebuildLinearPhase(int taps, double sampleRate, int ch
     {
         firWindow = std::make_unique<juce::dsp::WindowingFunction<float>>(taps, method);
         firWindowMethod = static_cast<int>(method);
+    }
+
+    const auto& channelNames = cachedChannelNames.empty() ? getCurrentChannelNames() : cachedChannelNames;
+    auto findIndex = [&channelNames](const juce::String& name) -> int
+    {
+        for (int i = 0; i < static_cast<int>(channelNames.size()); ++i)
+            if (channelNames[static_cast<size_t>(i)] == name)
+                return i;
+        return -1;
+    };
+    auto maskFor = [&](const juce::String& name) -> uint32_t
+    {
+        const int idx = findIndex(name);
+        return idx >= 0 ? (1u << static_cast<uint32_t>(idx)) : 0u;
+    };
+    auto maskForPair = [&](const juce::String& left, const juce::String& right) -> uint32_t
+    {
+        return maskFor(left) | maskFor(right);
+    };
+    std::array<uint32_t, ParamIDs::kBandsPerChannel> bandChannelMasks {};
+    const uint32_t maskAll = (channels >= 32)
+        ? 0xFFFFFFFFu
+        : (channels > 0 ? ((1u << static_cast<uint32_t>(channels)) - 1u) : 0u);
+    for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+    {
+        const int target = lastMsTargets[band];
+        uint32_t mask = maskAll;
+        switch (target)
+        {
+            case 0: mask = maskAll; break;
+            case 1: mask = maskForPair("L", "R"); break;
+            case 2: mask = maskForPair("L", "R"); break;
+            case 3: mask = maskFor("L"); break;
+            case 4: mask = maskFor("R"); break;
+            case 5: mask = maskForPair("L", "R"); break;
+            case 6: mask = maskForPair("L", "R"); break;
+            case 7: mask = maskFor("C"); break;
+            case 8: mask = maskFor("LFE"); break;
+            case 9: mask = maskFor("Ls"); break;
+            case 10: mask = maskFor("Rs"); break;
+            case 11: mask = maskFor("Lrs"); break;
+            case 12: mask = maskFor("Rrs"); break;
+            case 13: mask = maskFor("Lc"); break;
+            case 14: mask = maskFor("Rc"); break;
+            case 15: mask = maskFor("Ltf"); break;
+            case 16: mask = maskFor("Rtf"); break;
+            case 17: mask = maskFor("Tfc"); break;
+            case 18: mask = maskFor("Tm"); break;
+            case 19: mask = maskFor("Ltr"); break;
+            case 20: mask = maskFor("Rtr"); break;
+            case 21: mask = maskFor("Trc"); break;
+            case 22: mask = maskFor("Lts"); break;
+            case 23: mask = maskFor("Rts"); break;
+            case 24: mask = maskFor("Lw"); break;
+            case 25: mask = maskFor("Rw"); break;
+            case 26: mask = maskFor("LFE2"); break;
+            case 27: mask = maskFor("Bfl"); break;
+            case 28: mask = maskFor("Bfr"); break;
+            case 29: mask = maskFor("Bfc"); break;
+            case 30: mask = maskFor("W"); break;
+            case 31: mask = maskFor("X"); break;
+            case 32: mask = maskFor("Y"); break;
+            case 33: mask = maskFor("Z"); break;
+            case 34: mask = maskForPair("Ls", "Rs"); break;
+            case 35: mask = maskForPair("Lrs", "Rrs"); break;
+            case 36: mask = maskForPair("Lc", "Rc"); break;
+            case 37: mask = maskForPair("Ltf", "Rtf"); break;
+            case 38: mask = maskForPair("Ltr", "Rtr"); break;
+            case 39: mask = maskForPair("Lts", "Rts"); break;
+            case 40: mask = maskForPair("Lw", "Rw"); break;
+            case 41: mask = maskForPair("Bfl", "Bfr"); break;
+            default: mask = maskAll; break;
+        }
+        bandChannelMasks[band] = mask;
     }
 
     auto buildImpulse = [&](int channel, std::function<bool(int)> includeBand) -> juce::AudioBuffer<float>
@@ -1409,10 +1688,21 @@ void EQProAudioProcessor::rebuildLinearPhase(int taps, double sampleRate, int ch
         return buffer;
     };
 
-    const auto includeAll = [](int) { return true; };
+    auto includeForChannel = [this, &bandChannelMasks](int channel)
+    {
+        return [this, channel, &bandChannelMasks](int band)
+        {
+            const int target = lastMsTargets[band];
+            if ((bandChannelMasks[band] & (1u << static_cast<uint32_t>(channel))) == 0)
+                return false;
+            if (channel < 2 && (target == 1 || target == 2 || target == 6))
+                return false;
+            return true;
+        };
+    };
     for (int ch = 0; ch < channels; ++ch)
     {
-        auto impulse = buildImpulse(ch, includeAll);
+        auto impulse = buildImpulse(ch, includeForChannel(ch));
         linearPhaseEq.loadImpulse(ch, std::move(impulse), sampleRate);
     }
 
@@ -1423,7 +1713,7 @@ void EQProAudioProcessor::rebuildLinearPhase(int taps, double sampleRate, int ch
     {
         auto includeMid = [this](int band)
         {
-            return lastMsTargets[band] == 0 || lastMsTargets[band] == 1;
+            return lastMsTargets[band] == 0 || lastMsTargets[band] == 1 || lastMsTargets[band] == 6;
         };
         auto includeSide = [this](int band)
         {

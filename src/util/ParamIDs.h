@@ -5,7 +5,7 @@
 namespace ParamIDs
 {
 constexpr int kMaxChannels = 16;
-constexpr int kBandsPerChannel = 24;
+constexpr int kBandsPerChannel = 12;
 
 extern const juce::String globalBypass;
 extern const juce::String globalMix;

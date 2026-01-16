@@ -894,7 +894,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     for (const auto& name : channelNames)
         labels.add(name);
     meters.setChannelLabels(labels);
-    bandControls.setMsEnabled(channelNames.size() == 2);
+    bandControls.setMsEnabled(true);
 
     analyzer.onBandSelected = [this](int band)
     {

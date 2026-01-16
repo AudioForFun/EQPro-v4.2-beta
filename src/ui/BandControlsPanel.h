@@ -2,12 +2,14 @@
 
 #include <JuceHeader.h>
 #include <optional>
+#include <atomic>
 #include "../util/ParamIDs.h"
 #include "Theme.h"
 
 class EQProAudioProcessor;
 
-class BandControlsPanel final : public juce::Component
+class BandControlsPanel final : public juce::Component,
+                                private juce::Timer
 {
 public:
     explicit BandControlsPanel(EQProAudioProcessor& processor);
@@ -19,13 +21,18 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    void timerCallback() override;
 
 private:
     void updateAttachments();
     void updateTypeUi();
+    int getCurrentTypeIndex() const;
+    void updateFilterButtonsFromType(int typeIndex);
     void copyBandState();
     void pasteBandState();
     void mirrorToLinkedChannel(const juce::String& suffix, float value);
+    bool isBandExisting(int bandIndex) const;
+    int findNextExisting(int startIndex, int direction) const;
 
     struct BandState
     {
@@ -38,6 +45,12 @@ private:
         float slope = 1.0f;
         float solo = 0.0f;
         float mix = 100.0f;
+        float dynEnable = 0.0f;
+        float dynMode = 0.0f;
+        float dynThresh = -24.0f;
+        float dynAttack = 20.0f;
+        float dynRelease = 200.0f;
+        float dynAuto = 1.0f;
     };
 
     EQProAudioProcessor& processor;
@@ -57,12 +70,8 @@ private:
     juce::Slider freqSlider;
     juce::Slider gainSlider;
     juce::Slider qSlider;
-    juce::Label qModeLabel;
-    juce::ToggleButton qModeToggle;
-    juce::Label qAmountLabel;
-    juce::Slider qAmountSlider;
     juce::Label typeLabel;
-    juce::ComboBox typeBox;
+    std::array<juce::ToggleButton, 10> filterButtons;
     juce::Label msLabel;
     juce::ComboBox msBox;
     juce::Label slopeLabel;
@@ -73,6 +82,19 @@ private:
     juce::TextButton copyButton;
     juce::TextButton pasteButton;
     juce::ToggleButton soloButton;
+    juce::ToggleButton tiltDirToggle;
+    juce::Label dynamicLabel;
+    juce::ToggleButton dynEnableToggle;
+    juce::TextButton dynUpButton;
+    juce::TextButton dynDownButton;
+    juce::Label thresholdLabel;
+    juce::Slider thresholdSlider;
+    juce::Label attackLabel;
+    juce::Slider attackSlider;
+    juce::Label releaseLabel;
+    juce::Slider releaseSlider;
+    juce::ToggleButton autoScaleToggle;
+    juce::Rectangle<float> detectorMeterBounds;
 
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
@@ -81,18 +103,22 @@ private:
     std::unique_ptr<SliderAttachment> freqAttachment;
     std::unique_ptr<SliderAttachment> gainAttachment;
     std::unique_ptr<SliderAttachment> qAttachment;
-    std::unique_ptr<ComboBoxAttachment> typeAttachment;
     std::unique_ptr<ComboBoxAttachment> msAttachment;
     std::unique_ptr<SliderAttachment> slopeAttachment;
     std::unique_ptr<SliderAttachment> mixAttachment;
     std::unique_ptr<ButtonAttachment> bypassAttachment;
     std::unique_ptr<ButtonAttachment> soloAttachment;
-    std::unique_ptr<SliderAttachment> qAmountAttachment;
+    std::unique_ptr<ButtonAttachment> dynEnableAttachment;
+    std::unique_ptr<ComboBoxAttachment> dynModeAttachment;
+    std::unique_ptr<SliderAttachment> dynThresholdAttachment;
+    std::unique_ptr<SliderAttachment> dynAttackAttachment;
+    std::unique_ptr<SliderAttachment> dynReleaseAttachment;
+    std::unique_ptr<ButtonAttachment> dynAutoAttachment;
 
     ThemeColors theme = makeDarkTheme();
     bool msEnabled = true;
     std::optional<BandState> clipboard;
+    float detectorDb = -60.0f;
 
     void resetSelectedBand(bool shouldBypass);
-    void syncQModeToggle();
 };

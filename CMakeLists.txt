@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(EQPro VERSION 1.3.0)
+project(EQPro VERSION 1.4.0)
 
 # Set this to your local JUCE path or pass -DJUCE_DIR=... when configuring.
 if (NOT DEFINED JUCE_DIR)
@@ -24,6 +24,11 @@ juce_add_plugin(EQPro
 )
 
 juce_generate_juce_header(EQPro)
+
+juce_add_binary_data(EQProAssets
+    SOURCES
+        assets/knob-86/knob-86-Filmstrip.png
+)
 
 target_sources(EQPro PRIVATE
     src/PluginProcessor.cpp
@@ -74,13 +79,14 @@ target_compile_definitions(EQPro PUBLIC
     JUCE_USE_CURL=0
     JUCE_IGNORE_VST3_MISMATCHED_PARAMETER_ID_WARNING=1
     EQPRO_VERSION="${PROJECT_VERSION}"
-    EQPRO_ITERATION="v1.3 beta"
+    EQPRO_ITERATION="v1.4 beta"
 )
 
 target_link_libraries(EQPro PRIVATE
     juce::juce_audio_utils
     juce::juce_dsp
     juce::juce_opengl
+    EQProAssets
 )
 
 target_include_directories(EQPro PRIVATE

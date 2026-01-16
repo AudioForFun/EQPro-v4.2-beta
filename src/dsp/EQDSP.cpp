@@ -19,6 +19,23 @@ SlopeConfig slopeFromDb(float slopeDb)
     return { juce::jmax(0, stages), useOnePole };
 }
 
+float computeDynamicGain(const eqdsp::BandParams& params, float detectorDb)
+{
+    if (! params.dynamicEnabled)
+        return params.gainDb;
+
+    const float overDb = detectorDb - params.thresholdDb;
+    const float amount = juce::jlimit(0.0f, 1.0f, overDb / 12.0f);
+    if (params.dynamicMode == 0)
+    {
+        if (params.gainDb >= 0.0f)
+            return params.gainDb * amount;
+        return params.gainDb * (1.0f - amount);
+    }
+    if (params.gainDb >= 0.0f)
+        return params.gainDb * (1.0f - amount);
+    return params.gainDb * amount;
+}
 eqdsp::BandParams makeTiltParams(const eqdsp::BandParams& params, bool highShelf, float qOverride = -1.0f)
 {
     auto tiltParams = params;
@@ -36,6 +53,11 @@ void EQDSP::prepare(double sampleRate, int maxBlockSize, int channels)
 {
     sampleRateHz = sampleRate;
     numChannels = juce::jlimit(0, ParamIDs::kMaxChannels, channels);
+    const uint32_t maskAll = (numChannels >= 32)
+        ? 0xFFFFFFFFu
+        : (numChannels > 0 ? ((1u << static_cast<uint32_t>(numChannels)) - 1u) : 0u);
+    for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+        bandChannelMasks[band] = maskAll;
 
     msBuffer.setSize(2, maxBlockSize);
     msBuffer.clear();
@@ -49,6 +71,7 @@ void EQDSP::prepare(double sampleRate, int maxBlockSize, int channels)
             for (int stage = 0; stage < kMaxStages; ++stage)
                 filters[ch][band][stage].prepare(sampleRateHz);
             onePoles[ch][band].prepare(sampleRateHz);
+            detectorFilters[ch][band].prepare(sampleRateHz);
             cachedParams[ch][band] = {};
             cachedParams[ch][band].frequencyHz = 1000.0f;
             cachedParams[ch][band].gainDb = 0.0f;
@@ -57,6 +80,8 @@ void EQDSP::prepare(double sampleRate, int maxBlockSize, int channels)
             cachedParams[ch][band].slopeDb = 12.0f;
             cachedParams[ch][band].bypassed = false;
             cachedParams[ch][band].mix = 1.0f;
+            detectorEnv[ch][band] = 0.0f;
+            detectorDb[ch][band].store(-60.0f);
             smoothFreq[ch][band].reset(sampleRateHz, 0.02);
             smoothGain[ch][band].reset(sampleRateHz, 0.02);
             smoothQ[ch][band].reset(sampleRateHz, 0.02);
@@ -87,6 +112,9 @@ void EQDSP::reset()
                 filters[ch][band][stage].reset();
             onePoles[ch][band].reset();
             soloFilters[ch][band].reset();
+            detectorFilters[ch][band].reset();
+            detectorEnv[ch][band] = 0.0f;
+            detectorDb[ch][band].store(-60.0f);
         }
 }
 
@@ -150,6 +178,20 @@ void EQDSP::setMsTargets(const std::array<int, ParamIDs::kBandsPerChannel>& targ
     msTargets = targets;
 }
 
+void EQDSP::setBandChannelMasks(const std::array<uint32_t, ParamIDs::kBandsPerChannel>& masks)
+{
+    bandChannelMasks = masks;
+}
+
+float EQDSP::getDetectorDb(int channelIndex, int bandIndex) const
+{
+    if (channelIndex < 0 || channelIndex >= numChannels)
+        return -60.0f;
+    if (bandIndex < 0 || bandIndex >= ParamIDs::kBandsPerChannel)
+        return -60.0f;
+    return detectorDb[channelIndex][bandIndex].load();
+}
+
 void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     const juce::AudioBuffer<float>* detectorBuffer)
 {
@@ -186,6 +228,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
             {
                 if (! cachedParams[ch][band].solo)
+                    continue;
+                if ((bandChannelMasks[band] & (1u << static_cast<uint32_t>(ch))) == 0)
                     continue;
 
                 auto params = cachedParams[ch][band];
@@ -247,6 +291,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
         {
             if (cachedParams[0][band].bypassed)
                 continue;
+            if ((bandChannelMasks[band] & 0x3u) == 0)
+                continue;
 
             const int target = msTargets[band];
             if (target == 3 || target == 4)
@@ -264,6 +310,21 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             params.q = smoothQ[0][band].getCurrentValue();
             params.q = applyQMode(params);
             const float mix = juce::jlimit(0.0f, 1.0f, params.mix);
+            const float staticGainDb = params.gainDb;
+
+            const float scale = params.autoScale
+                ? juce::jlimit(0.25f, 4.0f, params.frequencyHz / 1000.0f)
+                : 1.0f;
+            const float attackMs = juce::jmax(0.1f, params.attackMs * scale);
+            const float releaseMs = juce::jmax(0.1f, params.releaseMs * scale);
+            const float attackCoeff = std::exp(-1.0f / (attackMs * 0.001f * static_cast<float>(sampleRateHz)));
+            const float releaseCoeff = std::exp(-1.0f / (releaseMs * 0.001f * static_cast<float>(sampleRateHz)));
+
+            BandParams detectorParams = params;
+            detectorParams.type = FilterType::bandPass;
+            detectorParams.gainDb = 0.0f;
+            detectorFilters[0][band].update(detectorParams);
+            detectorFilters[1][band].update(detectorParams);
 
             const int stages = isTilt ? 2 : (isHpLp ? slopeConfig.stages : 1);
 
@@ -305,6 +366,17 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     float m = dryM;
                     float s = dryS;
 
+                    const float detInput = (target == 2) ? dryS : dryM;
+                    const float detSample = (target == 2)
+                        ? detectorFilters[1][band].processSample(detInput)
+                        : detectorFilters[0][band].processSample(detInput);
+                    float& env = (target == 2) ? detectorEnv[1][band] : detectorEnv[0][band];
+                    const float absVal = std::abs(detSample);
+                    const float coeff = absVal > env ? attackCoeff : releaseCoeff;
+                    env = coeff * env + (1.0f - coeff) * absVal;
+                    const float detDb = juce::Decibels::gainToDecibels(env, -60.0f);
+                    detectorDb[0][band].store(detDb);
+
                     if (isHpLp && slopeConfig.useOnePole)
                     {
                         m = msOnePoles[0][band].processSample(m);
@@ -315,6 +387,15 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     {
                         m = msFilters[0][band][stage].processSample(m);
                         s = msFilters[1][band][stage].processSample(s);
+                    }
+
+                    if (params.dynamicEnabled)
+                    {
+                        const float dynamicGainDb = computeDynamicGain(params, detDb);
+                        const float deltaDb = dynamicGainDb - staticGainDb;
+                        const float deltaGain = juce::Decibels::decibelsToGain(deltaDb);
+                        m *= deltaGain;
+                        s *= deltaGain;
                     }
 
                     if (mix < 1.0f)
@@ -341,12 +422,26 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 {
                     const float dryM = mid[i];
                     float m = dryM;
+                    const float detSample = detectorFilters[0][band].processSample(dryM);
+                    float& env = detectorEnv[0][band];
+                    const float absVal = std::abs(detSample);
+                    const float coeff = absVal > env ? attackCoeff : releaseCoeff;
+                    env = coeff * env + (1.0f - coeff) * absVal;
+                    const float detDb = juce::Decibels::gainToDecibels(env, -60.0f);
+                    detectorDb[0][band].store(detDb);
                     if (isHpLp && slopeConfig.useOnePole)
                         m = msOnePoles[0][band].processSample(m);
 
                     for (int stage = 0; stage < stages; ++stage)
                     {
                         m = msFilters[0][band][stage].processSample(m);
+                    }
+
+                    if (params.dynamicEnabled)
+                    {
+                        const float dynamicGainDb = computeDynamicGain(params, detDb);
+                        const float deltaDb = dynamicGainDb - staticGainDb;
+                        m *= juce::Decibels::decibelsToGain(deltaDb);
                     }
 
                     if (mix < 1.0f)
@@ -368,12 +463,26 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 {
                     const float dryS = side[i];
                     float s = dryS;
+                    const float detSample = detectorFilters[1][band].processSample(dryS);
+                    float& env = detectorEnv[1][band];
+                    const float absVal = std::abs(detSample);
+                    const float coeff = absVal > env ? attackCoeff : releaseCoeff;
+                    env = coeff * env + (1.0f - coeff) * absVal;
+                    const float detDb = juce::Decibels::gainToDecibels(env, -60.0f);
+                    detectorDb[1][band].store(detDb);
                     if (isHpLp && slopeConfig.useOnePole)
                         s = msOnePoles[1][band].processSample(s);
 
                     for (int stage = 0; stage < stages; ++stage)
                     {
                         s = msFilters[1][band][stage].processSample(s);
+                    }
+
+                    if (params.dynamicEnabled)
+                    {
+                        const float dynamicGainDb = computeDynamicGain(params, detDb);
+                        const float deltaDb = dynamicGainDb - staticGainDb;
+                        s *= juce::Decibels::decibelsToGain(deltaDb);
                     }
 
                     if (mix < 1.0f)
@@ -402,6 +511,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 continue;
             if (ch == 1 && target == 3)
                 continue;
+            if ((bandChannelMasks[band] & (1u << static_cast<uint32_t>(ch))) == 0)
+                continue;
 
             if (cachedParams[ch][band].bypassed)
                 continue;
@@ -416,9 +527,23 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             smoothQ[ch][band].skip(samples);
             params.frequencyHz = smoothFreq[ch][band].getCurrentValue();
             params.gainDb = smoothGain[ch][band].getCurrentValue();
-                params.q = smoothQ[ch][band].getCurrentValue();
-                params.q = applyQMode(params);
+            params.q = smoothQ[ch][band].getCurrentValue();
+            params.q = applyQMode(params);
             const float mix = juce::jlimit(0.0f, 1.0f, params.mix);
+            const float staticGainDb = params.gainDb;
+
+            const float scale = params.autoScale
+                ? juce::jlimit(0.25f, 4.0f, params.frequencyHz / 1000.0f)
+                : 1.0f;
+            const float attackMs = juce::jmax(0.1f, params.attackMs * scale);
+            const float releaseMs = juce::jmax(0.1f, params.releaseMs * scale);
+            const float attackCoeff = std::exp(-1.0f / (attackMs * 0.001f * static_cast<float>(sampleRateHz)));
+            const float releaseCoeff = std::exp(-1.0f / (releaseMs * 0.001f * static_cast<float>(sampleRateHz)));
+
+            BandParams detectorParams = params;
+            detectorParams.type = FilterType::bandPass;
+            detectorParams.gainDb = 0.0f;
+            detectorFilters[ch][band].update(detectorParams);
 
             const int stages = isTilt ? 2 : (isHpLp ? slopeConfig.stages : 1);
             if (isTilt)
@@ -447,11 +572,26 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 const float dry = channelData[i];
                 float sample = dry;
 
+                const float detSample = detectorFilters[ch][band].processSample(dry);
+                float& env = detectorEnv[ch][band];
+                const float absVal = std::abs(detSample);
+                const float coeff = absVal > env ? attackCoeff : releaseCoeff;
+                env = coeff * env + (1.0f - coeff) * absVal;
+                const float detDb = juce::Decibels::gainToDecibels(env, -60.0f);
+                detectorDb[ch][band].store(detDb);
+
                 if (isHpLp && slopeConfig.useOnePole)
                     sample = onePoles[ch][band].processSample(sample);
 
                 for (int stage = 0; stage < stages; ++stage)
                     sample = filters[ch][band][stage].processSample(sample);
+
+                if (params.dynamicEnabled)
+                {
+                    const float dynamicGainDb = computeDynamicGain(params, detDb);
+                    const float deltaDb = dynamicGainDb - staticGainDb;
+                    sample *= juce::Decibels::decibelsToGain(deltaDb);
+                }
 
                 if (mix < 1.0f)
                     sample = dry + (sample - dry) * mix;

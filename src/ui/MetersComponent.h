@@ -25,12 +25,8 @@ private:
     EQProAudioProcessor& processorRef;
     int selectedChannel = 0;
     juce::StringArray channelLabels;
-
-    float leftRms = -120.0f;
-    float leftPeak = -120.0f;
-    float rightRms = -120.0f;
-    float rightPeak = -120.0f;
+    std::vector<float> rmsDb;
+    std::vector<float> peakDb;
     float phaseValue = 0.0f;
-    bool dualMode = true;
     ThemeColors theme = makeDarkTheme();
 };

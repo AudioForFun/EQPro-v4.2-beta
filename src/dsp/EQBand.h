@@ -26,5 +26,11 @@ struct BandParams
     bool bypassed = false;
     bool solo = false;
     float mix = 1.0f;
+    bool dynamicEnabled = false;
+    int dynamicMode = 0; // 0 = Up, 1 = Down
+    float thresholdDb = -24.0f;
+    float attackMs = 20.0f;
+    float releaseMs = 200.0f;
+    bool autoScale = true;
 };
 } // namespace eqdsp

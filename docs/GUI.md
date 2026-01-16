@@ -1,35 +1,34 @@
 # EQ Pro GUI Guide
 
 ## Layout
-- Left: meters (RMS/peak + peak readout).
-- Center: analyzer with pre/post/external spectra and EQ/phase curves.
-- Right: processing controls, presets, snapshots, channel selection, and correlation.
+- Top: global bypass + global mix.
+- Center/top: analyzer with pre/post/external spectra and EQ curves.
+- Middle: band controls panel.
+- Right: multi-channel meters + correlation + phase.
+- Bottom: processing row (phase mode + quality) and output trim/auto gain.
 
 ## Analyzer
 - Drag band points to change frequency/gain.
 - Shift-click to multi-select bands; drag to move all selected.
 - Alt-drag to snap to nearby spectrum peaks (Spectrum Grab).
-- Phase overlay can be toggled on/off.
+- Per-band curves are overlaid with a highlighted selected band.
 
 ## Band Controls
-- Per-band: Frequency, Gain, Q, Filter Type, Slope.
-- Routing: Stereo/Mid/Side/Left/Right.
+- Per-band: Frequency, Gain, Q, Mix, Filter Type (button grid), Slope.
+- Routing: All/Mid/Side/Left/Right plus immersive channels/pairs.
 - Solo and Bypass per band.
-- Dynamic EQ: Enable, Mode (Up/Down), Threshold, Attack, Release, Mix.
-- Sidechain: Internal/External, optional detector filter.
-- Copy/Paste band state, and channel linking via Link Pair.
+- Dynamic EQ: Enable, Up/Down trigger, Threshold, Attack, Release, Auto Scale + detector meter.
+- Copy/Paste band state, Reset/Default/Delete.
 
 ## Processing / Global
 - Phase mode: Real-time / Natural / Linear.
-- Linear quality and window selection.
-- Oversampling (Real-time mode).
+- Linear quality selection.
 - Character modes: Gentle / Warm.
 - Auto Gain + Gain Scale.
 - Output Trim (smoothed).
 
 ## Presets / Snapshots
-- Preset dropdown + save/load.
-- Snapshot buttons A/B/C/D and Snapshot menu (Recall/Store).
+- Snapshot buttons and menu (Recall/Store).
 
 ## Analyzer Options
 - Range: 3/6/12/30 dB.

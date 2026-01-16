@@ -14,4 +14,6 @@ public:
 
 private:
     ThemeColors theme = makeDarkTheme();
+    juce::Image knobFilmstrip;
+    int knobFrames = 0;
 };

@@ -111,6 +111,8 @@ private:
 
     std::vector<float> eqCurveDb;
     std::vector<float> selectedBandCurveDb;
+    std::vector<std::vector<float>> perBandCurveDb;
+    std::vector<bool> perBandActive;
     std::vector<juce::Point<float>> bandPoints;
     std::vector<juce::Rectangle<float>> bypassIcons;
     std::array<juce::Rectangle<float>, 2> qHandleRects {};
@@ -118,8 +120,8 @@ private:
 
     float lastSampleRate = 48000.0f;
     int frameCounter = 0;
-    float minDb = -24.0f;
-    float maxDb = 24.0f;
+    float minDb = -60.0f;
+    float maxDb = 60.0f;
     int analyzerSpeedIndex = -1;
     uint64_t lastCurveHash = 0;
     int lastCurveBand = -1;

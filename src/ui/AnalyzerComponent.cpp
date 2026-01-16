@@ -10,11 +10,11 @@
 
 namespace
 {
-constexpr float kMinFreq = 20.0f;
-constexpr float kMaxDb = 24.0f;
-constexpr float kMinDb = -24.0f;
-constexpr float kAnalyzerMinDb = -90.0f;
-constexpr float kAnalyzerMaxDb = 6.0f;
+constexpr float kMinFreq = 10.0f;
+constexpr float kMaxDb = 60.0f;
+constexpr float kMinDb = -60.0f;
+constexpr float kAnalyzerMinDb = -60.0f;
+constexpr float kAnalyzerMaxDb = 60.0f;
 constexpr float kPointRadius = 6.5f;
 constexpr float kHitRadius = 10.0f;
 constexpr float kSmoothingCoeff = 0.2f;
@@ -27,6 +27,7 @@ const juce::String kParamBypassSuffix = "bypass";
 const juce::String kParamSlopeSuffix = "slope";
 const juce::String kParamMsSuffix = "ms";
 const juce::String kParamSoloSuffix = "solo";
+const juce::String kParamMixSuffix = "mix";
 const juce::StringArray kFilterTypeLabels {
     "Bell",
     "Low Shelf",
@@ -100,7 +101,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
     drawLabels(g, magnitudeArea);
 
-    const float maxFreq = std::min(20000.0f, lastSampleRate * 0.5f);
+    const float maxFreq = std::min(60000.0f, lastSampleRate * 0.5f);
 
     juce::Path prePath;
     juce::Path postPath;
@@ -179,6 +180,30 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
     if (! eqCurveDb.empty())
     {
+        for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+        {
+            if (band >= static_cast<int>(perBandCurveDb.size()))
+                break;
+            if (band >= static_cast<int>(perBandActive.size()) || ! perBandActive[static_cast<size_t>(band)])
+                continue;
+
+            const auto& curve = perBandCurveDb[static_cast<size_t>(band)];
+            if (curve.empty())
+                continue;
+
+            juce::Path bandPath;
+            bandPath.startNewSubPath(plotArea.getX(),
+                                     gainToY(curve.front()));
+            for (int x = 1; x < static_cast<int>(curve.size()); ++x)
+                bandPath.lineTo(plotArea.getX() + x,
+                                gainToY(curve[static_cast<size_t>(x)]));
+
+            const auto bandColour = ColorUtils::bandColour(band);
+            const bool isSelected = band == selectedBand;
+            g.setColour(bandColour.withAlpha(isSelected ? 0.65f : 0.45f));
+            g.strokePath(bandPath, juce::PathStrokeType((isSelected ? 1.8f : 1.3f) * scale));
+        }
+
         juce::Path eqPath;
         eqPath.startNewSubPath(plotArea.getX(),
                                gainToY(eqCurveDb.front()));
@@ -632,6 +657,8 @@ void AnalyzerComponent::createBandAtPosition(const juce::Point<float>& position)
     setBandParameter(targetBand, kParamFreqSuffix, freq);
     setBandParameter(targetBand, kParamGainSuffix, gain);
     setBandParameter(targetBand, kParamBypassSuffix, 0.0f);
+    setBandParameter(targetBand, kParamMixSuffix, 100.0f);
+    setBandParameter(targetBand, kParamSoloSuffix, 0.0f);
     setSelectedBand(targetBand);
     if (onBandSelected)
         onBandSelected(targetBand);
@@ -652,6 +679,7 @@ void AnalyzerComponent::resetBandToDefaults(int bandIndex, bool shouldBypass)
     resetParam(kParamMsSuffix);
     resetParam(kParamSlopeSuffix);
     resetParam(kParamSoloSuffix);
+    resetParam(kParamMixSuffix);
 
     if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, bandIndex, kParamBypassSuffix)))
         bypassParam->setValueNotifyingHost(shouldBypass ? 1.0f : 0.0f);
@@ -838,7 +866,8 @@ void AnalyzerComponent::updateCurves()
         hashValue(getBandParameter(band, kParamQSuffix));
         hashValue(getBandParameter(band, kParamTypeSuffix));
         hashValue(getBandParameter(band, kParamBypassSuffix));
-        hashValue(getBandParameter(band, kParamSlopeSuffix));
+    hashValue(getBandParameter(band, kParamSlopeSuffix));
+    hashValue(getBandParameter(band, kParamMixSuffix));
     }
 
     if (hash == lastCurveHash && selectedBand == lastCurveBand
@@ -849,19 +878,38 @@ void AnalyzerComponent::updateCurves()
     lastCurveBand = selectedBand;
     lastCurveChannel = selectedChannel;
 
-    eqCurveDb.assign(static_cast<size_t>(magnitudeArea.getWidth()), 0.0f);
-    selectedBandCurveDb.assign(static_cast<size_t>(magnitudeArea.getWidth()), 0.0f);
+    const int width = magnitudeArea.getWidth();
+    eqCurveDb.assign(static_cast<size_t>(width), 0.0f);
+    selectedBandCurveDb.assign(static_cast<size_t>(width), 0.0f);
+    perBandCurveDb.assign(ParamIDs::kBandsPerChannel, std::vector<float>(static_cast<size_t>(width), 0.0f));
+    perBandActive.assign(ParamIDs::kBandsPerChannel, false);
     // Phase view removed.
 
-    const float maxFreq = std::min(20000.0f, lastSampleRate * 0.5f);
-    for (int x = 0; x < magnitudeArea.getWidth(); ++x)
+    const float maxFreq = std::min(60000.0f, lastSampleRate * 0.5f);
+    std::array<bool, ParamIDs::kBandsPerChannel> bandActive {};
+    for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
     {
-        const float norm = static_cast<float>(x) / static_cast<float>(magnitudeArea.getWidth());
+        const float mix = getBandParameter(band, kParamMixSuffix) / 100.0f;
+        bandActive[band] = ! getBandBypassed(band) && mix > 0.0005f;
+        perBandActive[band] = bandActive[band];
+    }
+
+    for (int x = 0; x < width; ++x)
+    {
+        const float norm = static_cast<float>(x) / static_cast<float>(width);
         const float freq = FFTUtils::normToFreq(norm, kMinFreq, maxFreq);
 
         std::complex<double> total = { 1.0, 0.0 };
         for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
-            total *= computeBandResponse(band, freq);
+        {
+            const auto response = computeBandResponse(band, freq);
+            total *= response;
+            if (bandActive[band])
+            {
+                perBandCurveDb[static_cast<size_t>(band)][static_cast<size_t>(x)] =
+                    juce::Decibels::gainToDecibels(static_cast<float>(std::abs(response)), minDb);
+            }
+        }
 
         const auto bandResp = computeBandResponse(selectedBand, freq);
         const double mag = std::abs(total);
@@ -886,45 +934,53 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
 
     const float spectrumMinDb = kAnalyzerMinDb;
     const float spectrumMaxDb = kAnalyzerMaxDb;
-    const float spectrumStep = 12.0f;
+    const float spectrumStep = 6.0f;
     for (float db = spectrumMinDb; db <= spectrumMaxDb + 0.01f; db += spectrumStep)
     {
         const float y = juce::jmap(db, spectrumMinDb, spectrumMaxDb,
                                    static_cast<float>(labelArea.getBottom()),
                                    static_cast<float>(labelArea.getY()));
-        g.setColour(theme.grid.withAlpha(0.25f));
+        const bool major = (static_cast<int>(db) % 12 == 0);
+        g.setColour(theme.grid.withAlpha(major ? 0.55f : 0.28f));
         g.drawLine(static_cast<float>(area.getX()), y,
-                   static_cast<float>(area.getX() + 6 * scale), y, 1.0f);
-        g.setColour(theme.textMuted.withAlpha(0.7f));
-        g.drawFittedText(juce::String(db, 0),
-                         juce::Rectangle<int>(static_cast<int>(area.getX() + 2 * scale),
-                                              static_cast<int>(y - 7 * scale),
-                                              static_cast<int>(36 * scale),
-                                              static_cast<int>(14 * scale)),
-                         juce::Justification::left, 1);
+                   static_cast<float>(area.getRight()), y, major ? 1.2f : 0.8f);
+        if (major)
+        {
+            g.setColour(theme.textMuted.withAlpha(0.8f));
+            g.drawFittedText(juce::String(db, 0),
+                             juce::Rectangle<int>(static_cast<int>(area.getX() + 2 * scale),
+                                                  static_cast<int>(y - 7 * scale),
+                                                  static_cast<int>(36 * scale),
+                                                  static_cast<int>(14 * scale)),
+                             juce::Justification::left, 1);
+        }
     }
 
-    const float maxFreq = std::min(20000.0f, lastSampleRate * 0.5f);
-    const float freqs[] { 20.0f, 30.0f, 40.0f, 50.0f, 60.0f, 80.0f, 100.0f, 200.0f, 300.0f,
-                          400.0f, 500.0f, 600.0f, 800.0f, 1000.0f, 2000.0f, 3000.0f, 4000.0f,
-                          5000.0f, 6000.0f, 8000.0f, 10000.0f, 12000.0f, 16000.0f, 20000.0f };
+    const float maxFreq = std::min(60000.0f, lastSampleRate * 0.5f);
+    const float freqs[] { 10.0f, 12.5f, 16.0f, 20.0f, 25.0f, 31.5f, 40.0f, 50.0f, 63.0f, 80.0f, 100.0f, 125.0f,
+                          160.0f, 200.0f, 250.0f, 315.0f, 400.0f, 500.0f, 630.0f, 800.0f, 1000.0f, 1250.0f, 1600.0f,
+                          2000.0f, 2500.0f, 3150.0f, 4000.0f, 5000.0f, 6300.0f, 8000.0f, 10000.0f, 12500.0f, 16000.0f,
+                          20000.0f, 25000.0f, 31500.0f, 40000.0f, 50000.0f, 60000.0f };
     float lastLabelX = -1.0e6f;
-    const float minLabelSpacing = 40.0f * scale;
+    const float minLabelSpacing = 34.0f * scale;
     for (float f : freqs)
     {
         if (f < kMinFreq || f > maxFreq)
             continue;
         const float x = frequencyToX(f);
-        const bool major = (f == 20.0f || f == 50.0f || f == 100.0f || f == 200.0f || f == 500.0f
-            || f == 1000.0f || f == 2000.0f || f == 5000.0f || f == 10000.0f || f == 20000.0f);
-        g.setColour(major ? theme.grid.withAlpha(0.6f) : theme.grid.withAlpha(0.25f));
+        const bool major = (f == 10.0f || f == 20.0f || f == 50.0f || f == 100.0f || f == 200.0f || f == 500.0f
+            || f == 1000.0f || f == 2000.0f || f == 5000.0f || f == 10000.0f || f == 20000.0f || f == 40000.0f
+            || f == 60000.0f);
+        g.setColour(major ? theme.grid.withAlpha(0.7f) : theme.grid.withAlpha(0.35f));
         g.drawVerticalLine(static_cast<int>(x), static_cast<float>(area.getY()),
                            static_cast<float>(area.getBottom()));
         if (major && (x - lastLabelX) >= minLabelSpacing)
         {
             lastLabelX = x;
             g.setColour(theme.textMuted);
-            const juce::String text = f >= 1000.0f ? juce::String(f / 1000.0f, 1) + "k" : juce::String(f, 0);
+            const juce::String text = f >= 1000.0f
+                ? juce::String(f / 1000.0f, (f >= 10000.0f ? 1 : 2)) + "k"
+                : juce::String(f, f < 100.0f ? 1 : 0);
             g.drawFittedText(text,
                              juce::Rectangle<int>(static_cast<int>(x + 3.0f * scale),
                                                   static_cast<int>(area.getBottom() - bottomGutter),
@@ -1072,6 +1128,9 @@ std::complex<double> AnalyzerComponent::computeBandResponse(int bandIndex, float
         return { 1.0, 0.0 };
 
     const float gainDb = getBandParameter(bandIndex, kParamGainSuffix);
+    const float mix = getBandParameter(bandIndex, kParamMixSuffix) / 100.0f;
+    if (mix <= 0.0001f)
+        return { 1.0, 0.0 };
     const float q = std::max(0.1f, getBandParameter(bandIndex, kParamQSuffix));
     const float freq = getBandParameter(bandIndex, kParamFreqSuffix);
     const int type = getBandType(bandIndex);
@@ -1230,6 +1289,12 @@ std::complex<double> AnalyzerComponent::computeBandResponse(int bandIndex, float
             response = std::pow(response, stages);
         if (useOnePole)
             response *= onePoleResponse(freq, frequency);
+    }
+
+    if (mix < 1.0f)
+    {
+        const double wet = mix;
+        response = (1.0 - wet) + response * wet;
     }
 
     return response;

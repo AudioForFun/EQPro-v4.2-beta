@@ -5,6 +5,7 @@
 #include "Biquad.h"
 #include "OnePole.h"
 #include "../util/ParamIDs.h"
+#include <atomic>
 
 namespace eqdsp
 {
@@ -20,6 +21,8 @@ public:
     void updateBandParams(int channelIndex, int bandIndex, const BandParams& params);
     void updateMsBandParams(int bandIndex, const BandParams& params);
     void setMsTargets(const std::array<int, ParamIDs::kBandsPerChannel>& targets);
+    void setBandChannelMasks(const std::array<uint32_t, ParamIDs::kBandsPerChannel>& masks);
+    float getDetectorDb(int channelIndex, int bandIndex) const;
     void process(juce::AudioBuffer<float>& buffer,
                  const juce::AudioBuffer<float>* detectorBuffer = nullptr);
 
@@ -46,6 +49,13 @@ private:
         msFilters {};
     std::array<std::array<OnePole, ParamIDs::kBandsPerChannel>, 2> msOnePoles {};
     std::array<int, ParamIDs::kBandsPerChannel> msTargets {};
+    std::array<uint32_t, ParamIDs::kBandsPerChannel> bandChannelMasks {};
+    std::array<std::array<Biquad, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        detectorFilters {};
+    std::array<std::array<float, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        detectorEnv {};
+    std::array<std::array<std::atomic<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        detectorDb {};
     juce::AudioBuffer<float> msBuffer;
     bool globalBypass = false;
     bool smartSoloEnabled = false;

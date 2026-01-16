@@ -78,6 +78,7 @@ public:
     void setSelectedChannelIndex(int index);
     int getSelectedBandIndex() const;
     int getSelectedChannelIndex() const;
+    float getBandDetectorDb(int channelIndex, int bandIndex) const;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
@@ -93,6 +94,12 @@ private:
         std::atomic<float>* slope = nullptr;
         std::atomic<float>* solo = nullptr;
         std::atomic<float>* mix = nullptr;
+        std::atomic<float>* dynEnable = nullptr;
+        std::atomic<float>* dynMode = nullptr;
+        std::atomic<float>* dynThreshold = nullptr;
+        std::atomic<float>* dynAttack = nullptr;
+        std::atomic<float>* dynRelease = nullptr;
+        std::atomic<float>* dynAuto = nullptr;
     };
 
     void initializeParamPointers();
@@ -150,6 +157,7 @@ private:
     std::array<int, ParamIDs::kBandsPerChannel> lastMsTargets {};
     std::atomic<int> selectedBandIndex { 0 };
     std::atomic<int> selectedChannelIndex { 0 };
+    std::vector<juce::String> cachedChannelNames;
     bool showPhasePreference = true;
     int presetSelection = 0;
     int presetApplyTarget = 0;

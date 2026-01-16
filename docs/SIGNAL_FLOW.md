@@ -4,11 +4,10 @@
 
 Input
   -> Global Bypass?
-     -> EQDSP (per-channel, 24 bands)
-        -> per-band M/S or L/R routing
-        -> per-band dynamic EQ (attack/release, threshold, mix)
-        -> optional external sidechain detector
-     -> Elliptic DSP (mono-maker)
+     -> EQDSP (per-channel, 12 bands)
+        -> per-band channel targets (All/Mid/Side/L/R + immersive pairs)
+        -> per-band mix
+        -> per-band dynamic gain modulation (Up/Down)
      -> Spectral Dynamics (optional)
      -> Character Mode (Gentle/Warm saturation)
      -> Output Trim (smoothed gain)
@@ -23,16 +22,16 @@ Input channel
   -> For each band:
        - slope model (continuous dB/oct)
        - tilt / flat tilt handled as dual shelves
-       - dynamic modulation (threshold, attack, release, mix)
+       - per-band mix (dry/wet)
+       - dynamic detector (threshold/attack/release + auto scale)
   -> Output channel
 
 ## Dynamic EQ (per band)
 
 Detector input:
-  -> Internal (band signal) or External (sidechain bus)
-  -> Optional detector filter (band-pass)
+  -> Band-pass detector
   -> Envelope follower (attack/release)
-  -> Gain delta (Down/Up) applied to band gain
+  -> Up/Down gain modulation against threshold
 
 ## Spectral Dynamics
 
@@ -57,14 +56,12 @@ EQ curve + phase curve from band parameters
 prepareToPlay()
   -> EQDSP.prepare
   -> LinearPhaseEQ.prepare
-  -> EllipticDSP.prepare
   -> SpectralDynamicsDSP.prepare
   -> MeteringDSP.prepare
 
 processBlock()
   -> EQDSP.process (min phase)
   -> LinearPhaseEQ.process (linear/natural)
-  -> EllipticDSP.process
   -> SpectralDynamicsDSP.process
   -> Character Mode saturation
   -> Output Trim (smoothed gain)
@@ -79,7 +76,6 @@ timerCallback()
 process()
   -> solo audition (if enabled)
   -> per-band filter update + sample processing
-  -> dynamic detector update + gain modulation
 
 ### AnalyzerComponent
 timerCallback()

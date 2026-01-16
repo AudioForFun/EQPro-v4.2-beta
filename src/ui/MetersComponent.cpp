@@ -40,9 +40,13 @@ void MetersComponent::paint(juce::Graphics& g)
     auto meterArea = bounds.reduced(8.0f, 12.0f);
     const auto phaseArea = meterArea.removeFromBottom(14.0f);
     const auto peakArea = meterArea.removeFromBottom(18.0f);
-    const float meterWidth = dualMode ? (meterArea.getWidth() - 6.0f) * 0.5f : meterArea.getWidth();
+    const int channels = juce::jmax(1, static_cast<int>(rmsDb.size()));
+    const float gap = 4.0f;
+    const float meterWidth = (meterArea.getWidth() - gap * static_cast<float>(channels - 1))
+        / static_cast<float>(channels);
+    const float fontSize = channels > 8 ? 9.5f : 11.0f;
 
-    auto drawMeter = [&](float x, float rmsDb, float peakDb, const juce::String& label)
+    auto drawMeter = [&](float x, float rmsDbValue, float peakDbValue, const juce::String& label)
     {
         const auto meterBounds = juce::Rectangle<float>(x, meterArea.getY(), meterWidth,
                                                         meterArea.getHeight());
@@ -54,8 +58,8 @@ void MetersComponent::paint(juce::Graphics& g)
             const float clamped = juce::jlimit(kMinDb, kMaxDb, db);
             return juce::jmap(clamped, kMinDb, kMaxDb, meterArea.getBottom(), meterArea.getY());
         };
-        const float rmsY = mapDbToY(rmsDb);
-        const float peakY = mapDbToY(peakDb);
+        const float rmsY = mapDbToY(rmsDbValue);
+        const float peakY = mapDbToY(peakDbValue);
         const auto fill = juce::Rectangle<float>(meterBounds.getX(), rmsY,
                                                  meterBounds.getWidth(),
                                                  meterBounds.getBottom() - rmsY);
@@ -66,39 +70,37 @@ void MetersComponent::paint(juce::Graphics& g)
         g.drawLine(meterBounds.getX(), peakY, meterBounds.getRight(), peakY, 1.5f);
 
         g.setColour(theme.textMuted);
-        g.setFont(12.0f);
+        g.setFont(fontSize);
         g.drawFittedText(label, meterBounds.toNearestInt().withHeight(16),
                          juce::Justification::centred, 1);
     };
 
-    if (dualMode)
-    {
-        const float leftX = meterArea.getX();
-        const float rightX = meterArea.getX() + meterWidth + 6.0f;
-        drawMeter(leftX, leftRms, leftPeak, channelLabels.isEmpty() ? "L" : channelLabels[0]);
-        drawMeter(rightX, rightRms, rightPeak,
-                  channelLabels.size() > 1 ? channelLabels[1] : "R");
-    }
-    else
+    for (int ch = 0; ch < channels; ++ch)
     {
         const juce::String label =
-            channelLabels.size() > selectedChannel
-                ? channelLabels[selectedChannel]
-                : ("Ch " + juce::String(selectedChannel + 1));
-        drawMeter(meterArea.getX(), leftRms, leftPeak, label);
+            channelLabels.size() > ch
+                ? channelLabels[ch]
+                : ("Ch " + juce::String(ch + 1));
+        const float x = meterArea.getX() + ch * (meterWidth + gap);
+        drawMeter(x,
+                  rmsDb[static_cast<size_t>(ch)],
+                  peakDb[static_cast<size_t>(ch)],
+                  label);
     }
 
-    const float peakDb = dualMode ? juce::jmax(leftPeak, rightPeak) : leftPeak;
+    float peakDbValue = kMinDb;
+    for (const auto value : peakDb)
+        peakDbValue = juce::jmax(peakDbValue, value);
     g.setColour(theme.panel);
     g.fillRoundedRectangle(peakArea, 4.0f);
-    const float peakNorm = juce::jmap(juce::jlimit(kMinDb, kMaxDb, peakDb),
+    const float peakNorm = juce::jmap(juce::jlimit(kMinDb, kMaxDb, peakDbValue),
                                       kMinDb, kMaxDb, 0.0f, 1.0f);
     const auto peakFill = peakArea.withWidth(peakArea.getWidth() * peakNorm);
     g.setColour(theme.meterPeak);
     g.fillRoundedRectangle(peakFill, 4.0f);
     g.setColour(theme.text);
     g.setFont(12.0f);
-    g.drawFittedText("Peak " + juce::String(peakDb, 1) + " dB",
+    g.drawFittedText("Peak " + juce::String(peakDbValue, 1) + " dB",
                      peakArea.toNearestInt(), juce::Justification::centred, 1);
 
     g.setColour(theme.panel);
@@ -123,25 +125,18 @@ void MetersComponent::resized()
 
 void MetersComponent::timerCallback()
 {
-    const int totalChannels = processorRef.getTotalNumInputChannels();
-    dualMode = totalChannels >= 2 && (selectedChannel == 0 || selectedChannel == 1);
-
-    if (dualMode)
+    const int totalChannels = juce::jmax(1, processorRef.getTotalNumInputChannels());
+    if (static_cast<int>(rmsDb.size()) != totalChannels)
     {
-        const auto leftState = processorRef.getMeterState(0);
-        const auto rightState = processorRef.getMeterState(1);
-        leftRms = leftState.rmsDb;
-        leftPeak = leftState.peakDb;
-        rightRms = rightState.rmsDb;
-        rightPeak = rightState.peakDb;
+        rmsDb.assign(static_cast<size_t>(totalChannels), kMinDb);
+        peakDb.assign(static_cast<size_t>(totalChannels), kMinDb);
     }
-    else
+
+    for (int ch = 0; ch < totalChannels; ++ch)
     {
-        const auto state = processorRef.getMeterState(selectedChannel);
-        leftRms = state.rmsDb;
-        leftPeak = state.peakDb;
-        rightRms = leftRms;
-        rightPeak = leftPeak;
+        const auto state = processorRef.getMeterState(ch);
+        rmsDb[static_cast<size_t>(ch)] = state.rmsDb;
+        peakDb[static_cast<size_t>(ch)] = state.peakDb;
     }
 
     phaseValue = processorRef.getCorrelation();

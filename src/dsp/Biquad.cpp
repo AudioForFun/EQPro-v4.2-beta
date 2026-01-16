@@ -38,6 +38,55 @@ float Biquad::processSample(float x)
     return static_cast<float>(y);
 }
 
+void Biquad::processBlock(float* data, int numSamples)
+{
+    if (data == nullptr || numSamples <= 0)
+        return;
+
+    double z1l = z1;
+    double z2l = z2;
+    const double b0l = b0;
+    const double b1l = b1;
+    const double b2l = b2;
+    const double a1l = a1;
+    const double a2l = a2;
+
+    int i = 0;
+    for (; i + 3 < numSamples; i += 4)
+    {
+        double y = b0l * data[i] + z1l;
+        z1l = b1l * data[i] - a1l * y + z2l;
+        z2l = b2l * data[i] - a2l * y;
+        data[i] = static_cast<float>(y);
+
+        y = b0l * data[i + 1] + z1l;
+        z1l = b1l * data[i + 1] - a1l * y + z2l;
+        z2l = b2l * data[i + 1] - a2l * y;
+        data[i + 1] = static_cast<float>(y);
+
+        y = b0l * data[i + 2] + z1l;
+        z1l = b1l * data[i + 2] - a1l * y + z2l;
+        z2l = b2l * data[i + 2] - a2l * y;
+        data[i + 2] = static_cast<float>(y);
+
+        y = b0l * data[i + 3] + z1l;
+        z1l = b1l * data[i + 3] - a1l * y + z2l;
+        z2l = b2l * data[i + 3] - a2l * y;
+        data[i + 3] = static_cast<float>(y);
+    }
+
+    for (; i < numSamples; ++i)
+    {
+        const double y = b0l * data[i] + z1l;
+        z1l = b1l * data[i] - a1l * y + z2l;
+        z2l = b2l * data[i] - a2l * y;
+        data[i] = static_cast<float>(y);
+    }
+
+    z1 = z1l;
+    z2 = z2l;
+}
+
 void Biquad::setCoefficients(const BandParams& params)
 {
     const double nyquist = sampleRateHz * 0.5;

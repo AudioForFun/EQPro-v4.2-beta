@@ -14,6 +14,9 @@
 - Metering updates are decimated at very high sample rates to lower CPU.
 - Global mix and output trim use block ramps instead of per-sample smoothing loops.
 - External sidechain buffers drive dynamic detectors when present.
+- Biquad/one-pole filters provide block processors for fast paths (no dynamic/mix).
+- Inactive bands are skipped early when mix is ~0 or gain is neutral (where safe).
+- Analyzer updates are skipped when the view is not visible.
 
 ## DSP Pipeline (Milestone 1)
 - Per-channel processing pipeline with 12 fixed bands each.

@@ -58,6 +58,7 @@ private:
         detectorDb {};
     juce::AudioBuffer<float> msBuffer;
     juce::AudioBuffer<float> detectorMsBuffer;
+    juce::AudioBuffer<float> detectorTemp;
     bool globalBypass = false;
     bool smartSoloEnabled = false;
     int qMode = 0;

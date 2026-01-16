@@ -64,6 +64,8 @@ void EQDSP::prepare(double sampleRate, int maxBlockSize, int channels)
     msBuffer.clear();
     detectorMsBuffer.setSize(2, maxBlockSize);
     detectorMsBuffer.clear();
+    detectorTemp.setSize(1, maxBlockSize);
+    detectorTemp.clear();
     scratchBuffer.setSize(numChannels, maxBlockSize);
     scratchBuffer.clear();
 
@@ -276,6 +278,17 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
         return;
     const bool useMs = numChannels >= 2
         && std::any_of(msTargets.begin(), msTargets.end(), [](int v) { return v == 1 || v == 2; });
+    bool linkStereoDetectors = false;
+    if (! useMs && numChannels == 2)
+    {
+        const auto* left = buffer.getReadPointer(0);
+        const auto* right = buffer.getReadPointer(1);
+        const int checkCount = juce::jmin(samples, 32);
+        float acc = 0.0f;
+        for (int i = 0; i < checkCount; ++i)
+            acc += std::abs(left[i] - right[i]);
+        linkStereoDetectors = acc < 1.0e-5f * static_cast<float>(checkCount);
+    }
 
     if (useMs)
     {
@@ -551,8 +564,12 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 continue;
 
             auto params = cachedParams[ch][band];
+            if (params.mix <= 0.0001f)
+                continue;
             const bool isHpLp = params.type == FilterType::lowPass || params.type == FilterType::highPass;
             const bool isTilt = params.type == FilterType::tilt || params.type == FilterType::flatTilt;
+            const bool isShelf = params.type == FilterType::lowShelf || params.type == FilterType::highShelf;
+            const bool isBell = params.type == FilterType::bell;
             const float tiltQ = (params.type == FilterType::flatTilt) ? 0.5f : -1.0f;
             const auto slopeConfig = slopeFromDb(params.slopeDb);
             smoothFreq[ch][band].skip(samples);
@@ -564,6 +581,9 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             params.q = applyQMode(params);
             const float mix = juce::jlimit(0.0f, 1.0f, params.mix);
             const float staticGainDb = params.gainDb;
+            if (! params.dynamicEnabled && (isBell || isShelf || isTilt)
+                && std::abs(staticGainDb) < 0.0001f)
+                continue;
 
             const float scale = params.autoScale
                 ? juce::jlimit(0.25f, 4.0f, params.frequencyHz / 1000.0f)
@@ -608,19 +628,59 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     detData = detectorBuffer->getReadPointer(detChannel);
             }
 
+            const bool canFastPath = ! params.dynamicEnabled && mix >= 0.999f;
+            if (canFastPath && (isBell || isShelf || isHpLp || isTilt || params.type == FilterType::notch
+                                || params.type == FilterType::bandPass || params.type == FilterType::allPass))
+            {
+                if (isHpLp && slopeConfig.useOnePole)
+                    onePoles[ch][band].processBlock(channelData, samples);
+                for (int stage = 0; stage < stages; ++stage)
+                    filters[ch][band][stage].processBlock(channelData, samples);
+                continue;
+            }
+
+            const bool linkDetector = linkStereoDetectors && ch == 1
+                && cachedParams[0][band].frequencyHz == params.frequencyHz
+                && cachedParams[0][band].gainDb == params.gainDb
+                && cachedParams[0][band].q == params.q
+                && cachedParams[0][band].type == params.type
+                && cachedParams[0][band].slopeDb == params.slopeDb
+                && cachedParams[0][band].mix == params.mix
+                && cachedParams[0][band].dynamicEnabled == params.dynamicEnabled
+                && cachedParams[0][band].dynamicMode == params.dynamicMode
+                && cachedParams[0][band].thresholdDb == params.thresholdDb
+                && cachedParams[0][band].attackMs == params.attackMs
+                && cachedParams[0][band].releaseMs == params.releaseMs
+                && cachedParams[0][band].autoScale == params.autoScale;
+            float* detTempWrite = linkStereoDetectors && ch == 0 ? detectorTemp.getWritePointer(0) : nullptr;
+            const float* detTempRead = linkDetector ? detectorTemp.getReadPointer(0) : nullptr;
+
             for (int i = 0; i < samples; ++i)
             {
                 const float dry = channelData[i];
                 float sample = dry;
 
-                const float detInput = detData != nullptr ? detData[i] : dry;
-                const float detSample = detectorFilters[ch][band].processSample(detInput);
-                float& env = detectorEnv[ch][band];
-                const float absVal = std::abs(detSample);
-                const float coeff = absVal > env ? attackCoeff : releaseCoeff;
-                env = coeff * env + (1.0f - coeff) * absVal;
-                const float detDb = juce::Decibels::gainToDecibels(env, -60.0f);
-                detectorDb[ch][band].store(detDb);
+                float detDb = 0.0f;
+                if (params.dynamicEnabled)
+                {
+                    if (detTempRead != nullptr)
+                    {
+                        detDb = detTempRead[i];
+                    }
+                    else
+                    {
+                        const float detInput = detData != nullptr ? detData[i] : dry;
+                        const float detSample = detectorFilters[ch][band].processSample(detInput);
+                        float& env = detectorEnv[ch][band];
+                        const float absVal = std::abs(detSample);
+                        const float coeff = absVal > env ? attackCoeff : releaseCoeff;
+                        env = coeff * env + (1.0f - coeff) * absVal;
+                        detDb = juce::Decibels::gainToDecibels(env, -60.0f);
+                        detectorDb[ch][band].store(detDb);
+                        if (detTempWrite != nullptr)
+                            detTempWrite[i] = detDb;
+                    }
+                }
 
                 if (isHpLp && slopeConfig.useOnePole)
                     sample = onePoles[ch][band].processSample(sample);

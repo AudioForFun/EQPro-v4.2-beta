@@ -12,6 +12,7 @@ public:
     void setLowPass(float cutoffHz);
     void setHighPass(float cutoffHz);
     float processSample(float x);
+    void processBlock(float* data, int numSamples);
 
 private:
     void updateCoeff(float cutoffHz);

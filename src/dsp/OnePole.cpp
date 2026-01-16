@@ -40,6 +40,37 @@ float OnePole::processSample(float x)
     return static_cast<float>(y);
 }
 
+void OnePole::processBlock(float* data, int numSamples)
+{
+    if (data == nullptr || numSamples <= 0)
+        return;
+
+    double z = z1;
+    const double a = alpha;
+    const bool hp = highPass;
+
+    if (! hp)
+    {
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const double y = (1.0 - a) * data[i] + a * z;
+            z = y;
+            data[i] = static_cast<float>(y);
+        }
+    }
+    else
+    {
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const double y = (1.0 + a) * 0.5 * (data[i] - z) + a * z;
+            z = y;
+            data[i] = static_cast<float>(y);
+        }
+    }
+
+    z1 = z;
+}
+
 void OnePole::updateCoeff(float cutoffHz)
 {
     if (cutoffHz == lastCutoff)

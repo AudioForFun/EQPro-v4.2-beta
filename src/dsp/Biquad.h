@@ -13,6 +13,7 @@ public:
     void update(const BandParams& params);
 
     float processSample(float x);
+    void processBlock(float* data, int numSamples);
 
 private:
     void setCoefficients(const BandParams& params);

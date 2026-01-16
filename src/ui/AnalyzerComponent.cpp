@@ -814,6 +814,9 @@ void AnalyzerComponent::stopAltSolo()
 
 void AnalyzerComponent::timerCallback()
 {
+    if (! isShowing())
+        return;
+
     minDb = kMinDb;
     maxDb = kMaxDb;
 
@@ -841,13 +844,19 @@ void AnalyzerComponent::timerCallback()
     const bool freeze = parameters.getRawParameterValue(ParamIDs::analyzerFreeze) != nullptr
         && parameters.getRawParameterValue(ParamIDs::analyzerFreeze)->load() > 0.5f;
 
+    bool didUpdate = false;
     if (! freeze)
     {
         updateFft();
+        didUpdate = true;
         if (++frameCounter % 2 == 0)
+        {
             updateCurves();
+            didUpdate = true;
+        }
     }
-    repaint();
+    if (didUpdate)
+        repaint();
 }
 
 void AnalyzerComponent::updateFft()

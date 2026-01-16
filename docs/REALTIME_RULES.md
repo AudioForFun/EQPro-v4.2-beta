@@ -4,4 +4,5 @@
 - No mutex locks or blocking calls in the audio thread.
 - Avoid I/O and logging in real-time processing.
 - Preallocate all DSP state in `prepareToPlay`.
-- Use lock-free communication for UI ↔ DSP.
+- Use lock-free communication for UI ↔ DSP (`AnalyzerTap`/`MeterTap`).
+- Read a stable `ParamSnapshot` once per block; no APVTS reads in the audio thread.

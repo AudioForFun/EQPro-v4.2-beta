@@ -1,10 +1,17 @@
 # EQ Pro Architecture
 
+## DSP/UI Boundary (Refactor)
+- `EQProAudioProcessor` owns APVTS, `EqEngine`, snapshots, and analyzer/meter taps.
+- `EqEngine` in `src/dsp/` contains all audio processing state and logic (prepare/reset/process).
+- `ParamSnapshot` is a fixed-size struct updated on the message thread and read atomically at block start.
+- `AnalyzerTap` and `MeterTap` are DSP-side, lock-free bridges for UI visualization.
+- `PluginEditor` talks to DSP only via APVTS attachments and read-only tap accessors.
+
 ## DSP Pipeline (Milestone 1)
 - Per-channel processing pipeline with 12 fixed bands each.
 - Each band is a minimum-phase IIR biquad (RBJ formulas).
 - Parameters are stored in APVTS and read into a fixed-size cache.
-- `EQDSP` owns the filters and processes channels in-place.
+- `EQDSP` owns the filters and processes channels in-place (invoked by `EqEngine`).
 - Global bypass short-circuits processing.
 - Band Solo audition routes audio through a band-pass version of the selected band(s).
 - Per-band mix blends dry/wet for each band.
@@ -14,7 +21,7 @@
 - Smart Solo tightens the audition bandwidth and applies a small gain lift.
 
 ## Analyzer (Milestone 2)
-- Pre/post analyzer taps into channel 1 via lock-free FIFO.
+- Pre/post analyzer taps into channel 1 via lock-free FIFO (`AnalyzerTap`).
 - FFT runs on a UI timer (30 Hz) and uses windowed FFT.
 - EQ curve is computed from current band parameters for display.
 - External analyzer input can be enabled for overlay visualization.

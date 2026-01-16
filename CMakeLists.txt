@@ -42,6 +42,13 @@ target_sources(EQPro PRIVATE
     src/dsp/EQDSP.h
     src/dsp/OnePole.cpp
     src/dsp/OnePole.h
+    src/dsp/EqEngine.cpp
+    src/dsp/EqEngine.h
+    src/dsp/ParamSnapshot.h
+    src/dsp/AnalyzerTap.cpp
+    src/dsp/AnalyzerTap.h
+    src/dsp/MeterTap.cpp
+    src/dsp/MeterTap.h
     src/dsp/LinearPhaseEQ.cpp
     src/dsp/LinearPhaseEQ.h
     src/dsp/MeteringDSP.cpp

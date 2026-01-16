@@ -1,11 +1,10 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "dsp/EQDSP.h"
-#include "dsp/LinearPhaseEQ.h"
-#include "dsp/MeteringDSP.h"
-#include "dsp/SpectralDynamicsDSP.h"
-#include "util/RingBuffer.h"
+#include "dsp/EqEngine.h"
+#include "dsp/ParamSnapshot.h"
+#include "dsp/AnalyzerTap.h"
+#include "dsp/MeterTap.h"
 
 class EQProAudioProcessor final : public juce::AudioProcessor,
                                   private juce::Timer
@@ -104,9 +103,7 @@ private:
 
     void initializeParamPointers();
     void timerCallback() override;
-    void rebuildLinearPhase(int taps, double sampleRate, int channels);
-    uint64_t computeParamsHash(int channels) const;
-    void updateOversampling();
+    void buildSnapshot(eqdsp::ParamSnapshot& snapshot);
 
     juce::AudioProcessorValueTreeState parameters;
     juce::UndoManager undoManager;
@@ -139,22 +136,13 @@ private:
     std::atomic<float>* midiTargetParam = nullptr;
     std::atomic<float>* smartSoloParam = nullptr;
 
-    juce::AudioBuffer<float> dryBuffer;
-    juce::SmoothedValue<float> globalMixSmoothed;
-
-    eqdsp::EQDSP eqDsp;
-    eqdsp::EQDSP eqDspOversampled;
-    eqdsp::LinearPhaseEQ linearPhaseEq;
-    eqdsp::LinearPhaseEQ linearPhaseMsEq;
-    eqdsp::MeteringDSP meteringDsp;
-    eqdsp::SpectralDynamicsDSP spectralDsp;
-
-    int lastPhaseMode = 0;
-    int lastLinearQuality = 0;
-    int lastTaps = 0;
-    int lastWindowIndex = 0;
-    uint64_t lastParamHash = 0;
-    std::array<int, ParamIDs::kBandsPerChannel> lastMsTargets {};
+    eqdsp::EqEngine eqEngine;
+    eqdsp::AnalyzerTap analyzerPreTap;
+    eqdsp::AnalyzerTap analyzerPostTap;
+    eqdsp::AnalyzerTap analyzerExternalTap;
+    eqdsp::MeterTap meterTap;
+    eqdsp::ParamSnapshot snapshots[2];
+    std::atomic<int> activeSnapshot { 0 };
     std::atomic<int> selectedBandIndex { 0 };
     std::atomic<int> selectedChannelIndex { 0 };
     std::vector<juce::String> cachedChannelNames;
@@ -175,24 +163,8 @@ private:
     static juce::String sharedStateClipboard;
     juce::String favoritePresets;
 
-    int firFftSize = 0;
-    int firFftOrder = 0;
-    std::unique_ptr<juce::dsp::FFT> firFft;
-    std::vector<float> firData;
-    std::vector<float> firImpulse;
-    std::unique_ptr<juce::dsp::WindowingFunction<float>> firWindow;
-    int firWindowMethod = -1;
-
-    std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;
-    juce::AudioBuffer<float> oversampledBuffer;
-    int oversamplingIndex = 0;
     double lastSampleRate = 0.0;
     int lastMaxBlockSize = 0;
-
-    juce::SmoothedValue<float> outputTrimGainSmoothed;
-    AudioFifo analyzerPreFifo;
-    AudioFifo analyzerPostFifo;
-    AudioFifo analyzerExternalFifo;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EQProAudioProcessor)
 };

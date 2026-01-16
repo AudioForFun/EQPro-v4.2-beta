@@ -1,10 +1,15 @@
 #include "PluginEditor.h"
 #include "util/ParamIDs.h"
 
+juce::AudioProcessorEditor* EQProAudioProcessor::createEditor()
+{
+    return new EQProAudioProcessorEditor(*this);
+}
+
 namespace
 {
-constexpr int kEditorWidth = 1200;
-constexpr int kEditorHeight = 800;
+constexpr int kEditorWidth = 1400;
+constexpr int kEditorHeight = 900;
 constexpr int kOuterMargin = 16;
 constexpr int kLeftPanelWidth = 0;
 constexpr int kRightPanelWidth = 180;
@@ -1021,7 +1026,7 @@ void EQProAudioProcessorEditor::resized()
     const int metersWidth = static_cast<int>(kRightPanelWidth * uiScale);
     auto rightPanel = content.removeFromRight(metersWidth);
     auto leftContent = content;
-    const int analyzerHeight = static_cast<int>(leftContent.getHeight() * 0.70f);
+    const int analyzerHeight = static_cast<int>(leftContent.getHeight() * 0.65f);
     auto analyzerArea = leftContent.removeFromTop(analyzerHeight);
     analyzer.setBounds(analyzerArea);
 

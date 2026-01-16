@@ -1,5 +1,4 @@
 #include "PluginProcessor.h"
-#include "PluginEditor.h"
 #include "util/ParamIDs.h"
 #include "util/ChannelLayoutUtils.h"
 #include <cmath>
@@ -128,31 +127,18 @@ EQProAudioProcessor::~EQProAudioProcessor()
 
 void EQProAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    eqDsp.prepare(sampleRate, samplesPerBlock, getTotalNumInputChannels());
-    eqDsp.reset();
-    meteringDsp.prepare(sampleRate);
-    spectralDsp.prepare(sampleRate, samplesPerBlock, getTotalNumInputChannels());
-    spectralDsp.reset();
-    linearPhaseEq.prepare(sampleRate, samplesPerBlock, getTotalNumInputChannels());
-    linearPhaseEq.reset();
-    linearPhaseMsEq.prepare(sampleRate, samplesPerBlock, 2);
-    linearPhaseMsEq.reset();
+    eqEngine.prepare(sampleRate, samplesPerBlock, getTotalNumInputChannels());
+    meterTap.prepare(sampleRate);
     lastSampleRate = sampleRate;
     lastMaxBlockSize = samplesPerBlock;
-    updateOversampling();
-
-    outputTrimGainSmoothed.reset(sampleRate, 0.02);
-    outputTrimGainSmoothed.setCurrentAndTargetValue(1.0f);
-    globalMixSmoothed.reset(sampleRate, 0.02);
-    globalMixSmoothed.setCurrentAndTargetValue(1.0f);
-
-    dryBuffer.setSize(getTotalNumInputChannels(), samplesPerBlock);
-    dryBuffer.clear();
-
     constexpr int analyzerBufferSize = 16384;
-    analyzerPreFifo.prepare(analyzerBufferSize);
-    analyzerPostFifo.prepare(analyzerBufferSize);
-    analyzerExternalFifo.prepare(analyzerBufferSize);
+    analyzerPreTap.prepare(analyzerBufferSize);
+    analyzerPostTap.prepare(analyzerBufferSize);
+    analyzerExternalTap.prepare(analyzerBufferSize);
+
+    cachedChannelNames = getCurrentChannelNames();
+    buildSnapshot(snapshots[0]);
+    activeSnapshot.store(0);
 }
 
 void EQProAudioProcessor::releaseResources()
@@ -191,17 +177,6 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     juce::ScopedNoDenormals noDenormals;
 
     const auto numChannels = juce::jmin(buffer.getNumChannels(), ParamIDs::kMaxChannels);
-    const bool globalBypass = globalBypassParam != nullptr && globalBypassParam->load() > 0.5f;
-    eqDsp.setGlobalBypass(globalBypass);
-    eqDsp.setSmartSoloEnabled(smartSoloParam != nullptr && smartSoloParam->load() > 0.5f);
-    eqDspOversampled.setGlobalBypass(globalBypass);
-    eqDspOversampled.setSmartSoloEnabled(smartSoloParam != nullptr && smartSoloParam->load() > 0.5f);
-    const int qMode = qModeParam != nullptr ? static_cast<int>(qModeParam->load()) : 0;
-    const float qAmount = qModeAmountParam != nullptr ? qModeAmountParam->load() : 50.0f;
-    eqDsp.setQMode(qMode);
-    eqDsp.setQModeAmount(qAmount);
-    eqDspOversampled.setQMode(qMode);
-    eqDspOversampled.setQModeAmount(qAmount);
 
     const bool midiLearnEnabled = midiLearnParam != nullptr && midiLearnParam->load() > 0.5f;
     if (midiLearnEnabled || learnedMidiCC.load() >= 0)
@@ -238,378 +213,23 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     if (correlationPairs.empty())
     {
         if (numChannels >= 2)
-            meteringDsp.setCorrelationPair(0, 1);
+            meterTap.setCorrelationPair(0, 1);
     }
     else
     {
         const int safeIndex = juce::jlimit(0, static_cast<int>(correlationPairs.size() - 1),
                                            correlationPairIndex);
         const auto pair = correlationPairs[static_cast<size_t>(safeIndex)];
-        meteringDsp.setCorrelationPair(pair.first, pair.second);
+        meterTap.setCorrelationPair(pair.first, pair.second);
     }
 
-    if (buffer.getNumChannels() > 0)
-        analyzerPreFifo.push(buffer.getReadPointer(0), buffer.getNumSamples());
-
-    const float globalMixTarget = globalMixParam != nullptr ? (globalMixParam->load() / 100.0f) : 1.0f;
-    globalMixSmoothed.setTargetValue(globalMixTarget);
-    const bool applyGlobalMix = globalMixParam != nullptr
-        && (globalMixSmoothed.isSmoothing() || std::abs(globalMixTarget - 1.0f) > 0.0001f);
-    if (applyGlobalMix)
-    {
-        const int copyChannels = juce::jmin(numChannels, dryBuffer.getNumChannels());
-        for (int ch = 0; ch < copyChannels; ++ch)
-            juce::FloatVectorOperations::copy(dryBuffer.getWritePointer(ch),
-                                              buffer.getReadPointer(ch),
-                                              buffer.getNumSamples());
-    }
-
-    std::array<int, ParamIDs::kBandsPerChannel> msTargets {};
-    std::array<uint32_t, ParamIDs::kBandsPerChannel> bandChannelMasks {};
-    const uint32_t maskAll = (numChannels >= 32)
-        ? 0xFFFFFFFFu
-        : (numChannels > 0 ? ((1u << static_cast<uint32_t>(numChannels)) - 1u) : 0u);
-    for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
-    {
-        msTargets[band] = 0;
-        bandChannelMasks[band] = maskAll;
-    }
-
-    const auto& channelNames = cachedChannelNames;
-    auto findIndex = [&channelNames](const juce::String& name) -> int
-    {
-        for (int i = 0; i < static_cast<int>(channelNames.size()); ++i)
-            if (channelNames[static_cast<size_t>(i)] == name)
-                return i;
-        return -1;
-    };
-    auto maskFor = [&](const juce::String& name) -> uint32_t
-    {
-        const int idx = findIndex(name);
-        return idx >= 0 ? (1u << static_cast<uint32_t>(idx)) : 0u;
-    };
-    auto maskForPair = [&](const juce::String& left, const juce::String& right) -> uint32_t
-    {
-        return maskFor(left) | maskFor(right);
-    };
-
-    for (int ch = 0; ch < numChannels; ++ch)
-    {
-        for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
-        {
-            const auto& ptrs = bandParamPointers[ch][band];
-            if (ptrs.frequency == nullptr)
-                continue;
-
-            eqdsp::BandParams params;
-            params.frequencyHz = ptrs.frequency->load();
-            params.gainDb = ptrs.gain->load();
-            params.q = ptrs.q->load();
-            params.type = static_cast<eqdsp::FilterType>(static_cast<int>(ptrs.type->load()));
-            params.slopeDb = ptrs.slope != nullptr ? ptrs.slope->load() : 12.0f;
-            params.bypassed = ptrs.bypass->load() > 0.5f;
-            params.solo = ptrs.solo != nullptr && ptrs.solo->load() > 0.5f;
-            params.mix = ptrs.mix != nullptr ? (ptrs.mix->load() / 100.0f) : 1.0f;
-            params.dynamicEnabled = ptrs.dynEnable != nullptr && ptrs.dynEnable->load() > 0.5f;
-            params.dynamicMode = ptrs.dynMode != nullptr ? static_cast<int>(ptrs.dynMode->load()) : 0;
-            params.thresholdDb = ptrs.dynThreshold != nullptr ? ptrs.dynThreshold->load() : -24.0f;
-            params.attackMs = ptrs.dynAttack != nullptr ? ptrs.dynAttack->load() : 20.0f;
-            params.releaseMs = ptrs.dynRelease != nullptr ? ptrs.dynRelease->load() : 200.0f;
-            params.autoScale = ptrs.dynAuto != nullptr && ptrs.dynAuto->load() > 0.5f;
-
-            eqDsp.updateBandParams(ch, band, params);
-
-            if (ch == 0)
-            {
-                eqDsp.updateMsBandParams(band, params);
-            }
-        }
-    }
-
-    for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
-    {
-        const auto& ptrs = bandParamPointers[0][band];
-        const int target = ptrs.msTarget != nullptr ? static_cast<int>(ptrs.msTarget->load()) : 0;
-        int msTarget = 0;
-        uint32_t mask = maskAll;
-
-        switch (target)
-        {
-            case 0: // All
-                mask = maskAll;
-                break;
-            case 1: // Mid
-                msTarget = 1;
-                mask = maskForPair("L", "R");
-                break;
-            case 2: // Side
-                msTarget = 2;
-                mask = maskForPair("L", "R");
-                break;
-            case 3: // L/R
-                mask = maskForPair("L", "R");
-                break;
-            case 4: // Left
-                mask = maskFor("L");
-                break;
-            case 5: // Right
-                mask = maskFor("R");
-                break;
-            case 6: // Mono
-                msTarget = 1;
-                mask = maskForPair("L", "R");
-                break;
-            case 7: mask = maskFor("L"); break;
-            case 8: mask = maskFor("R"); break;
-            case 9: mask = maskFor("C"); break;
-            case 10: mask = maskFor("LFE"); break;
-            case 11: mask = maskFor("Ls"); break;
-            case 12: mask = maskFor("Rs"); break;
-            case 13: mask = maskFor("Lrs"); break;
-            case 14: mask = maskFor("Rrs"); break;
-            case 15: mask = maskFor("Lc"); break;
-            case 16: mask = maskFor("Rc"); break;
-            case 17: mask = maskFor("Ltf"); break;
-            case 18: mask = maskFor("Rtf"); break;
-            case 19: mask = maskFor("Tfc"); break;
-            case 20: mask = maskFor("Tm"); break;
-            case 21: mask = maskFor("Ltr"); break;
-            case 22: mask = maskFor("Rtr"); break;
-            case 23: mask = maskFor("Trc"); break;
-            case 24: mask = maskFor("Lts"); break;
-            case 25: mask = maskFor("Rts"); break;
-            case 26: mask = maskFor("Lw"); break;
-            case 27: mask = maskFor("Rw"); break;
-            case 28: mask = maskFor("LFE2"); break;
-            case 29: mask = maskFor("Bfl"); break;
-            case 30: mask = maskFor("Bfr"); break;
-            case 31: mask = maskFor("Bfc"); break;
-            case 32: mask = maskForPair("Ls", "Rs"); break;
-            case 33: mask = maskForPair("Lrs", "Rrs"); break;
-            case 34: mask = maskForPair("Lc", "Rc"); break;
-            case 35: mask = maskForPair("Ltf", "Rtf"); break;
-            case 36: mask = maskForPair("Ltr", "Rtr"); break;
-            case 37: mask = maskForPair("Lts", "Rts"); break;
-            case 38: mask = maskForPair("Lw", "Rw"); break;
-            case 39: mask = maskForPair("Bfl", "Bfr"); break;
-            default:
-                mask = maskAll;
-                break;
-        }
-
-        msTargets[band] = msTarget;
-        bandChannelMasks[band] = mask;
-    }
-
-    const int phaseMode = phaseModeParam != nullptr
-        ? static_cast<int>(phaseModeParam->load())
-        : 0;
-
-    const bool useOversampling = (phaseMode == 0 && oversamplingIndex > 0 && oversampler != nullptr);
-    bool characterApplied = false;
-    if (useOversampling)
-    {
-        auto block = juce::dsp::AudioBlock<float>(buffer);
-        auto upBlock = oversampler->processSamplesUp(block);
-        const int upSamples = static_cast<int>(upBlock.getNumSamples());
-        const int channels = juce::jmin(buffer.getNumChannels(), oversampledBuffer.getNumChannels());
-
-        for (int ch = 0; ch < channels; ++ch)
-            juce::FloatVectorOperations::copy(oversampledBuffer.getWritePointer(ch),
-                                              upBlock.getChannelPointer(ch), upSamples);
-
-        eqDspOversampled.setMsTargets(msTargets);
-        eqDspOversampled.setBandChannelMasks(bandChannelMasks);
-        eqDspOversampled.process(oversampledBuffer, nullptr);
-
-
-        const int characterMode = characterModeParam != nullptr
-            ? static_cast<int>(characterModeParam->load())
-            : 0;
-        if (characterMode > 0)
-        {
-            const float drive = (characterMode == 1) ? 1.5f : 2.5f;
-            const float norm = std::tanh(drive);
-            for (int ch = 0; ch < channels; ++ch)
-            {
-                auto* data = oversampledBuffer.getWritePointer(ch);
-                for (int i = 0; i < upSamples; ++i)
-                {
-                    const float x = data[i] * drive;
-                    data[i] = std::tanh(x) / norm;
-                }
-            }
-            characterApplied = true;
-        }
-
-        for (int ch = 0; ch < channels; ++ch)
-            juce::FloatVectorOperations::copy(upBlock.getChannelPointer(ch),
-                                              oversampledBuffer.getReadPointer(ch), upSamples);
-
-        oversampler->processSamplesDown(block);
-    }
-    else if (phaseMode == 0)
-    {
-        eqDsp.setMsTargets(msTargets);
-        eqDsp.setBandChannelMasks(bandChannelMasks);
-        eqDsp.process(buffer, detectorBuffer);
-    }
-    else
-    {
-        const bool useMs = numChannels >= 2
-            && std::any_of(msTargets.begin(), msTargets.end(), [](int v) { return v != 0; });
-
-        if (useMs)
-        {
-            auto* left = buffer.getWritePointer(0);
-            auto* right = buffer.getWritePointer(1);
-            const int samples = buffer.getNumSamples();
-
-            for (int i = 0; i < samples; ++i)
-            {
-                const float mid = 0.5f * (left[i] + right[i]);
-                const float side = 0.5f * (left[i] - right[i]);
-                left[i] = mid;
-                right[i] = side;
-            }
-
-            linearPhaseMsEq.processRange(buffer, 0, 2);
-
-            for (int i = 0; i < samples; ++i)
-            {
-                const float mid = left[i];
-                const float side = right[i];
-                left[i] = mid + side;
-                right[i] = mid - side;
-            }
-
-            linearPhaseEq.processRange(buffer, 0, 2);
-
-            if (numChannels > 2)
-                linearPhaseEq.processRange(buffer, 2, numChannels - 2);
-        }
-        else
-        {
-            linearPhaseEq.process(buffer);
-        }
-    }
-
-
-    const bool spectralEnabled = spectralEnableParam != nullptr
-        && spectralEnableParam->load() > 0.5f;
-    spectralDsp.setEnabled(spectralEnabled);
-    if (spectralEnabled)
-    {
-        const float threshold = spectralThresholdParam != nullptr ? spectralThresholdParam->load() : -24.0f;
-        const float ratio = spectralRatioParam != nullptr ? spectralRatioParam->load() : 2.0f;
-        const float attack = spectralAttackParam != nullptr ? spectralAttackParam->load() : 20.0f;
-        const float release = spectralReleaseParam != nullptr ? spectralReleaseParam->load() : 200.0f;
-        const float mix = spectralMixParam != nullptr ? (spectralMixParam->load() / 100.0f) : 1.0f;
-        spectralDsp.setParams(threshold, ratio, attack, release, mix);
-        spectralDsp.process(buffer);
-    }
-
-    const int characterMode = characterModeParam != nullptr
-        ? static_cast<int>(characterModeParam->load())
-        : 0;
-    if (characterMode > 0 && ! characterApplied)
-    {
-        const float drive = (characterMode == 1) ? 1.5f : 2.5f;
-        const float norm = std::tanh(drive);
-        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-        {
-            auto* data = buffer.getWritePointer(ch);
-            for (int i = 0; i < buffer.getNumSamples(); ++i)
-            {
-                const float x = data[i] * drive;
-                data[i] = std::tanh(x) / norm;
-            }
-        }
-    }
-
-    if (autoGainEnableParam != nullptr && autoGainEnableParam->load() > 0.5f)
-    {
-        float sumDb = 0.0f;
-        int count = 0;
-        for (int ch = 0; ch < numChannels; ++ch)
-        {
-            for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
-            {
-                const auto& ptrs = bandParamPointers[ch][band];
-                if (ptrs.gain == nullptr || ptrs.bypass == nullptr || ptrs.type == nullptr)
-                    continue;
-                if (ptrs.bypass->load() > 0.5f)
-                    continue;
-                const int type = static_cast<int>(ptrs.type->load());
-                if (type == static_cast<int>(eqdsp::FilterType::lowPass)
-                    || type == static_cast<int>(eqdsp::FilterType::highPass)
-                    || type == static_cast<int>(eqdsp::FilterType::allPass))
-                    continue;
-                sumDb += ptrs.gain->load();
-                ++count;
-            }
-        }
-
-        if (count > 0)
-        {
-            const float avgDb = sumDb / static_cast<float>(count);
-            const float scale = gainScaleParam != nullptr ? (gainScaleParam->load() / 100.0f) : 1.0f;
-            const float autoGainDb = juce::jlimit(-12.0f, 12.0f, -avgDb * scale);
-            buffer.applyGain(juce::Decibels::decibelsToGain(autoGainDb));
-        }
-    }
-
-    if (applyGlobalMix)
-    {
-        const int mixChannels = juce::jmin(numChannels, dryBuffer.getNumChannels());
-        for (int i = 0; i < buffer.getNumSamples(); ++i)
-        {
-            const float wet = globalMixSmoothed.getNextValue();
-            const float dryGain = 1.0f - wet;
-            for (int ch = 0; ch < mixChannels; ++ch)
-            {
-                auto* data = buffer.getWritePointer(ch);
-                const float dry = dryBuffer.getReadPointer(ch)[i];
-                data[i] = dry * dryGain + data[i] * wet;
-            }
-        }
-    }
-
-    if (phaseInvertParam != nullptr && phaseInvertParam->load() > 0.5f)
-        buffer.applyGain(-1.0f);
-
-    if (outputTrimParam != nullptr)
-    {
-        const float trimDb = outputTrimParam->load();
-        const float targetGain = juce::Decibels::decibelsToGain(trimDb);
-        outputTrimGainSmoothed.setTargetValue(targetGain);
-        if (outputTrimGainSmoothed.isSmoothing()
-            || std::abs(targetGain - 1.0f) > 0.0001f)
-        {
-            for (int i = 0; i < buffer.getNumSamples(); ++i)
-            {
-                const float gain = outputTrimGainSmoothed.getNextValue();
-                for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-                    buffer.getWritePointer(ch)[i] *= gain;
-            }
-        }
-    }
-
-    meteringDsp.process(buffer, numChannels);
-
-    if (buffer.getNumChannels() > 0)
-        analyzerPostFifo.push(buffer.getReadPointer(0), buffer.getNumSamples());
+    const int snapshotIndex = activeSnapshot.load();
+    const auto& snapshot = snapshots[snapshotIndex];
+    eqEngine.process(buffer, snapshot, detectorBuffer, analyzerPreTap, analyzerPostTap, meterTap);
 
     if (analyzerExternalParam != nullptr && analyzerExternalParam->load() > 0.5f && detectorBuffer != nullptr
         && detectorBuffer->getNumChannels() > 0)
-    {
-        analyzerExternalFifo.push(detectorBuffer->getReadPointer(0), detectorBuffer->getNumSamples());
-    }
-}
-
-juce::AudioProcessorEditor* EQProAudioProcessor::createEditor()
-{
-    return new EQProAudioProcessorEditor(*this);
+        analyzerExternalTap.push(detectorBuffer->getReadPointer(0), detectorBuffer->getNumSamples());
 }
 
 bool EQProAudioProcessor::hasEditor() const
@@ -713,17 +333,17 @@ juce::AudioProcessorValueTreeState& EQProAudioProcessor::getParameters()
 
 AudioFifo& EQProAudioProcessor::getAnalyzerPreFifo()
 {
-    return analyzerPreFifo;
+    return analyzerPreTap.getFifo();
 }
 
 AudioFifo& EQProAudioProcessor::getAnalyzerPostFifo()
 {
-    return analyzerPostFifo;
+    return analyzerPostTap.getFifo();
 }
 
 AudioFifo& EQProAudioProcessor::getAnalyzerExternalFifo()
 {
-    return analyzerExternalFifo;
+    return analyzerExternalTap.getFifo();
 }
 
 std::vector<juce::String> EQProAudioProcessor::getCurrentChannelNames() const
@@ -752,12 +372,12 @@ juce::String EQProAudioProcessor::getCurrentLayoutDescription() const
 
 eqdsp::ChannelMeterState EQProAudioProcessor::getMeterState(int channelIndex) const
 {
-    return meteringDsp.getChannelState(channelIndex);
+    return meterTap.getState(channelIndex);
 }
 
 float EQProAudioProcessor::getCorrelation() const
 {
-    return meteringDsp.getCorrelation();
+    return meterTap.getCorrelation();
 }
 
 juce::StringArray EQProAudioProcessor::getCorrelationPairNames()
@@ -966,7 +586,7 @@ int EQProAudioProcessor::getSelectedChannelIndex() const
 
 float EQProAudioProcessor::getBandDetectorDb(int channelIndex, int bandIndex) const
 {
-    return eqDsp.getDetectorDb(channelIndex, bandIndex);
+    return eqEngine.getEqDsp().getDetectorDb(channelIndex, bandIndex);
 }
 
 void EQProAudioProcessor::initializeParamPointers()
@@ -1242,134 +862,21 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 void EQProAudioProcessor::timerCallback()
 {
     cachedChannelNames = getCurrentChannelNames();
-    const int phaseMode = phaseModeParam != nullptr
-        ? static_cast<int>(phaseModeParam->load())
-        : 0;
+    const int nextIndex = 1 - activeSnapshot.load();
+    buildSnapshot(snapshots[nextIndex]);
 
-    updateOversampling();
-
-    if (phaseMode == 0)
-    {
-        setLatencySamples(0);
-        lastPhaseMode = phaseMode;
-        return;
-    }
-
-    const int quality = linearQualityParam != nullptr
-        ? static_cast<int>(linearQualityParam->load())
-        : 1;
-    const int windowIndex = linearWindowParam != nullptr
-        ? static_cast<int>(linearWindowParam->load())
-        : 0;
-
-    int taps = 256;
-    if (phaseMode == 1)
-    {
-        switch (quality)
-        {
-            case 0: taps = 128; break;
-            case 1: taps = 256; break;
-            case 2: taps = 512; break;
-            case 3: taps = 1024; break;
-            case 4: taps = 2048; break;
-            default: taps = 256; break;
-        }
-    }
-    else
-    {
-        switch (quality)
-        {
-            case 0: taps = 512; break;
-            case 1: taps = 1024; break;
-            case 2: taps = 2048; break;
-            case 3: taps = 4096; break;
-            case 4: taps = 8192; break;
-            default: taps = 1024; break;
-        }
-    }
-
-    const int channels = getTotalNumInputChannels();
     const auto sampleRate = getSampleRate();
-    if (sampleRate <= 0.0)
-        return;
-
-    for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+    if (sampleRate > 0.0)
     {
-        if (bandParamPointers[0][band].msTarget != nullptr)
-            lastMsTargets[band] = static_cast<int>(bandParamPointers[0][band].msTarget->load());
-        else
-            lastMsTargets[band] = 0;
+        eqEngine.updateLinearPhase(snapshots[nextIndex], sampleRate);
+        setLatencySamples(eqEngine.getLatencySamples());
     }
 
-    const uint64_t hash = computeParamsHash(channels);
-    if (hash == lastParamHash && taps == lastTaps && phaseMode == lastPhaseMode
-        && quality == lastLinearQuality && windowIndex == lastWindowIndex)
-        return;
-
-    int headSize = 0;
-    if (phaseMode == 1)
-        headSize = taps / 2;
-    else
-    {
-        switch (quality)
-        {
-            case 0: headSize = 128; break;
-            case 1: headSize = 256; break;
-            case 2: headSize = 512; break;
-            case 3: headSize = 1024; break;
-            case 4: headSize = 2048; break;
-            default: headSize = 256; break;
-        }
-    }
-
-    linearPhaseEq.configurePartitioning(headSize);
-    linearPhaseMsEq.configurePartitioning(headSize);
-
-    rebuildLinearPhase(taps, sampleRate, channels);
-    lastParamHash = hash;
-    lastTaps = taps;
-    lastPhaseMode = phaseMode;
-    lastLinearQuality = quality;
-    lastWindowIndex = windowIndex;
+    activeSnapshot.store(nextIndex);
 }
 
-uint64_t EQProAudioProcessor::computeParamsHash(int channels) const
-{
-    auto hash = uint64_t { 1469598103934665603ull };
-    const auto hashFloat = [&hash](float value)
-    {
-        uint32_t bits = 0;
-        std::memcpy(&bits, &value, sizeof(bits));
-        hash ^= bits;
-        hash *= 1099511628211ull;
-    };
 
-    for (int ch = 0; ch < channels; ++ch)
-    {
-        for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
-        {
-            const auto& ptrs = bandParamPointers[ch][band];
-            if (ptrs.frequency == nullptr)
-                continue;
-
-            hashFloat(ptrs.frequency->load());
-            hashFloat(ptrs.gain->load());
-            hashFloat(ptrs.q->load());
-            hashFloat(ptrs.type->load());
-            hashFloat(ptrs.bypass->load());
-            if (ptrs.mix != nullptr)
-                hashFloat(ptrs.mix->load());
-            if (ptrs.slope != nullptr)
-                hashFloat(ptrs.slope->load());
-
-            if (ch == 0 && ptrs.msTarget != nullptr)
-                hashFloat(ptrs.msTarget->load());
-        }
-    }
-
-    return hash;
-}
-
+#if 0
 void EQProAudioProcessor::rebuildLinearPhase(int taps, double sampleRate, int channels)
 {
     const int fftSize = juce::nextPowerOfTwo(taps * 2);
@@ -1749,4 +1256,138 @@ void EQProAudioProcessor::updateOversampling()
 
     eqDspOversampled.prepare(lastSampleRate * upFactor, lastMaxBlockSize * upFactor, channels);
     eqDspOversampled.reset();
+}
+#endif
+
+void EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
+{
+    const int numChannels = juce::jmin(getTotalNumInputChannels(), ParamIDs::kMaxChannels);
+    snapshot.numChannels = numChannels;
+    snapshot.globalBypass = globalBypassParam != nullptr && globalBypassParam->load() > 0.5f;
+    snapshot.globalMix = globalMixParam != nullptr ? (globalMixParam->load() / 100.0f) : 1.0f;
+    snapshot.phaseMode = phaseModeParam != nullptr ? static_cast<int>(phaseModeParam->load()) : 0;
+    snapshot.linearQuality = linearQualityParam != nullptr ? static_cast<int>(linearQualityParam->load()) : 1;
+    snapshot.linearWindow = linearWindowParam != nullptr ? static_cast<int>(linearWindowParam->load()) : 0;
+    snapshot.oversampling = oversamplingParam != nullptr ? static_cast<int>(oversamplingParam->load()) : 0;
+    snapshot.outputTrimDb = outputTrimParam != nullptr ? outputTrimParam->load() : 0.0f;
+    snapshot.characterMode = characterModeParam != nullptr ? static_cast<int>(characterModeParam->load()) : 0;
+    snapshot.smartSolo = smartSoloParam != nullptr && smartSoloParam->load() > 0.5f;
+    snapshot.qMode = qModeParam != nullptr ? static_cast<int>(qModeParam->load()) : 0;
+    snapshot.qModeAmount = qModeAmountParam != nullptr ? qModeAmountParam->load() : 50.0f;
+    snapshot.spectralEnabled = spectralEnableParam != nullptr && spectralEnableParam->load() > 0.5f;
+    snapshot.spectralThresholdDb = spectralThresholdParam != nullptr ? spectralThresholdParam->load() : -24.0f;
+    snapshot.spectralRatio = spectralRatioParam != nullptr ? spectralRatioParam->load() : 2.0f;
+    snapshot.spectralAttackMs = spectralAttackParam != nullptr ? spectralAttackParam->load() : 20.0f;
+    snapshot.spectralReleaseMs = spectralReleaseParam != nullptr ? spectralReleaseParam->load() : 200.0f;
+    snapshot.spectralMix = spectralMixParam != nullptr ? (spectralMixParam->load() / 100.0f) : 1.0f;
+    snapshot.autoGainEnabled = autoGainEnableParam != nullptr && autoGainEnableParam->load() > 0.5f;
+    snapshot.gainScale = gainScaleParam != nullptr ? (gainScaleParam->load() / 100.0f) : 1.0f;
+    snapshot.phaseInvert = phaseInvertParam != nullptr && phaseInvertParam->load() > 0.5f;
+
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+        {
+            const auto& ptrs = bandParamPointers[ch][band];
+            auto& dst = snapshot.bands[ch][band];
+            if (ptrs.frequency != nullptr)
+                dst.frequencyHz = ptrs.frequency->load();
+            if (ptrs.gain != nullptr)
+                dst.gainDb = ptrs.gain->load();
+            if (ptrs.q != nullptr)
+                dst.q = ptrs.q->load();
+            if (ptrs.type != nullptr)
+                dst.type = static_cast<int>(ptrs.type->load());
+            dst.bypassed = ptrs.bypass != nullptr && ptrs.bypass->load() > 0.5f;
+            dst.msTarget = ptrs.msTarget != nullptr ? static_cast<int>(ptrs.msTarget->load()) : 0;
+            dst.slopeDb = ptrs.slope != nullptr ? ptrs.slope->load() : 12.0f;
+            dst.solo = ptrs.solo != nullptr && ptrs.solo->load() > 0.5f;
+            dst.mix = ptrs.mix != nullptr ? (ptrs.mix->load() / 100.0f) : 1.0f;
+            dst.dynEnabled = ptrs.dynEnable != nullptr && ptrs.dynEnable->load() > 0.5f;
+            dst.dynMode = ptrs.dynMode != nullptr ? static_cast<int>(ptrs.dynMode->load()) : 0;
+            dst.dynThresholdDb = ptrs.dynThreshold != nullptr ? ptrs.dynThreshold->load() : -24.0f;
+            dst.dynAttackMs = ptrs.dynAttack != nullptr ? ptrs.dynAttack->load() : 20.0f;
+            dst.dynReleaseMs = ptrs.dynRelease != nullptr ? ptrs.dynRelease->load() : 200.0f;
+            dst.dynAuto = ptrs.dynAuto != nullptr && ptrs.dynAuto->load() > 0.5f;
+        }
+    }
+
+    snapshot.msTargets.fill(0);
+    snapshot.bandChannelMasks.fill(0);
+    const uint32_t maskAll = (numChannels >= 32)
+        ? 0xFFFFFFFFu
+        : (numChannels > 0 ? ((1u << static_cast<uint32_t>(numChannels)) - 1u) : 0u);
+
+    const auto& channelNames = cachedChannelNames;
+    auto findIndex = [&channelNames](const juce::String& name) -> int
+    {
+        for (int i = 0; i < static_cast<int>(channelNames.size()); ++i)
+            if (channelNames[static_cast<size_t>(i)] == name)
+                return i;
+        return -1;
+    };
+    auto maskFor = [&](const juce::String& name) -> uint32_t
+    {
+        const int idx = findIndex(name);
+        return idx >= 0 ? (1u << static_cast<uint32_t>(idx)) : 0u;
+    };
+    auto maskForPair = [&](const juce::String& left, const juce::String& right) -> uint32_t
+    {
+        return maskFor(left) | maskFor(right);
+    };
+
+    for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+    {
+        const int target = snapshot.bands[0][band].msTarget;
+        int msTarget = 0;
+        uint32_t mask = maskAll;
+
+        switch (target)
+        {
+            case 0: mask = maskAll; break;
+            case 1: msTarget = 1; mask = maskForPair("L", "R"); break;
+            case 2: msTarget = 2; mask = maskForPair("L", "R"); break;
+            case 3: mask = maskForPair("L", "R"); break;
+            case 4: mask = maskFor("L"); break;
+            case 5: mask = maskFor("R"); break;
+            case 6: msTarget = 1; mask = maskForPair("L", "R"); break;
+            case 7: mask = maskFor("L"); break;
+            case 8: mask = maskFor("R"); break;
+            case 9: mask = maskFor("C"); break;
+            case 10: mask = maskFor("LFE"); break;
+            case 11: mask = maskFor("Ls"); break;
+            case 12: mask = maskFor("Rs"); break;
+            case 13: mask = maskFor("Lrs"); break;
+            case 14: mask = maskFor("Rrs"); break;
+            case 15: mask = maskFor("Lc"); break;
+            case 16: mask = maskFor("Rc"); break;
+            case 17: mask = maskFor("Ltf"); break;
+            case 18: mask = maskFor("Rtf"); break;
+            case 19: mask = maskFor("Tfc"); break;
+            case 20: mask = maskFor("Tm"); break;
+            case 21: mask = maskFor("Ltr"); break;
+            case 22: mask = maskFor("Rtr"); break;
+            case 23: mask = maskFor("Trc"); break;
+            case 24: mask = maskFor("Lts"); break;
+            case 25: mask = maskFor("Rts"); break;
+            case 26: mask = maskFor("Lw"); break;
+            case 27: mask = maskFor("Rw"); break;
+            case 28: mask = maskFor("LFE2"); break;
+            case 29: mask = maskFor("Bfl"); break;
+            case 30: mask = maskFor("Bfr"); break;
+            case 31: mask = maskFor("Bfc"); break;
+            case 32: mask = maskForPair("Ls", "Rs"); break;
+            case 33: mask = maskForPair("Lrs", "Rrs"); break;
+            case 34: mask = maskForPair("Lc", "Rc"); break;
+            case 35: mask = maskForPair("Ltf", "Rtf"); break;
+            case 36: mask = maskForPair("Ltr", "Rtr"); break;
+            case 37: mask = maskForPair("Lts", "Rts"); break;
+            case 38: mask = maskForPair("Lw", "Rw"); break;
+            case 39: mask = maskForPair("Bfl", "Bfr"); break;
+            default: mask = maskAll; break;
+        }
+
+        snapshot.msTargets[band] = msTarget;
+        snapshot.bandChannelMasks[band] = mask;
+    }
 }

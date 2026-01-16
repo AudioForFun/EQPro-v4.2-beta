@@ -180,8 +180,6 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     typeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     typeBox.setColour(juce::ComboBox::textColourId, theme.text);
     typeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    typeBox.setItemHeight(20);
-    typeBox.setMinimumNumDisplayRows(juce::jmin(8, kFilterTypeChoices.size()));
     typeBox.onChange = [this]
     {
         const int index = typeBox.getSelectedItemIndex();
@@ -196,8 +194,6 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     modeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     modeBox.setColour(juce::ComboBox::textColourId, theme.text);
     modeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    modeBox.setItemHeight(20);
-    modeBox.setMinimumNumDisplayRows(3);
     modeBox.onChange = [this]
     {
         const int index = modeBox.getSelectedItemIndex();
@@ -222,8 +218,6 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     msBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     msBox.setColour(juce::ComboBox::textColourId, theme.text);
     msBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    msBox.setItemHeight(20);
-    msBox.setMinimumNumDisplayRows(8);
     addAndMakeVisible(msBox);
     msBox.onChange = [this]
     {
@@ -246,8 +240,6 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     slopeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     slopeBox.setColour(juce::ComboBox::textColourId, theme.text);
     slopeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    slopeBox.setItemHeight(20);
-    slopeBox.setMinimumNumDisplayRows(8);
     slopeBox.onChange = [this]
     {
         const int index = slopeBox.getSelectedItemIndex();
@@ -417,7 +409,6 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     attackSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
     releaseSlider.setColour(juce::Slider::textBoxTextColourId, theme.text);
     releaseSlider.setColour(juce::Slider::textBoxOutlineColourId, theme.panelOutline);
-    bypassButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     copyButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     pasteButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     deleteButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
@@ -431,7 +422,6 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
         button.setColour(juce::TextButton::textColourOffId, colour.withAlpha(0.9f));
         button.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
     }
-    soloButton.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     tiltDirToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     dynEnableToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     dynUpButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
@@ -826,7 +816,6 @@ void BandControlsPanel::updateMsChoices()
 
     msBox.clear(juce::dontSendNotification);
     msBox.addItemList(labels, 1);
-    msBox.setMinimumNumDisplayRows(juce::jmin(8, labels.size()));
 }
 
 void BandControlsPanel::syncMsSelectionFromParam()
@@ -861,12 +850,12 @@ void BandControlsPanel::copyBandState()
     state.gain = static_cast<float>(gainSlider.getValue());
     state.q = static_cast<float>(qSlider.getValue());
     state.type = static_cast<float>(getCurrentTypeIndex());
-    state.bypass = bypassButton.getToggleState() ? 1.0f : 0.0f;
+    state.bypass = (modeBox.getSelectedItemIndex() == 2) ? 1.0f : 0.0f;
     state.ms = static_cast<float>(getMsParamValue());
     const auto slopeId = ParamIDs::bandParamId(selectedChannel, selectedBand, "slope");
     if (auto* param = parameters.getParameter(slopeId))
         state.slope = param->convertFrom0to1(param->getValue());
-    state.solo = soloButton.getToggleState() ? 1.0f : 0.0f;
+    state.solo = (modeBox.getSelectedItemIndex() == 1) ? 1.0f : 0.0f;
     state.mix = static_cast<float>(mixSlider.getValue());
     state.dynEnable = dynEnableToggle.getToggleState() ? 1.0f : 0.0f;
     state.dynMode = dynUpButton.getToggleState() ? 0.0f : 1.0f;

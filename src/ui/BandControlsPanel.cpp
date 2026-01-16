@@ -470,7 +470,7 @@ void BandControlsPanel::resized()
     const int knobRowHeight = 132;
     const int knobSize = juce::jmin(96, knobRowHeight - labelHeight - 6);
 
-    auto left = bounds.removeFromLeft(static_cast<int>(bounds.getWidth() * 0.70f));
+    auto left = bounds.removeFromLeft(static_cast<int>(bounds.getWidth() * 0.62f));
     auto right = bounds;
 
     auto headerRow = left.removeFromTop(rowHeight);
@@ -543,10 +543,10 @@ void BandControlsPanel::resized()
     auto dynHeader = right.removeFromTop(labelHeight);
     dynamicLabel.setBounds(dynHeader);
     auto dynRow = right.removeFromTop(rowHeight);
-    dynEnableToggle.setBounds(dynRow.removeFromLeft(90));
-    dynUpButton.setBounds(dynRow.removeFromLeft(50));
-    dynDownButton.setBounds(dynRow.removeFromLeft(60));
-    autoScaleToggle.setBounds(dynRow.removeFromLeft(90));
+    dynEnableToggle.setBounds(dynRow.removeFromLeft(96));
+    dynUpButton.setBounds(dynRow.removeFromLeft(54));
+    dynDownButton.setBounds(dynRow.removeFromLeft(64));
+    autoScaleToggle.setBounds(dynRow.removeFromLeft(96));
     dynExternalToggle.setBounds(dynRow);
 
     right.removeFromTop(4);

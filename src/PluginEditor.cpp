@@ -1160,7 +1160,9 @@ bool EQProAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
 
 void EQProAudioProcessorEditor::resized()
 {
-    const float uiScale = juce::jlimit(0.8f, 2.5f, getWidth() / static_cast<float>(kEditorWidth));
+    const float scaleX = getWidth() / static_cast<float>(kEditorWidth);
+    const float scaleY = getHeight() / static_cast<float>(kEditorHeight);
+    const float uiScale = juce::jlimit(0.6f, 2.5f, std::min(scaleX, scaleY));
     analyzer.setUiScale(uiScale);
     const int margin = static_cast<int>(kOuterMargin * uiScale);
     auto bounds = getLocalBounds().reduced(margin);

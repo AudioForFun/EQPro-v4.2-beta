@@ -16,5 +16,7 @@ cmake --build build --config Release
 ## Notes
 - VST3/AU/Standalone targets are enabled in `CMakeLists.txt`.
 - Change `JUCE_DIR` in `CMakeLists.txt` or pass `-DJUCE_DIR=...` when configuring.
+- Standalone startup log: `%TEMP%\\EQPro_startup_*.log`.
+- Standalone state restore is disabled by default; set `EQPRO_LOAD_STATE=1` to enable.
 
 

@@ -18,6 +18,7 @@
 ## Band Controls
 - Per-band: Frequency, Gain, Q, Mix, Filter Type (dropdown), Slope (dropdown).
 - Band Mix is parallel dry/wet per band (dry + wet delta).
+- FFT display ignores Band Mix so the curve represents the band filter only.
 - Routing: All/Mid/Side/Left/Right plus immersive channels/pairs.
 - Channel options are filtered to the current host layout and refresh on layout change.
 - Channel selector sits under the rotary row (not inside Dynamic section).

@@ -43,6 +43,8 @@ Notes:
 - No heap allocations in `process`.
 - Uses `ParamSnapshot` exclusively for parameters.
 - Global dry/wet mix uses an internal delay line to align dry with linear-phase latency.
+- Startup diagnostics write a log to `%TEMP%\\EQPro_startup_*.log`.
+- Standalone state restore is disabled by default; set `EQPRO_LOAD_STATE=1` to enable.
 
 ### `eqdsp::AnalyzerTap`
 Location: `src/dsp/AnalyzerTap.h/.cpp`  

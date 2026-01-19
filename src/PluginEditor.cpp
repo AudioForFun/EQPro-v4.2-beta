@@ -966,6 +966,18 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     setResizeLimits(kEditorWidth, kEditorHeight, kEditorWidth, kEditorHeight);
 
     setSize(kEditorWidth, kEditorHeight);
+
+    if (juce::JUCEApplicationBase::isStandaloneApp())
+    {
+        auto& desktop = juce::Desktop::getInstance();
+        const auto display = desktop.getDisplays().getMainDisplay();
+        const auto area = display.userArea;
+        const int targetW = juce::jmin(kEditorWidth, area.getWidth());
+        const int targetH = juce::jmin(kEditorHeight, area.getHeight());
+        setBounds(area.withSizeKeepingCentre(targetW, targetH));
+        setVisible(true);
+        toFront(true);
+    }
 }
 
 EQProSafeEditor::EQProSafeEditor(EQProAudioProcessor& p)
@@ -977,6 +989,17 @@ EQProSafeEditor::EQProSafeEditor(EQProAudioProcessor& p)
     infoLabel.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(infoLabel);
     setSize(520, 160);
+
+    if (juce::JUCEApplicationBase::isStandaloneApp())
+    {
+        auto& desktop = juce::Desktop::getInstance();
+        const auto display = desktop.getDisplays().getMainDisplay();
+        const auto area = display.userArea;
+        setBounds(area.withSizeKeepingCentre(getWidth(), getHeight()));
+        setAlwaysOnTop(true);
+        setVisible(true);
+        toFront(true);
+    }
 }
 
 void EQProSafeEditor::paint(juce::Graphics& g)
@@ -1013,6 +1036,8 @@ void EQProAudioProcessorEditor::timerCallback()
                 top->setAlwaysOnTop(true);
                 top->setVisible(true);
                 top->toFront(true);
+                if (auto* peer = top->getPeer())
+                    peer->setMinimised(false);
             }
             if (windowRescueTicks > 10)
             {

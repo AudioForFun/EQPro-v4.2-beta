@@ -44,11 +44,16 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
 {
     setLookAndFeel(&lookAndFeel);
     setWantsKeyboardFocus(true);
-    openGLContext.setContinuousRepainting(false);
-    openGLContext.setComponentPaintingEnabled(true);
-    openGLContext.setMultisamplingEnabled(true);
-    openGLContext.setSwapInterval(1);
-    openGLContext.attachTo(*this);
+    const bool enableOpenGL = juce::SystemStats::getEnvironmentVariable("EQPRO_OPENGL", "0")
+                                  .getIntValue() != 0;
+    if (enableOpenGL)
+    {
+        openGLContext.setContinuousRepainting(false);
+        openGLContext.setComponentPaintingEnabled(true);
+        openGLContext.setMultisamplingEnabled(true);
+        openGLContext.setSwapInterval(1);
+        openGLContext.attachTo(*this);
+    }
     analyzer.setInteractive(false);
     backgroundNoise = makeNoiseImage(128);
     startTimerHz(2);
@@ -73,7 +78,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         std::make_unique<ButtonAttachment>(processorRef.getParameters(), ParamIDs::globalBypass,
                                            globalBypassButton);
 
-    globalMixLabel.setText("Para General Mix", juce::dontSendNotification);
+    globalMixLabel.setText("Global Mix", juce::dontSendNotification);
     globalMixLabel.setJustificationType(juce::Justification::centredLeft);
     globalMixLabel.setFont(kLabelFontSize);
     globalMixLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
@@ -1130,7 +1135,8 @@ void EQProAudioProcessorEditor::resized()
     globalBypassButton.setBounds(topBar.removeFromLeft(globalBypassWidth)
                                      .withSizeKeepingCentre(globalBypassWidth, globalBypassHeight));
     topBar.removeFromLeft(static_cast<int>(12 * uiScale));
-    const int mixLabelWidth = static_cast<int>(36 * uiScale);
+    const int mixLabelWidth = static_cast<int>(
+        globalMixLabel.getFont().getStringWidthFloat(globalMixLabel.getText()) + 10 * uiScale);
     globalMixLabel.setBounds(topBar.removeFromLeft(mixLabelWidth)
                                  .withSizeKeepingCentre(mixLabelWidth, globalBypassHeight));
     const int mixSliderWidth = static_cast<int>(140 * uiScale);

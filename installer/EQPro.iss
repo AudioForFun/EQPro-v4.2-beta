@@ -1,8 +1,8 @@
 #define MyAppName "EQ Pro"
-#define MyAppVersion "2.2.0-beta"
+#define MyAppVersion "2.4.0-beta"
 #define MyAppPublisher "DidAudio"
 #define MyAppURL "https://github.com/AudioForFun/EQPro"
-#define BuildDir "C:\Users\Did\Desktop\DID CURSOR Projects\EQ\build\EQPro_artefacts\Release"
+#define BuildDir "..\build\EQPro_artefacts\Release"
 
 [Setup]
 AppId={{D0D4C7A2-0C42-4E3D-9A20-4E6F25B4F2E1}
@@ -41,4 +41,5 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\EQ Pro.exe"; Tasks: desktop
 
 [Run]
 Filename: "{app}\EQ Pro.exe"; Description: "Launch EQ Pro"; Flags: nowait postinstall skipifsilent
+
 

@@ -43,6 +43,10 @@ private:
     SpectralDynamicsDSP spectralDsp;
 
     juce::AudioBuffer<float> dryBuffer;
+    juce::AudioBuffer<float> dryDelayBuffer;
+    int dryDelayWritePos = 0;
+    int mixDelaySamples = 0;
+    int maxDelaySamples = 8192;
     juce::AudioBuffer<float> oversampledBuffer;
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;
 
@@ -50,6 +54,7 @@ private:
     juce::SmoothedValue<float> outputTrimGainSmoothed;
 
     int oversamplingIndex = 0;
+    int maxPreparedBlockSize = 0;
     double sampleRateHz = 48000.0;
     int meterSkipFactor = 1;
     int meterSkipCounter = 0;
@@ -68,5 +73,8 @@ private:
     std::vector<float> firImpulse;
     std::unique_ptr<juce::dsp::WindowingFunction<float>> firWindow;
     int firWindowMethod = -1;
+
+    void updateDryDelay(int latencySamples, int maxBlockSize, int numChannels);
+    void applyDryDelay(juce::AudioBuffer<float>& dry, int numSamples, int delaySamples);
 };
 } // namespace eqdsp

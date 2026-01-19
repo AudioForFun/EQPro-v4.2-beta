@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(EQPro VERSION 2.2.0)
+project(EQPro VERSION 2.4.0)
 
 # Set this to your local JUCE path or pass -DJUCE_DIR=... when configuring.
 if (NOT DEFINED JUCE_DIR)
@@ -86,7 +86,7 @@ target_compile_definitions(EQPro PUBLIC
     JUCE_USE_CURL=0
     JUCE_IGNORE_VST3_MISMATCHED_PARAMETER_ID_WARNING=1
     EQPRO_VERSION="${PROJECT_VERSION}"
-    EQPRO_ITERATION="2.2 beta"
+    EQPRO_ITERATION="2.4 beta"
 )
 
 target_link_libraries(EQPro PRIVATE
@@ -99,4 +99,5 @@ target_link_libraries(EQPro PRIVATE
 target_include_directories(EQPro PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/EQPro_artefacts/JuceLibraryCode
 )
+
 

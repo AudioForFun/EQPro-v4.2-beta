@@ -261,6 +261,32 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
     if (! eqCurveDb.empty())
     {
+        const float curveFloor = kAnalyzerMinDb + 2.0f;
+        auto buildCurvePath = [&](const std::vector<float>& curve, juce::Path& path)
+        {
+            bool started = false;
+            for (int x = 0; x < static_cast<int>(curve.size()); ++x)
+            {
+                const float db = curve[static_cast<size_t>(x)];
+                if (db <= curveFloor)
+                {
+                    started = false;
+                    continue;
+                }
+                const float px = plotArea.getX() + static_cast<float>(x);
+                const float py = gainToY(db);
+                if (! started)
+                {
+                    path.startNewSubPath(px, py);
+                    started = true;
+                }
+                else
+                {
+                    path.lineTo(px, py);
+                }
+            }
+        };
+
         for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
         {
             if (band >= static_cast<int>(perBandCurveDb.size()))
@@ -273,11 +299,9 @@ void AnalyzerComponent::paint(juce::Graphics& g)
                 continue;
 
             juce::Path bandPath;
-            bandPath.startNewSubPath(plotArea.getX(),
-                                     gainToY(curve.front()));
-            for (int x = 1; x < static_cast<int>(curve.size()); ++x)
-                bandPath.lineTo(plotArea.getX() + x,
-                                gainToY(curve[static_cast<size_t>(x)]));
+            buildCurvePath(curve, bandPath);
+            if (bandPath.isEmpty())
+                continue;
 
             const auto bandColour = ColorUtils::bandColour(band);
             const bool isSelected = band == selectedBand;
@@ -286,31 +310,48 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         }
 
         juce::Path eqPath;
-        eqPath.startNewSubPath(plotArea.getX(),
-                               gainToY(eqCurveDb.front()));
-
-        for (int x = 1; x < static_cast<int>(eqCurveDb.size()); ++x)
-            eqPath.lineTo(plotArea.getX() + x,
-                          gainToY(eqCurveDb[static_cast<size_t>(x)]));
-
-        g.setColour(theme.text.withAlpha(0.25f));
-        g.strokePath(eqPath, juce::PathStrokeType(3.2f * scale));
-        g.setColour(theme.text.withAlpha(0.85f));
-        g.strokePath(eqPath, juce::PathStrokeType(1.8f * scale));
+        buildCurvePath(eqCurveDb, eqPath);
+        if (! eqPath.isEmpty())
+        {
+            g.setColour(theme.text.withAlpha(0.25f));
+            g.strokePath(eqPath, juce::PathStrokeType(3.2f * scale));
+            g.setColour(theme.text.withAlpha(0.85f));
+            g.strokePath(eqPath, juce::PathStrokeType(1.8f * scale));
+        }
     }
 
     if (! selectedBandCurveDb.empty())
     {
+        const float curveFloor = kAnalyzerMinDb + 2.0f;
         juce::Path bandPath;
-        bandPath.startNewSubPath(plotArea.getX(),
-                                 gainToY(selectedBandCurveDb.front()));
-        for (int x = 1; x < static_cast<int>(selectedBandCurveDb.size()); ++x)
-            bandPath.lineTo(plotArea.getX() + x,
-                            gainToY(selectedBandCurveDb[static_cast<size_t>(x)]));
+        bool started = false;
+        for (int x = 0; x < static_cast<int>(selectedBandCurveDb.size()); ++x)
+        {
+            const float db = selectedBandCurveDb[static_cast<size_t>(x)];
+            if (db <= curveFloor)
+            {
+                started = false;
+                continue;
+            }
+            const float px = plotArea.getX() + static_cast<float>(x);
+            const float py = gainToY(db);
+            if (! started)
+            {
+                bandPath.startNewSubPath(px, py);
+                started = true;
+            }
+            else
+            {
+                bandPath.lineTo(px, py);
+            }
+        }
 
-        const auto bandColour = ColorUtils::bandColour(selectedBand);
-        g.setColour(bandColour.withAlpha(0.85f));
-        g.strokePath(bandPath, juce::PathStrokeType(1.5f));
+        if (! bandPath.isEmpty())
+        {
+            const auto bandColour = ColorUtils::bandColour(selectedBand);
+            g.setColour(bandColour.withAlpha(0.85f));
+            g.strokePath(bandPath, juce::PathStrokeType(1.5f));
+        }
     }
 
     bandPoints.clear();
@@ -415,29 +456,22 @@ void AnalyzerComponent::paint(juce::Graphics& g)
             g.setFont(juce::Font((isSelected ? 14.0f : 13.0f) * scale, juce::Font::bold));
             const float labelW = 26.0f * scale;
             const float labelH = 16.0f * scale;
+            const float yJitter = (static_cast<float>((band % 5) - 2) * 0.35f) * labelH;
+
             juce::Rectangle<float> labelRect(point.x + radius + 2.0f * scale,
-                                             point.y - 7.0f * scale,
+                                             point.y - labelH * 0.5f + yJitter,
                                              labelW, labelH);
-            const float offsetStep = labelH;
-            const int offsets[] { 0, -1, 1, -2, 2, -3, 3 };
-            for (int offset : offsets)
-            {
-                auto candidate = labelRect;
-                candidate.setY(labelRect.getY() + offset * offsetStep);
-                candidate.setY(juce::jlimit(static_cast<float>(plotArea.getY()),
-                                            static_cast<float>(plotArea.getBottom()) - labelH,
-                                            candidate.getY()));
-                const bool overlaps = std::any_of(labelRects.begin(), labelRects.end(),
-                                                  [&candidate](const juce::Rectangle<float>& other)
-                                                  {
-                                                      return candidate.intersects(other);
-                                                  });
-                if (! overlaps)
-                {
-                    labelRect = candidate;
-                    break;
-                }
-            }
+
+            if (labelRect.getRight() > plotArea.getRight())
+                labelRect.setX(point.x - radius - 2.0f * scale - labelW);
+
+            labelRect.setX(juce::jlimit(static_cast<float>(plotArea.getX()),
+                                        static_cast<float>(plotArea.getRight()) - labelW,
+                                        labelRect.getX()));
+            labelRect.setY(juce::jlimit(static_cast<float>(plotArea.getY()),
+                                        static_cast<float>(plotArea.getBottom()) - labelH,
+                                        labelRect.getY()));
+
             labelRects.push_back(labelRect);
             g.drawFittedText(juce::String(band + 1),
                              labelRect.toNearestInt(),

@@ -47,6 +47,13 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
     }
 
     const auto tint = slider.findColour(juce::Slider::trackColourId);
+    if (knobFilmstrip.isValid())
+    {
+        g.setColour(tint.withAlpha(slider.isEnabled() ? 0.18f : 0.08f));
+        g.fillEllipse(bounds.reduced(1.0f));
+        g.setColour(tint.withAlpha(slider.isEnabled() ? 0.45f : 0.2f));
+        g.drawEllipse(bounds.reduced(3.0f), 1.6f);
+    }
     const float dotRadius = 1.8f;
     const int dotCount = 24;
     for (int i = 0; i < dotCount; ++i)

@@ -24,7 +24,8 @@
 - Bypass is toggled by double-clicking band buttons; active = bypass off.
 - Solo is a per-band toggle under the 1–12 band row (exclusive per channel; double-click clears).
 - Any band edit automatically un-bypasses that band.
-- Dynamic EQ: Enable, Up/Down trigger, Threshold, Attack, Release, Auto Scale + diagonal threshold display.`n- Dynamic section greys out when disabled; threshold meter is a square with a diagonal ratio line.
+- Dynamic EQ: Enable, Up/Down trigger, Threshold, Attack, Release, Auto Scale + diagonal threshold display.
+- Dynamic section greys out when disabled; threshold meter is a square with a diagonal ratio line.
 - Copy/Paste band state and Reset (no Delete).
 
 ## Processing / Global
@@ -48,4 +49,6 @@
 
 ## Resizing
 - Fixed size (1500x980).
+
+
 

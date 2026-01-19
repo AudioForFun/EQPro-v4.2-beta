@@ -2,7 +2,7 @@
 
 ## Global
 - `globalBypass` (bool)
-- `globalMix` (float, %, 0..100)
+- `globalMix` (float, %, 0..100) — dry path is latency-aligned in linear modes
 - `phaseMode` (choice)
   - Real-time
   - Natural

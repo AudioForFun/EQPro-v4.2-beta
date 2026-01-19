@@ -42,6 +42,7 @@ Notes:
 - No UI includes, no GUI dependencies.
 - No heap allocations in `process`.
 - Uses `ParamSnapshot` exclusively for parameters.
+- Global dry/wet mix uses an internal delay line to align dry with linear-phase latency.
 
 ### `eqdsp::AnalyzerTap`
 Location: `src/dsp/AnalyzerTap.h/.cpp`  

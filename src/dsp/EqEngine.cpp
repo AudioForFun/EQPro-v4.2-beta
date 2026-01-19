@@ -8,6 +8,7 @@ namespace eqdsp
 void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
 {
     sampleRateHz = sampleRate;
+    maxPreparedBlockSize = maxBlockSize;
     debugPhaseDelta = 2.0 * juce::MathConstants<double>::pi * 1000.0 / sampleRateHz;
     eqDsp.prepare(sampleRate, maxBlockSize, numChannels);
     eqDsp.reset();
@@ -20,6 +21,10 @@ void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
 
     dryBuffer.setSize(numChannels, maxBlockSize);
     dryBuffer.clear();
+    dryDelayBuffer.setSize(numChannels, maxPreparedBlockSize + maxDelaySamples + 1);
+    dryDelayBuffer.clear();
+    dryDelayWritePos = 0;
+    mixDelaySamples = 0;
     oversampledBuffer.setSize(numChannels, maxBlockSize * 4);
     oversampledBuffer.clear();
 
@@ -42,6 +47,9 @@ void EqEngine::reset()
     linearPhaseEq.reset();
     linearPhaseMsEq.reset();
     spectralDsp.reset();
+    dryDelayBuffer.clear();
+    dryDelayWritePos = 0;
+    mixDelaySamples = 0;
 }
 
 void EqEngine::process(juce::AudioBuffer<float>& buffer,
@@ -114,11 +122,16 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
         || std::abs(snapshot.globalMix - 1.0f) > 0.0001f;
     if (applyGlobalMix)
     {
+        const int latencySamples = getLatencySamples();
+        if (latencySamples > 0)
+            updateDryDelay(latencySamples, buffer.getNumSamples(), numChannels);
         const int copyChannels = juce::jmin(numChannels, dryBuffer.getNumChannels());
         for (int ch = 0; ch < copyChannels; ++ch)
             juce::FloatVectorOperations::copy(dryBuffer.getWritePointer(ch),
                                               buffer.getReadPointer(ch),
                                               buffer.getNumSamples());
+        if (latencySamples > 0)
+            applyDryDelay(dryBuffer, buffer.getNumSamples(), latencySamples);
     }
 
     for (int ch = 0; ch < numChannels; ++ch)
@@ -749,6 +762,58 @@ void EqEngine::updateOversampling(const ParamSnapshot& snapshot, double sampleRa
     oversampledBuffer.setSize(0, 0);
     juce::ignoreUnused(snapshot, sampleRate, maxBlockSize, channels);
     return;
+}
+
+void EqEngine::updateDryDelay(int latencySamples, int maxBlockSize, int numChannels)
+{
+    const int targetDelay = juce::jmax(0, latencySamples);
+    maxPreparedBlockSize = juce::jmax(maxPreparedBlockSize, maxBlockSize);
+    const int neededSize = maxPreparedBlockSize + maxDelaySamples + 1;
+    if (dryDelayBuffer.getNumChannels() != numChannels
+        || dryDelayBuffer.getNumSamples() != neededSize)
+    {
+        dryDelayBuffer.setSize(numChannels, neededSize);
+        dryDelayBuffer.clear();
+        dryDelayWritePos = 0;
+    }
+
+    if (targetDelay != mixDelaySamples)
+    {
+        mixDelaySamples = targetDelay;
+        dryDelayBuffer.clear();
+        dryDelayWritePos = 0;
+    }
+}
+
+void EqEngine::applyDryDelay(juce::AudioBuffer<float>& dry, int numSamples, int delaySamples)
+{
+    if (delaySamples <= 0)
+        return;
+
+    const int bufferSize = dryDelayBuffer.getNumSamples();
+    if (bufferSize <= 1)
+        return;
+    delaySamples = juce::jmin(delaySamples, bufferSize - 1);
+
+    int writePos = dryDelayWritePos;
+    const int channels = juce::jmin(dry.getNumChannels(), dryDelayBuffer.getNumChannels());
+    for (int ch = 0; ch < channels; ++ch)
+    {
+        auto* delayData = dryDelayBuffer.getWritePointer(ch);
+        auto* dryData = dry.getWritePointer(ch);
+        int localWrite = writePos;
+        for (int i = 0; i < numSamples; ++i)
+        {
+            delayData[localWrite] = dryData[i];
+            int readPos = localWrite - delaySamples;
+            if (readPos < 0)
+                readPos += bufferSize;
+            dryData[i] = delayData[readPos];
+            if (++localWrite >= bufferSize)
+                localWrite = 0;
+        }
+    }
+    dryDelayWritePos = (writePos + numSamples) % bufferSize;
 }
 
 EQDSP& EqEngine::getEqDsp()

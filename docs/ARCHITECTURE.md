@@ -26,6 +26,7 @@
 - Global bypass short-circuits processing.
 - Band Solo audition routes audio through a band-pass version of the selected band(s).
 - Per-band mix blends dry/wet for each band.
+- Global mix uses a dry delay line to align with linear-phase latency before summing.
 - Per-band channel targets can address all channels, M/S targets, L/R, and immersive pairs.
 - Dynamic EQ modulates per-band gain using a detector envelope (Up/Down trigger modes).
 - Output trim applies a post-processing gain stage.
@@ -58,6 +59,7 @@
 - Real-time: minimum-phase IIR (current biquad pipeline).
 - Natural: short linear-phase FIR (lower latency).
 - Linear: long linear-phase FIR with selectable quality and host latency reporting.
+- Global dry/wet alignment uses internal sample-accurate delay compensation in linear modes.
 - Linear-phase IRs are windowed (Hann) and rebuilt only when parameters change.
 - Optional oversampling parameter is present but currently disabled in the DSP path.
 - Character modes (Gentle/Warm) apply a soft saturator (oversampled when enabled).

@@ -82,8 +82,8 @@ private:
     juce::Label titleLabel;
     juce::Label eqSectionLabel;
     juce::TextButton defaultButton;
-    juce::TextButton deleteButton;
     std::array<juce::TextButton, ParamIDs::kBandsPerChannel> bandSelectButtons;
+    std::array<juce::ToggleButton, ParamIDs::kBandsPerChannel> bandSoloButtons;
     juce::Label freqLabel;
     juce::Label gainLabel;
     juce::Label qLabel;
@@ -100,8 +100,6 @@ private:
     juce::Slider mixSlider;
     juce::TextButton copyButton;
     juce::TextButton pasteButton;
-    juce::ToggleButton soloButton;
-    juce::Label dynamicLabel;
     juce::ToggleButton dynEnableToggle;
     juce::TextButton dynUpButton;
     juce::TextButton dynDownButton;
@@ -123,7 +121,6 @@ private:
     std::unique_ptr<SliderAttachment> gainAttachment;
     std::unique_ptr<SliderAttachment> qAttachment;
     std::unique_ptr<SliderAttachment> mixAttachment;
-    std::unique_ptr<ButtonAttachment> soloAttachment;
     std::unique_ptr<ButtonAttachment> dynEnableAttachment;
     std::unique_ptr<ComboBoxAttachment> dynModeAttachment;
     std::unique_ptr<SliderAttachment> dynThresholdAttachment;
@@ -140,5 +137,9 @@ private:
     std::vector<juce::String> channelNames;
     std::vector<int> msChoiceMap;
 
-    void resetSelectedBand(bool shouldBypass);
+    void resetSelectedBand();
+    void updateComboBoxWidths();
+    int comboWidthType = 0;
+    int comboWidthMs = 0;
+    int comboWidthSlope = 0;
 };

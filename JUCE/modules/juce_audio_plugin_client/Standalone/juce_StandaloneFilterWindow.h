@@ -687,7 +687,8 @@ public:
             if (displays.displays.isEmpty())
                 return { width, height };
 
-            if (auto* props = pluginHolder->settings.get())
+            const bool loadWindowPos = SystemStats::getEnvironmentVariable ("EQPRO_LOAD_WINDOW_POS", "0").getIntValue() != 0;
+            if (loadWindowPos && (auto* props = pluginHolder->settings.get()))
             {
                 constexpr int defaultValue = -100;
 
@@ -696,7 +697,10 @@ public:
 
                 if (x != defaultValue && y != defaultValue)
                 {
-                    const auto screenLimits = displays.getDisplayForRect ({ x, y, width, height })->userArea;
+                    const auto* displayForRect = displays.getDisplayForRect ({ x, y, width, height });
+                    const auto screenLimits = displayForRect != nullptr
+                        ? displayForRect->userArea
+                        : displays.getPrimaryDisplay()->userArea;
 
                     return { jlimit (screenLimits.getX(), jmax (screenLimits.getX(), screenLimits.getRight()  - width),  x),
                              jlimit (screenLimits.getY(), jmax (screenLimits.getY(), screenLimits.getBottom() - height), y),

@@ -46,6 +46,7 @@ Notes:
 - Startup diagnostics write a log to `%TEMP%\\EQPro_startup_*.log`.
 - Standalone state restore is disabled by default; set `EQPRO_LOAD_STATE=1` to enable.
 - Standalone audio device restore is disabled by default; set `EQPRO_LOAD_AUDIO_STATE=1` to enable.
+- Standalone window position restore is disabled by default; set `EQPRO_LOAD_WINDOW_POS=1` to enable.
 
 ### `eqdsp::AnalyzerTap`
 Location: `src/dsp/AnalyzerTap.h/.cpp`  

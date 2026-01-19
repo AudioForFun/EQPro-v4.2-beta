@@ -1120,12 +1120,9 @@ void AnalyzerComponent::updateCurves()
 
     const float maxFreq = getMaxFreq();
     std::array<bool, ParamIDs::kBandsPerChannel> bandActive {};
-    std::array<float, ParamIDs::kBandsPerChannel> bandMix {};
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
     {
-        const float mix = getBandParameter(band, kParamMixSuffix) / 100.0f;
-        bandMix[band] = juce::jlimit(0.0f, 1.0f, mix);
-        bandActive[band] = ! getBandBypassed(band) && bandMix[band] > 0.0005f;
+        bandActive[band] = ! getBandBypassed(band);
         perBandActive[band] = bandActive[band];
     }
 
@@ -1144,7 +1141,6 @@ void AnalyzerComponent::updateCurves()
         hashBand(getBandParameter(band, kParamTypeSuffix));
         hashBand(getBandParameter(band, kParamBypassSuffix));
         hashBand(getBandParameter(band, kParamSlopeSuffix));
-        hashBand(getBandParameter(band, kParamMixSuffix));
         bandDirty[static_cast<size_t>(band)] = bandHash != perBandCurveHash[static_cast<size_t>(band)];
         perBandCurveHash[static_cast<size_t>(band)] = bandHash;
     }
@@ -1162,9 +1158,7 @@ void AnalyzerComponent::updateCurves()
             {
                 if (bandDirty[static_cast<size_t>(band)])
                 {
-                    const auto raw = computeBandResponse(band, freq);
-                    response = std::complex<double>(1.0, 0.0)
-                        + (raw - std::complex<double>(1.0, 0.0)) * static_cast<double>(bandMix[band]);
+                    response = computeBandResponse(band, freq);
                     perBandCurveDb[static_cast<size_t>(band)][static_cast<size_t>(x)] =
                         juce::Decibels::gainToDecibels(static_cast<float>(std::abs(response)), minDb);
                 }
@@ -1182,14 +1176,11 @@ void AnalyzerComponent::updateCurves()
             total += (response - std::complex<double>(1.0, 0.0));
         }
 
-        const auto rawSelected = computeBandResponse(selectedBand, freq);
-        const auto bandResp = std::complex<double>(1.0, 0.0)
-            + (rawSelected - std::complex<double>(1.0, 0.0)) * static_cast<double>(bandMix[selectedBand]);
         const double mag = std::abs(total);
         eqCurveDb[static_cast<size_t>(x)] =
             juce::Decibels::gainToDecibels(static_cast<float>(mag), minDb);
         selectedBandCurveDb[static_cast<size_t>(x)] =
-            juce::Decibels::gainToDecibels(static_cast<float>(std::abs(bandResp)), minDb);
+            juce::Decibels::gainToDecibels(static_cast<float>(std::abs(computeBandResponse(selectedBand, freq))), minDb);
     }
 }
 
@@ -1412,9 +1403,6 @@ std::complex<double> AnalyzerComponent::computeBandResponse(int bandIndex, float
         return { 1.0, 0.0 };
 
     const float gainDb = getBandParameter(bandIndex, kParamGainSuffix);
-    const float mix = getBandParameter(bandIndex, kParamMixSuffix) / 100.0f;
-    if (mix <= 0.0001f)
-        return { 1.0, 0.0 };
     const float q = std::max(0.1f, getBandParameter(bandIndex, kParamQSuffix));
     const float freq = getBandParameter(bandIndex, kParamFreqSuffix);
     const int type = getBandType(bandIndex);
@@ -1573,12 +1561,6 @@ std::complex<double> AnalyzerComponent::computeBandResponse(int bandIndex, float
             response = std::pow(response, stages);
         if (useOnePole)
             response *= onePoleResponse(freq, frequency);
-    }
-
-    if (mix < 1.0f)
-    {
-        const double wet = mix;
-        response = (1.0 - wet) + response * wet;
     }
 
     return response;

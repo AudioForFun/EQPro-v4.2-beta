@@ -720,6 +720,17 @@ public:
         if (auto* processor = getAudioProcessor())
             if (auto* editor = processor->getActiveEditor())
                 setResizable (editor->isResizable(), false);
+
+        setVisible (true);
+        setMinimised (false);
+        setAlwaysOnTop (true);
+        toFront (true);
+        Logger::writeToLog ("Standalone window shown");
+        Timer::callAfterDelay (1500, [safe = Component::SafePointer<StandaloneFilterWindow> (this)]()
+        {
+            if (safe != nullptr)
+                safe->setAlwaysOnTop (false);
+        });
        #endif
     }
 

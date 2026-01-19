@@ -630,7 +630,7 @@ void BandControlsPanel::resized()
     const int gap = 6;
     const int labelHeight = 14;
     const int rowHeight = 20;
-    const int comboHeight = 18;
+    const int comboHeight = 20;
     const int knobRowHeight = 120;
     const int knobSize = juce::jmin(86, knobRowHeight - labelHeight - 6);
 
@@ -733,7 +733,7 @@ void BandControlsPanel::resized()
     releaseSlider.setBounds(squareKnob(releaseArea).withSizeKeepingCentre(knobSize, knobSize));
 
     right.removeFromTop(4);
-    auto detectorArea = right.removeFromTop(52);
+    auto detectorArea = right.removeFromTop(104);
     const int detectorSize = std::min(detectorArea.getWidth(), detectorArea.getHeight());
     detectorMeterBounds = juce::Rectangle<int>(detectorSize, detectorSize)
                               .withCentre(detectorArea.getCentre())

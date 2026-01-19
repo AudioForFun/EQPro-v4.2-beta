@@ -763,7 +763,7 @@ void BandControlsPanel::resized()
     releaseSlider.setBounds(squareKnob(releaseArea).withSizeKeepingCentre(knobSize, knobSize));
 
     right.removeFromTop(4);
-    auto detectorArea = right.removeFromTop(104);
+    auto detectorArea = right.removeFromTop(208);
     const int detectorSize = std::min(detectorArea.getWidth(), detectorArea.getHeight());
     detectorMeterBounds = juce::Rectangle<int>(detectorSize, detectorSize)
                               .withCentre(detectorArea.getCentre())

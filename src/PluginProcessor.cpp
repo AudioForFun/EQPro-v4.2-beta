@@ -161,6 +161,8 @@ EQProAudioProcessor::EQProAudioProcessor()
 
     verifyBands =
         juce::SystemStats::getEnvironmentVariable("EQPRO_VERIFY_BANDS", "0").getIntValue() != 0;
+    if (juce::JUCEApplicationBase::isStandaloneApp())
+        verifyBands = false;
     bandVerifyLogFile = juce::File::getSpecialLocation(juce::File::tempDirectory)
                             .getChildFile("EQPro_band_verify.log");
     if (verifyBands)

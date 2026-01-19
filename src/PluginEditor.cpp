@@ -988,6 +988,25 @@ EQProAudioProcessorEditor::~EQProAudioProcessorEditor()
     setLookAndFeel(nullptr);
 }
 
+bool EQProAudioProcessorEditor::syncToHostBounds()
+{
+    auto* parent = getParentComponent();
+    if (parent == nullptr)
+        return false;
+
+    const auto parentBounds = parent->getLocalBounds();
+    const int targetW = parentBounds.getWidth();
+    const int targetH = parentBounds.getHeight();
+    if (targetW <= 0 || targetH <= 0)
+        return false;
+
+    if (targetW == getWidth() && targetH == getHeight())
+        return false;
+
+    setSize(targetW, targetH);
+    return true;
+}
+
 void EQProAudioProcessorEditor::timerCallback()
 {
     if (pendingWindowRescue)
@@ -1017,6 +1036,7 @@ void EQProAudioProcessorEditor::timerCallback()
             }
         }
     }
+    syncToHostBounds();
     refreshChannelLayout();
 }
 
@@ -1160,6 +1180,8 @@ bool EQProAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
 
 void EQProAudioProcessorEditor::resized()
 {
+    if (syncToHostBounds())
+        return;
     const float scaleX = getWidth() / static_cast<float>(kEditorWidth);
     const float scaleY = getHeight() / static_cast<float>(kEditorHeight);
     const float uiScale = juce::jlimit(0.6f, 2.5f, std::min(scaleX, scaleY));

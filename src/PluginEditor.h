@@ -23,6 +23,7 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
 
 private:
+    bool syncToHostBounds();
     void timerCallback() override;
     void refreshChannelLayout();
 

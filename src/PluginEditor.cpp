@@ -974,6 +974,29 @@ EQProAudioProcessorEditor::~EQProAudioProcessorEditor()
 
 void EQProAudioProcessorEditor::timerCallback()
 {
+    if (pendingWindowRescue)
+    {
+        ++windowRescueTicks;
+        if (windowRescueTicks > 1)
+        {
+            if (auto* top = getTopLevelComponent())
+            {
+                auto& desktop = juce::Desktop::getInstance();
+                const auto display = desktop.getDisplays().getMainDisplay();
+                const auto area = display.userArea;
+                auto bounds = top->getBounds();
+                if (! area.intersects(bounds) || bounds.getWidth() <= 0 || bounds.getHeight() <= 0)
+                {
+                    const int w = juce::jmin(bounds.getWidth(), area.getWidth());
+                    const int h = juce::jmin(bounds.getHeight(), area.getHeight());
+                    top->setBounds(area.withSizeKeepingCentre(w, h));
+                }
+                top->setVisible(true);
+                top->toFront(true);
+            }
+            pendingWindowRescue = false;
+        }
+    }
     refreshChannelLayout();
 }
 

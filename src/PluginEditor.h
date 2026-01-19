@@ -121,6 +121,8 @@ private:
     juce::Image backgroundNoise;
 
     bool debugVisible = false;
+    bool pendingWindowRescue = true;
+    int windowRescueTicks = 0;
 
     int selectedBand = 0;
     int selectedChannel = 0;

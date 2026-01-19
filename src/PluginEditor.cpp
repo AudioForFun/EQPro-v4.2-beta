@@ -9,8 +9,8 @@ juce::AudioProcessorEditor* EQProAudioProcessor::createEditor()
 
 namespace
 {
-constexpr int kEditorWidth = 1125;
-constexpr int kEditorHeight = 735;
+constexpr int kEditorWidth = 980;
+constexpr int kEditorHeight = 660;
 constexpr int kOuterMargin = 16;
 constexpr int kLeftPanelWidth = 0;
 constexpr int kRightPanelWidth = 180;
@@ -993,21 +993,7 @@ EQProAudioProcessorEditor::~EQProAudioProcessorEditor()
 
 bool EQProAudioProcessorEditor::syncToHostBounds()
 {
-    auto* parent = getParentComponent();
-    if (parent == nullptr)
-        return false;
-
-    const auto parentBounds = parent->getLocalBounds();
-    const int targetW = parentBounds.getWidth();
-    const int targetH = parentBounds.getHeight();
-    if (targetW <= 0 || targetH <= 0)
-        return false;
-
-    if (targetW == getWidth() && targetH == getHeight())
-        return false;
-
-    setSize(targetW, targetH);
-    return true;
+    return false;
 }
 
 void EQProAudioProcessorEditor::timerCallback()
@@ -1042,7 +1028,6 @@ void EQProAudioProcessorEditor::timerCallback()
             }
         }
     }
-    syncToHostBounds();
     refreshChannelLayout();
 }
 
@@ -1186,11 +1171,7 @@ bool EQProAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
 
 void EQProAudioProcessorEditor::resized()
 {
-    if (syncToHostBounds())
-        return;
-    const float scaleX = getWidth() / static_cast<float>(kEditorWidth);
-    const float scaleY = getHeight() / static_cast<float>(kEditorHeight);
-    const float uiScale = juce::jlimit(0.6f, 2.5f, std::min(scaleX, scaleY));
+    const float uiScale = 1.0f;
     analyzer.setUiScale(uiScale);
     const int margin = static_cast<int>(kOuterMargin * uiScale);
     auto bounds = getLocalBounds().reduced(margin);

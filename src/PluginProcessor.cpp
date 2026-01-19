@@ -148,6 +148,14 @@ EQProAudioProcessor::EQProAudioProcessor()
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       parameters(*this, &undoManager, "PARAMETERS", createParameterLayout())
 {
+    const bool disableSafeMode =
+        juce::SystemStats::getEnvironmentVariable("EQPRO_DISABLE_SAFE_MODE", "0").getIntValue() != 0;
+    safeModeMarker = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                         .getChildFile("EQPro_safe_mode.flag");
+    if (safeModeMarker.existsAsFile() && ! disableSafeMode)
+        safeMode = true;
+    safeModeMarker.replaceWithText("1");
+
     initializeParamPointers();
     startTimerHz(10);
 }
@@ -156,6 +164,8 @@ EQProAudioProcessor::~EQProAudioProcessor()
 {
     stopTimer();
     linearPhasePool.removeAllJobs(true, 2000);
+    if (safeModeMarker.existsAsFile())
+        safeModeMarker.deleteFile();
 }
 
 void EQProAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -640,6 +650,11 @@ int EQProAudioProcessor::getSelectedChannelIndex() const
 float EQProAudioProcessor::getBandDetectorDb(int channelIndex, int bandIndex) const
 {
     return eqEngine.getEqDsp().getDetectorDb(channelIndex, bandIndex);
+}
+
+bool EQProAudioProcessor::isSafeMode() const
+{
+    return safeMode;
 }
 
 void EQProAudioProcessor::initializeParamPointers()

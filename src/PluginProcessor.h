@@ -80,6 +80,7 @@ public:
     int getSelectedBandIndex() const;
     int getSelectedChannelIndex() const;
     float getBandDetectorDb(int channelIndex, int bandIndex) const;
+    bool isSafeMode() const;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
@@ -138,6 +139,9 @@ private:
     std::atomic<float>* midiLearnParam = nullptr;
     std::atomic<float>* midiTargetParam = nullptr;
     std::atomic<float>* smartSoloParam = nullptr;
+
+    bool safeMode = false;
+    juce::File safeModeMarker;
 
     eqdsp::EqEngine eqEngine;
     eqdsp::AnalyzerTap analyzerPreTap;

@@ -3,6 +3,8 @@
 
 juce::AudioProcessorEditor* EQProAudioProcessor::createEditor()
 {
+    if (isSafeMode())
+        return new EQProSafeEditor(*this);
     return new EQProAudioProcessorEditor(*this);
 }
 
@@ -964,6 +966,27 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     setResizeLimits(kEditorWidth, kEditorHeight, kEditorWidth, kEditorHeight);
 
     setSize(kEditorWidth, kEditorHeight);
+}
+
+EQProSafeEditor::EQProSafeEditor(EQProAudioProcessor& p)
+    : juce::AudioProcessorEditor(&p)
+{
+    infoLabel.setText("EQ Pro launched in Safe Mode.\n"
+                      "Close the app to clear safe mode, or set EQPRO_DISABLE_SAFE_MODE=1 to force full UI.",
+                      juce::dontSendNotification);
+    infoLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(infoLabel);
+    setSize(520, 160);
+}
+
+void EQProSafeEditor::paint(juce::Graphics& g)
+{
+    g.fillAll(juce::Colour(0xff0b0f15));
+}
+
+void EQProSafeEditor::resized()
+{
+    infoLabel.setBounds(getLocalBounds().reduced(16));
 }
 
 EQProAudioProcessorEditor::~EQProAudioProcessorEditor()

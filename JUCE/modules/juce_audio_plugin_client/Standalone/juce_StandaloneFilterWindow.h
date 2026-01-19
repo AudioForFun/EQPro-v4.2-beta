@@ -698,9 +698,12 @@ public:
                 if (x != defaultValue && y != defaultValue)
                 {
                     const auto* displayForRect = displays.getDisplayForRect ({ x, y, width, height });
+                    const auto* primaryDisplay = displays.getPrimaryDisplay();
+                    if (displayForRect == nullptr && primaryDisplay == nullptr)
+                        return { 0, 0, width, height };
                     const auto screenLimits = displayForRect != nullptr
                         ? displayForRect->userArea
-                        : displays.getPrimaryDisplay()->userArea;
+                        : primaryDisplay->userArea;
 
                     return { jlimit (screenLimits.getX(), jmax (screenLimits.getX(), screenLimits.getRight()  - width),  x),
                              jlimit (screenLimits.getY(), jmax (screenLimits.getY(), screenLimits.getBottom() - height), y),
@@ -708,11 +711,16 @@ public:
                 }
             }
 
-            const auto displayArea = displays.getPrimaryDisplay()->userArea;
+            if (const auto* primaryDisplay = displays.getPrimaryDisplay())
+            {
+                const auto displayArea = primaryDisplay->userArea;
 
-            return { displayArea.getCentreX() - width / 2,
-                     displayArea.getCentreY() - height / 2,
-                     width, height };
+                return { displayArea.getCentreX() - width / 2,
+                         displayArea.getCentreY() - height / 2,
+                         width, height };
+            }
+
+            return { 0, 0, width, height };
         }();
 
         setBoundsConstrained (windowScreenBounds);

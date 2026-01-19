@@ -970,13 +970,16 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     if (juce::JUCEApplicationBase::isStandaloneApp())
     {
         auto& desktop = juce::Desktop::getInstance();
-        const auto display = desktop.getDisplays().getMainDisplay();
+        const auto& display = desktop.getDisplays().getMainDisplay();
         const auto area = display.userArea;
-        const int targetW = juce::jmin(kEditorWidth, area.getWidth());
-        const int targetH = juce::jmin(kEditorHeight, area.getHeight());
-        setBounds(area.withSizeKeepingCentre(targetW, targetH));
-        setVisible(true);
-        toFront(true);
+        if (! area.isEmpty())
+        {
+            const int targetW = juce::jmin(kEditorWidth, area.getWidth());
+            const int targetH = juce::jmin(kEditorHeight, area.getHeight());
+            setBounds(area.withSizeKeepingCentre(targetW, targetH));
+            setVisible(true);
+            toFront(true);
+        }
     }
     processorRef.logStartup("Editor ctor end");
 }
@@ -1017,16 +1020,19 @@ void EQProAudioProcessorEditor::timerCallback()
             if (auto* top = getTopLevelComponent())
             {
                 auto& desktop = juce::Desktop::getInstance();
-                const auto display = desktop.getDisplays().getMainDisplay();
+                const auto& display = desktop.getDisplays().getMainDisplay();
                 const auto area = display.userArea;
-                const int targetW = juce::jmin(kEditorWidth, area.getWidth());
-                const int targetH = juce::jmin(kEditorHeight, area.getHeight());
-                top->setBounds(area.withSizeKeepingCentre(targetW, targetH));
-                top->setAlwaysOnTop(true);
-                top->setVisible(true);
-                top->toFront(true);
-                if (auto* peer = top->getPeer())
-                    peer->setMinimised(false);
+                if (! area.isEmpty())
+                {
+                    const int targetW = juce::jmin(kEditorWidth, area.getWidth());
+                    const int targetH = juce::jmin(kEditorHeight, area.getHeight());
+                    top->setBounds(area.withSizeKeepingCentre(targetW, targetH));
+                    top->setAlwaysOnTop(true);
+                    top->setVisible(true);
+                    top->toFront(true);
+                    if (auto* peer = top->getPeer())
+                        peer->setMinimised(false);
+                }
             }
             if (windowRescueTicks > 10)
             {

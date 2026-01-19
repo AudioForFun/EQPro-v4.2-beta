@@ -984,18 +984,19 @@ void EQProAudioProcessorEditor::timerCallback()
                 auto& desktop = juce::Desktop::getInstance();
                 const auto display = desktop.getDisplays().getMainDisplay();
                 const auto area = display.userArea;
-                auto bounds = top->getBounds();
-                if (! area.intersects(bounds) || bounds.getWidth() <= 0 || bounds.getHeight() <= 0)
-                {
-                    const int w = juce::jmin(bounds.getWidth(), area.getWidth());
-                    const int h = juce::jmin(bounds.getHeight(), area.getHeight());
-                    top->setBounds(area.withSizeKeepingCentre(w, h));
-                }
+                const int targetW = juce::jmin(kEditorWidth, area.getWidth());
+                const int targetH = juce::jmin(kEditorHeight, area.getHeight());
+                top->setBounds(area.withSizeKeepingCentre(targetW, targetH));
+                top->setAlwaysOnTop(true);
                 top->setVisible(true);
                 top->toFront(true);
             }
             if (windowRescueTicks > 10)
+            {
+                if (auto* top = getTopLevelComponent())
+                    top->setAlwaysOnTop(false);
                 pendingWindowRescue = false;
+            }
         }
     }
     refreshChannelLayout();

@@ -1341,7 +1341,10 @@ float AnalyzerComponent::gainToY(float gainDb) const
 
 float AnalyzerComponent::getMaxFreq() const
 {
-    return std::max(kMinFreq * 1.1f, std::min(60000.0f, lastSampleRate * 0.5f));
+    const float nyquist = lastSampleRate * 0.5f;
+    const float preferredMax = 40000.0f;
+    const float maxFreq = std::min(preferredMax, nyquist);
+    return std::max(kMinFreq * 1.1f, maxFreq);
 }
 
 

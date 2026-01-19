@@ -9,8 +9,8 @@ juce::AudioProcessorEditor* EQProAudioProcessor::createEditor()
 
 namespace
 {
-constexpr int kEditorWidth = 1500;
-constexpr int kEditorHeight = 980;
+constexpr int kEditorWidth = 1125;
+constexpr int kEditorHeight = 735;
 constexpr int kOuterMargin = 16;
 constexpr int kLeftPanelWidth = 0;
 constexpr int kRightPanelWidth = 180;

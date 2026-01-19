@@ -18,5 +18,6 @@ cmake --build build --config Release
 - Change `JUCE_DIR` in `CMakeLists.txt` or pass `-DJUCE_DIR=...` when configuring.
 - Standalone startup log: `%TEMP%\\EQPro_startup_*.log`.
 - Standalone state restore is disabled by default; set `EQPRO_LOAD_STATE=1` to enable.
+- Standalone audio device restore is disabled by default; set `EQPRO_LOAD_AUDIO_STATE=1` to enable.
 
 

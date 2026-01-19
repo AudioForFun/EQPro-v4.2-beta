@@ -345,6 +345,11 @@ public:
            #endif
         }
 
+        const bool loadAudioState =
+            SystemStats::getEnvironmentVariable ("EQPRO_LOAD_AUDIO_STATE", "0").getIntValue() != 0;
+        if (! loadAudioState)
+            savedState.reset();
+
         auto inputChannels  = getNumInputChannels();
         auto outputChannels = getNumOutputChannels();
 

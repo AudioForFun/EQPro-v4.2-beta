@@ -49,7 +49,7 @@
 - MIDI Learn toggle and target selector.
 
 ## Resizing
-- Fixed size (1500x980).
+- Fixed size (1125x735).
 
 
 

@@ -28,6 +28,7 @@
 - Per-band mix blends dry/wet for each band.
 - Global mix uses a dry delay line to align with linear-phase latency before summing.
 - Standalone state restore is disabled by default to avoid startup crashes from corrupted state.
+- Standalone audio device restore is disabled by default to avoid device init crashes.
 - Per-band channel targets can address all channels, M/S targets, L/R, and immersive pairs.
 - Dynamic EQ modulates per-band gain using a detector envelope (Up/Down trigger modes).
 - Output trim applies a post-processing gain stage.

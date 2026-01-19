@@ -164,6 +164,14 @@ private:
     std::unique_ptr<ButtonAttachment> dynAutoAttachment;
     std::unique_ptr<ButtonAttachment> dynExternalAttachment;
 
+    juce::RangedAudioParameter* freqParam = nullptr;
+    juce::RangedAudioParameter* gainParam = nullptr;
+    juce::RangedAudioParameter* qParam = nullptr;
+    juce::RangedAudioParameter* mixParam = nullptr;
+    juce::RangedAudioParameter* dynThreshParam = nullptr;
+    juce::RangedAudioParameter* dynAttackParam = nullptr;
+    juce::RangedAudioParameter* dynReleaseParam = nullptr;
+
     ThemeColors theme = makeDarkTheme();
     CompactComboLookAndFeel compactComboLookAndFeel;
     bool msEnabled = true;

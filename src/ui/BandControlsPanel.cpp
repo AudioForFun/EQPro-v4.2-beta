@@ -183,8 +183,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     freqSlider.setTextValueSuffix(" Hz");
     freqSlider.onDoubleClick = [this]
     {
-        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "freq")))
-            param->setValueNotifyingHost(param->convertTo0to1(1000.0f));
+        if (freqParam != nullptr)
+            freqParam->setValueNotifyingHost(freqParam->convertTo0to1(1000.0f));
     };
     freqSlider.onValueChange = [this]
     {
@@ -199,8 +199,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     gainSlider.setTextValueSuffix(" dB");
     gainSlider.onDoubleClick = [this]
     {
-        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "gain")))
-            param->setValueNotifyingHost(param->convertTo0to1(0.0f));
+        if (gainParam != nullptr)
+            gainParam->setValueNotifyingHost(gainParam->convertTo0to1(0.0f));
     };
     gainSlider.onValueChange = [this]
     {
@@ -214,8 +214,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     qSlider.setTextBoxIsEditable(true);
     qSlider.onDoubleClick = [this]
     {
-        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "q")))
-            param->setValueNotifyingHost(param->convertTo0to1(0.707f));
+        if (qParam != nullptr)
+            qParam->setValueNotifyingHost(qParam->convertTo0to1(0.707f));
     };
     qSlider.onValueChange = [this]
     {
@@ -288,8 +288,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     mixSlider.setTextValueSuffix(" %");
     mixSlider.onDoubleClick = [this]
     {
-        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "mix")))
-            param->setValueNotifyingHost(param->convertTo0to1(100.0f));
+        if (mixParam != nullptr)
+            mixParam->setValueNotifyingHost(mixParam->convertTo0to1(100.0f));
     };
     addAndMakeVisible(mixSlider);
     mixSlider.onValueChange = [this]
@@ -343,8 +343,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     thresholdSlider.setTextValueSuffix(" dB");
     thresholdSlider.onDoubleClick = [this]
     {
-        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynThresh")))
-            param->setValueNotifyingHost(param->convertTo0to1(-24.0f));
+        if (dynThreshParam != nullptr)
+            dynThreshParam->setValueNotifyingHost(dynThreshParam->convertTo0to1(-24.0f));
     };
     addAndMakeVisible(thresholdSlider);
     thresholdSlider.onValueChange = [this]
@@ -358,8 +358,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     attackSlider.setTextValueSuffix(" ms");
     attackSlider.onDoubleClick = [this]
     {
-        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynAttack")))
-            param->setValueNotifyingHost(param->convertTo0to1(20.0f));
+        if (dynAttackParam != nullptr)
+            dynAttackParam->setValueNotifyingHost(dynAttackParam->convertTo0to1(20.0f));
     };
     addAndMakeVisible(attackSlider);
     attackSlider.onValueChange = [this]
@@ -373,8 +373,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     releaseSlider.setTextValueSuffix(" ms");
     releaseSlider.onDoubleClick = [this]
     {
-        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynRelease")))
-            param->setValueNotifyingHost(param->convertTo0to1(200.0f));
+        if (dynReleaseParam != nullptr)
+            dynReleaseParam->setValueNotifyingHost(dynReleaseParam->convertTo0to1(200.0f));
     };
     addAndMakeVisible(releaseSlider);
     releaseSlider.onValueChange = [this]
@@ -780,6 +780,14 @@ void BandControlsPanel::updateAttachments()
     const auto msId = ParamIDs::bandParamId(selectedChannel, selectedBand, "ms");
     const auto slopeId = ParamIDs::bandParamId(selectedChannel, selectedBand, "slope");
     const auto mixId = ParamIDs::bandParamId(selectedChannel, selectedBand, "mix");
+
+    freqParam = parameters.getParameter(freqId);
+    gainParam = parameters.getParameter(gainId);
+    qParam = parameters.getParameter(qId);
+    mixParam = parameters.getParameter(mixId);
+    dynThreshParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynThresh"));
+    dynAttackParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynAttack"));
+    dynReleaseParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynRelease"));
 
     freqAttachment = std::make_unique<SliderAttachment>(parameters, freqId, freqSlider);
     gainAttachment = std::make_unique<SliderAttachment>(parameters, gainId, gainSlider);

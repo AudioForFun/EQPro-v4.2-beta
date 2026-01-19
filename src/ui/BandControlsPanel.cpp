@@ -435,6 +435,7 @@ BandControlsPanel::~BandControlsPanel()
 
 void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
 {
+    pushUiStateToParams();
     selectedChannel = juce::jlimit(0, ParamIDs::kMaxChannels - 1, channelIndex);
     selectedBand = juce::jlimit(0, ParamIDs::kBandsPerChannel - 1, bandIndex);
 
@@ -461,6 +462,45 @@ void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
     updateComboBoxWidths();
     syncMsSelectionFromParam();
     suppressParamCallbacks = false;
+}
+
+void BandControlsPanel::pushUiStateToParams()
+{
+    const int channel = selectedChannel;
+    const int band = selectedBand;
+    auto setParamValue = [this, channel, band](const juce::String& suffix, float value)
+    {
+        if (auto* param = dynamic_cast<juce::RangedAudioParameter*>(
+                parameters.getParameter(ParamIDs::bandParamId(channel, band, suffix))))
+        {
+            param->setValueNotifyingHost(param->convertTo0to1(value));
+        }
+    };
+
+    setParamValue("freq", static_cast<float>(freqSlider.getValue()));
+    setParamValue("gain", static_cast<float>(gainSlider.getValue()));
+    setParamValue("q", static_cast<float>(qSlider.getValue()));
+
+    const int typeIndex = typeBox.getSelectedItemIndex();
+    if (typeIndex >= 0)
+        setParamValue("type", static_cast<float>(typeIndex));
+
+    const int msIndex = msBox.getSelectedItemIndex();
+    if (msIndex >= 0 && msIndex < static_cast<int>(msChoiceMap.size()))
+        setParamValue("ms", static_cast<float>(msChoiceMap[static_cast<size_t>(msIndex)]));
+
+    const int slopeIndex = slopeBox.getSelectedItemIndex();
+    if (slopeIndex >= 0)
+        setParamValue("slope", static_cast<float>((slopeIndex + 1) * 6));
+
+    setParamValue("mix", static_cast<float>(mixSlider.getValue()));
+    setParamValue("dynEnable", dynEnableToggle.getToggleState() ? 1.0f : 0.0f);
+    setParamValue("dynMode", dynDownButton.getToggleState() ? 1.0f : 0.0f);
+    setParamValue("dynThresh", static_cast<float>(thresholdSlider.getValue()));
+    setParamValue("dynAttack", static_cast<float>(attackSlider.getValue()));
+    setParamValue("dynRelease", static_cast<float>(releaseSlider.getValue()));
+    setParamValue("dynAuto", autoScaleToggle.getToggleState() ? 1.0f : 0.0f);
+    setParamValue("dynExternal", dynExternalToggle.getToggleState() ? 1.0f : 0.0f);
 }
 
 void BandControlsPanel::setChannelNames(const std::vector<juce::String>& names)

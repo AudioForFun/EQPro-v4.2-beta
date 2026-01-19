@@ -88,6 +88,7 @@ private:
     int getMsParamValue() const;
     void updateBandKnobColours();
     void ensureBandActiveFromEdit();
+    void pushUiStateToParams();
 
     struct BandState
     {

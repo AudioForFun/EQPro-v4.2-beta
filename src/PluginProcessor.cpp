@@ -163,6 +163,11 @@ EQProAudioProcessor::EQProAudioProcessor()
     if (verifyBands)
         bandVerifyLogFile.deleteFile();
 
+    const bool fullUiRequested =
+        juce::SystemStats::getEnvironmentVariable("EQPRO_FULL_UI", "0").getIntValue() != 0;
+    if (juce::JUCEApplicationBase::isStandaloneApp() && ! fullUiRequested)
+        safeMode = true;
+
     initializeParamPointers();
     startTimerHz(10);
 }

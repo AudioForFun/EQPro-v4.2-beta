@@ -984,7 +984,7 @@ EQProSafeEditor::EQProSafeEditor(EQProAudioProcessor& p)
     : juce::AudioProcessorEditor(&p)
 {
     infoLabel.setText("EQ Pro launched in Safe Mode.\n"
-                      "Close the app to clear safe mode, or set EQPRO_DISABLE_SAFE_MODE=1 to force full UI.",
+                      "Set EQPRO_FULL_UI=1 to force full UI in standalone.",
                       juce::dontSendNotification);
     infoLabel.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(infoLabel);

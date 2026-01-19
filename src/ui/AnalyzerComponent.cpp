@@ -1256,6 +1256,30 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
         }
     }
 
+    // Ensure high-end label visibility (20k/40k) even if spacing hides it.
+    auto drawHighLabel = [&](float freq)
+    {
+        if (freq < kMinFreq || freq > maxFreq)
+            return;
+        const float x = frequencyToX(freq);
+        if (x < area.getX() || x > area.getRight())
+            return;
+        g.setColour(theme.textMuted);
+        const juce::String text = freq >= 1000.0f
+            ? juce::String(freq / 1000.0f, (freq >= 10000.0f ? 1 : 2)) + "k"
+            : juce::String(freq, freq < 100.0f ? 1 : 0);
+        const int xPos = static_cast<int>(std::min(x + 3.0f * scale,
+                                                   static_cast<float>(area.getRight() - labelWidth)));
+        g.drawFittedText(text,
+                         juce::Rectangle<int>(xPos,
+                                              static_cast<int>(area.getBottom() - bottomGutter),
+                                              labelWidth,
+                                              labelHeight),
+                         juce::Justification::left, 1);
+    };
+    drawHighLabel(20000.0f);
+    drawHighLabel(40000.0f);
+
     const float db = 0.0f;
     const int y = static_cast<int>(gainToY(db));
     g.setColour(theme.grid.withAlpha(0.6f));

@@ -994,7 +994,8 @@ void EQProAudioProcessorEditor::timerCallback()
                 top->setVisible(true);
                 top->toFront(true);
             }
-            pendingWindowRescue = false;
+            if (windowRescueTicks > 10)
+                pendingWindowRescue = false;
         }
     }
     refreshChannelLayout();

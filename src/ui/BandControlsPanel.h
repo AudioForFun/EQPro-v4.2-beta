@@ -39,6 +39,18 @@ private:
         }
     };
 
+    struct BandKnob final : public juce::Slider
+    {
+        std::function<void()> onDoubleClick;
+
+        void mouseDoubleClick(const juce::MouseEvent& event) override
+        {
+            juce::Slider::mouseDoubleClick(event);
+            if (onDoubleClick)
+                onDoubleClick();
+        }
+    };
+
     struct SoloToggleButton final : public juce::ToggleButton
     {
         std::function<void()> onDoubleClick;
@@ -110,9 +122,9 @@ private:
     juce::Label freqLabel;
     juce::Label gainLabel;
     juce::Label qLabel;
-    juce::Slider freqSlider;
-    juce::Slider gainSlider;
-    juce::Slider qSlider;
+    BandKnob freqSlider;
+    BandKnob gainSlider;
+    BandKnob qSlider;
     juce::Label typeLabel;
     juce::ComboBox typeBox;
     juce::Label msLabel;
@@ -120,7 +132,7 @@ private:
     juce::Label slopeLabel;
     juce::ComboBox slopeBox;
     juce::Label mixLabel;
-    juce::Slider mixSlider;
+    BandKnob mixSlider;
     juce::TextButton copyButton;
     juce::TextButton pasteButton;
     juce::ToggleButton dynEnableToggle;
@@ -128,11 +140,11 @@ private:
     juce::TextButton dynDownButton;
     juce::ToggleButton dynExternalToggle;
     juce::Label thresholdLabel;
-    juce::Slider thresholdSlider;
+    BandKnob thresholdSlider;
     juce::Label attackLabel;
-    juce::Slider attackSlider;
+    BandKnob attackSlider;
     juce::Label releaseLabel;
-    juce::Slider releaseSlider;
+    BandKnob releaseSlider;
     juce::ToggleButton autoScaleToggle;
     juce::Rectangle<float> detectorMeterBounds;
 

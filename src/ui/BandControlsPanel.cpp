@@ -181,6 +181,11 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     freqSlider.setTextBoxIsEditable(true);
     freqSlider.setSkewFactorFromMidPoint(1000.0);
     freqSlider.setTextValueSuffix(" Hz");
+    freqSlider.onDoubleClick = [this]
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "freq")))
+            param->setValueNotifyingHost(param->convertTo0to1(1000.0f));
+    };
     freqSlider.onValueChange = [this]
     {
         ensureBandActiveFromEdit();
@@ -192,7 +197,11 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     gainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     gainSlider.setTextBoxIsEditable(true);
     gainSlider.setTextValueSuffix(" dB");
-    gainSlider.setDoubleClickReturnValue(true, 0.0);
+    gainSlider.onDoubleClick = [this]
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "gain")))
+            param->setValueNotifyingHost(param->convertTo0to1(0.0f));
+    };
     gainSlider.onValueChange = [this]
     {
         ensureBandActiveFromEdit();
@@ -203,7 +212,11 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     qSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     qSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     qSlider.setTextBoxIsEditable(true);
-    qSlider.setDoubleClickReturnValue(true, 0.707f);
+    qSlider.onDoubleClick = [this]
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "q")))
+            param->setValueNotifyingHost(param->convertTo0to1(0.707f));
+    };
     qSlider.onValueChange = [this]
     {
         ensureBandActiveFromEdit();
@@ -273,7 +286,11 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     mixSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     mixSlider.setTextBoxIsEditable(true);
     mixSlider.setTextValueSuffix(" %");
-    mixSlider.setDoubleClickReturnValue(true, 100.0);
+    mixSlider.onDoubleClick = [this]
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "mix")))
+            param->setValueNotifyingHost(param->convertTo0to1(100.0f));
+    };
     addAndMakeVisible(mixSlider);
     mixSlider.onValueChange = [this]
     {
@@ -324,7 +341,11 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     thresholdSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     thresholdSlider.setTextBoxIsEditable(true);
     thresholdSlider.setTextValueSuffix(" dB");
-    thresholdSlider.setDoubleClickReturnValue(true, -24.0);
+    thresholdSlider.onDoubleClick = [this]
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynThresh")))
+            param->setValueNotifyingHost(param->convertTo0to1(-24.0f));
+    };
     addAndMakeVisible(thresholdSlider);
     thresholdSlider.onValueChange = [this]
     {
@@ -335,7 +356,11 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     attackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     attackSlider.setTextBoxIsEditable(true);
     attackSlider.setTextValueSuffix(" ms");
-    attackSlider.setDoubleClickReturnValue(true, 20.0);
+    attackSlider.onDoubleClick = [this]
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynAttack")))
+            param->setValueNotifyingHost(param->convertTo0to1(20.0f));
+    };
     addAndMakeVisible(attackSlider);
     attackSlider.onValueChange = [this]
     {
@@ -346,7 +371,11 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     releaseSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     releaseSlider.setTextBoxIsEditable(true);
     releaseSlider.setTextValueSuffix(" ms");
-    releaseSlider.setDoubleClickReturnValue(true, 200.0);
+    releaseSlider.onDoubleClick = [this]
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynRelease")))
+            param->setValueNotifyingHost(param->convertTo0to1(200.0f));
+    };
     addAndMakeVisible(releaseSlider);
     releaseSlider.onValueChange = [this]
     {
@@ -683,16 +712,25 @@ void BandControlsPanel::resized()
     mixSlider.setBounds(squareKnob(mixArea).withSizeKeepingCentre(knobSize, knobSize));
 
     left.removeFromTop(gap);
-    auto channelRow = left.removeFromTop(labelHeight + rowHeight);
-    msLabel.setBounds(channelRow.removeFromTop(labelHeight));
-    const int msWidth = juce::jmin(channelRow.getWidth(), comboWidthMs);
-    msBox.setBounds(channelRow.withHeight(comboHeight).withSizeKeepingCentre(msWidth, comboHeight));
+    auto comboRow = left.removeFromTop(labelHeight + rowHeight);
+    const int comboColWidth = (comboRow.getWidth() - gap * 2) / 3;
 
-    left.removeFromTop(gap);
-    auto typeRow = left.removeFromTop(labelHeight + rowHeight);
-    typeLabel.setBounds(typeRow.removeFromTop(labelHeight));
-    const int typeWidth = juce::jmin(typeRow.getWidth(), comboWidthType);
-    typeBox.setBounds(typeRow.withHeight(comboHeight).withSizeKeepingCentre(typeWidth, comboHeight));
+    auto channelCol = comboRow.removeFromLeft(comboColWidth);
+    msLabel.setBounds(channelCol.removeFromTop(labelHeight));
+    const int msWidth = juce::jmin(channelCol.getWidth(), comboWidthMs);
+    msBox.setBounds(channelCol.withHeight(comboHeight).withSizeKeepingCentre(msWidth, comboHeight));
+
+    comboRow.removeFromLeft(gap);
+    auto typeCol = comboRow.removeFromLeft(comboColWidth);
+    typeLabel.setBounds(typeCol.removeFromTop(labelHeight));
+    const int typeWidth = juce::jmin(typeCol.getWidth(), comboWidthType);
+    typeBox.setBounds(typeCol.withHeight(comboHeight).withSizeKeepingCentre(typeWidth, comboHeight));
+
+    comboRow.removeFromLeft(gap);
+    auto slopeCol = comboRow.removeFromLeft(comboColWidth);
+    slopeLabel.setBounds(slopeCol.removeFromTop(labelHeight));
+    const int slopeWidth = juce::jmin(slopeCol.getWidth(), comboWidthSlope);
+    slopeBox.setBounds(slopeCol.withHeight(comboHeight).withSizeKeepingCentre(slopeWidth, comboHeight));
 
     left.removeFromTop(2);
     auto togglesRow = left.removeFromTop(rowHeight);
@@ -732,11 +770,6 @@ void BandControlsPanel::resized()
                               .toFloat();
 
     left.removeFromTop(2);
-    auto slopeRow = left.removeFromTop(labelHeight + rowHeight);
-    slopeLabel.setBounds(slopeRow.removeFromTop(labelHeight));
-    const int slopeWidth = juce::jmin(slopeRow.getWidth(), comboWidthSlope);
-    slopeBox.setBounds(slopeRow.withHeight(comboHeight).withSizeKeepingCentre(slopeWidth, comboHeight));
-
 }
 
 void BandControlsPanel::updateAttachments()

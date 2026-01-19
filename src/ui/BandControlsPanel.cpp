@@ -799,9 +799,11 @@ void BandControlsPanel::updateAttachments()
 
 void BandControlsPanel::resetSelectedBand()
 {
-    auto resetParam = [this](const juce::String& suffix)
+    const int channel = selectedChannel;
+    const int band = selectedBand;
+    auto resetParam = [this, channel, band](const juce::String& suffix)
     {
-        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, suffix)))
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(channel, band, suffix)))
             param->setValueNotifyingHost(param->getDefaultValue());
     };
 
@@ -821,9 +823,9 @@ void BandControlsPanel::resetSelectedBand()
     resetParam("dynAuto");
     resetParam("dynExternal");
 
-    if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "bypass")))
+    if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(channel, band, "bypass")))
         bypassParam->setValueNotifyingHost(0.0f);
-    if (auto* soloParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "solo")))
+    if (auto* soloParam = parameters.getParameter(ParamIDs::bandParamId(channel, band, "solo")))
         soloParam->setValueNotifyingHost(0.0f);
 }
 

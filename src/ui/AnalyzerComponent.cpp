@@ -857,9 +857,10 @@ void AnalyzerComponent::createBandAtPosition(const juce::Point<float>& position)
 
 void AnalyzerComponent::resetBandToDefaults(int bandIndex, bool shouldBypass)
 {
-    auto resetParam = [this, bandIndex](const juce::String& suffix)
+    const int channel = selectedChannel;
+    auto resetParam = [this, channel, bandIndex](const juce::String& suffix)
     {
-        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, bandIndex, suffix)))
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(channel, bandIndex, suffix)))
             param->setValueNotifyingHost(param->getDefaultValue());
     };
 
@@ -879,7 +880,7 @@ void AnalyzerComponent::resetBandToDefaults(int bandIndex, bool shouldBypass)
     resetParam(kParamDynAutoSuffix);
         resetParam("dynExternal");
 
-    if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, bandIndex, kParamBypassSuffix)))
+    if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(channel, bandIndex, kParamBypassSuffix)))
         bypassParam->setValueNotifyingHost(shouldBypass ? 1.0f : 0.0f);
 }
 

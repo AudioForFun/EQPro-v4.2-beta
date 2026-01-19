@@ -27,6 +27,29 @@ public:
     void mouseDoubleClick(const juce::MouseEvent& event) override;
 
 private:
+    struct BandSelectButton final : public juce::TextButton
+    {
+        std::function<void()> onDoubleClick;
+
+        void mouseDoubleClick(const juce::MouseEvent& event) override
+        {
+            juce::TextButton::mouseDoubleClick(event);
+            if (onDoubleClick)
+                onDoubleClick();
+        }
+    };
+
+    struct SoloToggleButton final : public juce::ToggleButton
+    {
+        std::function<void()> onDoubleClick;
+
+        void mouseDoubleClick(const juce::MouseEvent& event) override
+        {
+            juce::ToggleButton::mouseDoubleClick(event);
+            if (onDoubleClick)
+                onDoubleClick();
+        }
+    };
     struct CompactComboLookAndFeel final : public juce::LookAndFeel_V4
     {
         juce::Font getComboBoxFont(juce::ComboBox&) override
@@ -82,8 +105,8 @@ private:
     juce::Label titleLabel;
     juce::Label eqSectionLabel;
     juce::TextButton defaultButton;
-    std::array<juce::TextButton, ParamIDs::kBandsPerChannel> bandSelectButtons;
-    std::array<juce::ToggleButton, ParamIDs::kBandsPerChannel> bandSoloButtons;
+    std::array<BandSelectButton, ParamIDs::kBandsPerChannel> bandSelectButtons;
+    std::array<SoloToggleButton, ParamIDs::kBandsPerChannel> bandSoloButtons;
     juce::Label freqLabel;
     juce::Label gainLabel;
     juce::Label qLabel;

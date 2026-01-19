@@ -107,6 +107,16 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
             if (onBandNavigate)
                 onBandNavigate(index);
         };
+        button.onDoubleClick = [this, index = i]()
+        {
+            const auto bypassId = ParamIDs::bandParamId(selectedChannel, index, "bypass");
+            if (auto* param = parameters.getParameter(bypassId))
+            {
+                const float current = param->getValue();
+                const float target = current < 0.5f ? 1.0f : 0.0f;
+                param->setValueNotifyingHost(target);
+            }
+        };
         addAndMakeVisible(button);
     }
 
@@ -134,6 +144,12 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
                     bandSoloButtons[static_cast<size_t>(band)].setToggleState(false, juce::dontSendNotification);
                 }
             }
+        };
+        button.onDoubleClick = [this, index = i]()
+        {
+            if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, index, "solo")))
+                param->setValueNotifyingHost(param->convertTo0to1(0.0f));
+            bandSoloButtons[static_cast<size_t>(index)].setToggleState(false, juce::dontSendNotification);
         };
         addAndMakeVisible(button);
     }
@@ -597,31 +613,7 @@ void BandControlsPanel::timerCallback()
 
 void BandControlsPanel::mouseDoubleClick(const juce::MouseEvent& event)
 {
-    for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
-    {
-        if (event.eventComponent == &bandSelectButtons[static_cast<size_t>(i)])
-        {
-            const auto bypassId = ParamIDs::bandParamId(selectedChannel, i, "bypass");
-            if (auto* param = parameters.getParameter(bypassId))
-            {
-                const float current = param->getValue();
-                const float target = current < 0.5f ? 1.0f : 0.0f;
-                param->setValueNotifyingHost(target);
-            }
-            break;
-        }
-    }
-
-    for (int i = 0; i < static_cast<int>(bandSoloButtons.size()); ++i)
-    {
-        if (event.eventComponent == &bandSoloButtons[static_cast<size_t>(i)])
-        {
-            if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, i, "solo")))
-                param->setValueNotifyingHost(param->convertTo0to1(0.0f));
-            bandSoloButtons[static_cast<size_t>(i)].setToggleState(false, juce::dontSendNotification);
-            break;
-        }
-    }
+    juce::ignoreUnused(event);
 }
 
 void BandControlsPanel::resized()

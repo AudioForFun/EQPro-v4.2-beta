@@ -9,6 +9,5 @@
 - Prefer block ramps (e.g., `applyGainRamp`) over per-sample smoothing loops.
 - Decimate analyzer/meter updates at high sample rates to reduce CPU load.
 - Heavy FIR rebuilds should run off the audio thread (background job or message thread).
-- Use block filter processors where possible to minimize per-sample overhead.`r`n- Dry/wet alignment uses preallocated delay buffers; avoid resizing in the audio thread.`r`n- Startup logging runs on the message thread only; no logging in the audio thread.
-
-
+- Use block filter processors where possible to minimize per-sample overhead.
+- Dry/wet alignment uses preallocated delay buffers; avoid resizing in the audio thread.

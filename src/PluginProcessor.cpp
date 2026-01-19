@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "util/ParamIDs.h"
 #include "util/ChannelLayoutUtils.h"
+#include "util/Version.h"
 #include <cmath>
 #include <complex>
 #include <cstring>
@@ -107,6 +108,74 @@ const juce::StringArray kOversamplingChoices {
     "4x"
 };
 
+juce::File getLogDirectory()
+{
+    auto documentsDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+    if (! documentsDir.exists())
+        documentsDir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory);
+
+    auto dir = documentsDir.getChildFile("EQPro").getChildFile("Logs");
+    dir.createDirectory();
+    return dir;
+}
+
+juce::File makeLogFile()
+{
+    const auto now = juce::Time::getCurrentTime();
+    const juce::String name = "EQPro_" + now.formatted("%Y-%m-%d_%H-%M-%S") + ".log";
+    return getLogDirectory().getChildFile(name);
+}
+
+std::atomic<int> gLoggerUsers { 0 };
+std::unique_ptr<juce::FileLogger> gSharedLogger;
+juce::File gSharedLogFile;
+juce::CriticalSection gLoggerLock;
+std::atomic<bool> gCrashHandlerInstalled { false };
+
+void crashHandler(void*)
+{
+    if (auto* logger = juce::Logger::getCurrentLogger())
+    {
+        logger->writeToLog("CRASH: " + juce::SystemStats::getStackBacktrace());
+    }
+}
+
+void startSharedLogger()
+{
+    const juce::ScopedLock lock(gLoggerLock);
+    if (gLoggerUsers.fetch_add(1) == 0)
+    {
+        gSharedLogFile = makeLogFile();
+        gSharedLogger = std::make_unique<juce::FileLogger>(gSharedLogFile, "EQ Pro log", 0);
+        juce::Logger::setCurrentLogger(gSharedLogger.get());
+        juce::Logger::writeToLog("Log file: " + gSharedLogFile.getFullPathName());
+        juce::Logger::writeToLog("Version: " + Version::displayString());
+        juce::Logger::writeToLog("Logger bootstrap: module load.");
+        if (! gCrashHandlerInstalled.exchange(true))
+            juce::SystemStats::setApplicationCrashHandler(crashHandler);
+    }
+}
+
+void stopSharedLogger()
+{
+    const juce::ScopedLock lock(gLoggerLock);
+    if (gLoggerUsers.fetch_sub(1) == 1)
+    {
+        juce::Logger::writeToLog("Log closed.");
+        juce::Logger::setCurrentLogger(nullptr);
+        gSharedLogger.reset();
+        gSharedLogFile = juce::File();
+    }
+}
+
+struct LoggerBootstrap
+{
+    LoggerBootstrap() { startSharedLogger(); }
+    ~LoggerBootstrap() { stopSharedLogger(); }
+};
+
+LoggerBootstrap gLoggerBootstrap;
+
 struct LinearPhaseJob final : public juce::ThreadPoolJob
 {
     LinearPhaseJob(eqdsp::EqEngine& engineIn,
@@ -148,16 +217,10 @@ EQProAudioProcessor::EQProAudioProcessor()
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       parameters(*this, &undoManager, "PARAMETERS", createParameterLayout())
 {
-    startupLogFile = juce::File::getSpecialLocation(juce::File::tempDirectory)
-                         .getChildFile("EQPro_startup_" + juce::Time::getCurrentTime()
-                             .formatted("%Y%m%d_%H%M%S") + ".log");
-    startupLogger.reset(juce::FileLogger::createDefaultAppLogger(
-        startupLogFile.getParentDirectory().getFullPathName(),
-        startupLogFile.getFileName(),
-        "EQ Pro startup log"));
-    if (startupLogger)
-        juce::Logger::setCurrentLogger(startupLogger.get());
+    initLogging();
     logStartup("EQProAudioProcessor ctor");
+    logStartup("Standalone: " + juce::String(juce::JUCEApplicationBase::isStandaloneApp() ? "true" : "false"));
+    logStartup("Executable: " + juce::File::getSpecialLocation(juce::File::currentExecutableFile).getFullPathName());
 
     verifyBands =
         juce::SystemStats::getEnvironmentVariable("EQPRO_VERIFY_BANDS", "0").getIntValue() != 0;
@@ -178,8 +241,17 @@ EQProAudioProcessor::~EQProAudioProcessor()
     stopTimer();
     linearPhasePool.removeAllJobs(true, 2000);
     logStartup("Processor dtor");
-    juce::Logger::setCurrentLogger(nullptr);
-    startupLogger.reset();
+    shutdownLogging();
+}
+
+void EQProAudioProcessor::initLogging()
+{
+    startSharedLogger();
+}
+
+void EQProAudioProcessor::shutdownLogging()
+{
+    stopSharedLogger();
 }
 
 void EQProAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)

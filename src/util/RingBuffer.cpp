@@ -2,6 +2,13 @@
 
 void AudioFifo::prepare(int bufferSize)
 {
+    if (bufferSize <= 0)
+    {
+        buffer.setSize(0, 0);
+        fifo.setTotalSize(1);
+        return;
+    }
+
     buffer.setSize(1, bufferSize);
     buffer.clear();
     fifo.setTotalSize(bufferSize);
@@ -10,6 +17,8 @@ void AudioFifo::prepare(int bufferSize)
 void AudioFifo::push(const float* data, int numSamples)
 {
     if (numSamples <= 0)
+        return;
+    if (buffer.getNumSamples() <= 0 || buffer.getNumChannels() <= 0)
         return;
 
     int start1 = 0;
@@ -36,6 +45,8 @@ void AudioFifo::push(const float* data, int numSamples)
 int AudioFifo::pull(float* dest, int numSamples)
 {
     if (numSamples <= 0)
+        return 0;
+    if (buffer.getNumSamples() <= 0 || buffer.getNumChannels() <= 0)
         return 0;
 
     int start1 = 0;

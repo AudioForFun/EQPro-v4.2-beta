@@ -359,12 +359,24 @@ public:
             outputChannels = 1;
         }
 
-        deviceManager.initialise (enableAudioInput ? inputChannels : 0,
-                                  outputChannels,
-                                  savedState.get(),
-                                  true,
-                                  preferredDefaultDeviceName,
-                                  preferredSetupOptions);
+        const auto initError = deviceManager.initialise (enableAudioInput ? inputChannels : 0,
+                                                         outputChannels,
+                                                         savedState.get(),
+                                                         true,
+                                                         preferredDefaultDeviceName,
+                                                         preferredSetupOptions);
+        if (initError.isNotEmpty())
+        {
+            Logger::writeToLog ("Audio init failed: " + initError);
+            const auto fallbackError = deviceManager.initialise (0,
+                                                                 outputChannels,
+                                                                 nullptr,
+                                                                 true,
+                                                                 preferredDefaultDeviceName,
+                                                                 preferredSetupOptions);
+            if (fallbackError.isNotEmpty())
+                Logger::writeToLog ("Audio fallback init failed: " + fallbackError);
+        }
     }
 
     //==============================================================================
@@ -659,6 +671,7 @@ public:
           pluginHolder (std::move (pluginHolderIn)),
           optionsButton ("Options")
     {
+        Logger::writeToLog ("StandaloneFilterWindow ctor");
         setConstrainer (&decoratorConstrainer);
 
        #if JUCE_IOS || JUCE_ANDROID
@@ -675,7 +688,9 @@ public:
         setFullScreen (true);
         updateContent();
        #else
+        Logger::writeToLog ("Standalone window updateContent begin");
         updateContent();
+        Logger::writeToLog ("Standalone window updateContent end");
 
         const auto windowScreenBounds = [this]() -> Rectangle<int>
         {
@@ -723,6 +738,7 @@ public:
             return { 0, 0, width, height };
         }();
 
+        Logger::writeToLog ("Standalone window bounds computed");
         setBoundsConstrained (windowScreenBounds);
 
         if (auto* processor = getAudioProcessor())
@@ -730,6 +746,7 @@ public:
                 setResizable (editor->isResizable(), false);
 
         setVisible (true);
+        Logger::writeToLog ("Standalone window visible");
         setMinimised (false);
         setAlwaysOnTop (true);
         toFront (true);
@@ -774,6 +791,7 @@ public:
 
     ~StandaloneFilterWindow() override
     {
+        Logger::writeToLog ("StandaloneFilterWindow dtor begin");
        #if (! JUCE_IOS) && (! JUCE_ANDROID)
         if (auto* props = pluginHolder->settings.get())
         {
@@ -785,6 +803,7 @@ public:
         pluginHolder->stopPlaying();
         clearContentComponent();
         pluginHolder = nullptr;
+        Logger::writeToLog ("StandaloneFilterWindow dtor end");
     }
 
     //==============================================================================
@@ -809,6 +828,7 @@ public:
     //==============================================================================
     void closeButtonPressed() override
     {
+        Logger::writeToLog ("Standalone closeButtonPressed");
         pluginHolder->savePluginState();
 
         JUCEApplicationBase::quit();

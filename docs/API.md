@@ -85,6 +85,13 @@ Usage:
 - Read analyzer/meter data via processor accessors only.
 - Never include or reference `EqEngine`.
 
+## v3.0 Beta Updates (DSP/UI Boundary)
+- `BandControlsPanel` now maintains a **per-channel, per-band UI cache** for all band parameters.
+  - Cache updates on UI edits and on timer-driven parameter reads.
+  - Cache is re-applied to APVTS on band switches so **all bands stay active** and the analyzer reflects every band.
+  - Cache access remains on the message thread; no audio-thread reads/writes.
+- Analyzer point hit-testing now requires a **tighter center hit** to avoid overlapping band selection.
+
 ## Call Flow (Simplified)
 1. UI updates APVTS parameters.
 2. `timerCallback` builds `ParamSnapshot` and swaps it.

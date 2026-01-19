@@ -192,6 +192,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
             return;
         ensureBandActiveFromEdit();
         mirrorToLinkedChannel("freq", static_cast<float>(freqSlider.getValue()));
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
     addAndMakeVisible(freqSlider);
 
@@ -210,6 +211,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
             return;
         ensureBandActiveFromEdit();
         mirrorToLinkedChannel("gain", static_cast<float>(gainSlider.getValue()));
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
     addAndMakeVisible(gainSlider);
 
@@ -227,6 +229,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
             return;
         ensureBandActiveFromEdit();
         mirrorToLinkedChannel("q", static_cast<float>(qSlider.getValue()));
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
     addAndMakeVisible(qSlider);
 
@@ -243,6 +246,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
             param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(index)));
         updateTypeUi();
         mirrorToLinkedChannel("type", static_cast<float>(index));
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
     addAndMakeVisible(typeBox);
 
@@ -264,6 +268,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "ms")))
             param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(paramIndex)));
         mirrorToLinkedChannel("ms", static_cast<float>(paramIndex));
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
 
     for (int i = 0; i < 16; ++i)
@@ -285,6 +290,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "slope")))
             param->setValueNotifyingHost(param->convertTo0to1(slopeValue));
         mirrorToLinkedChannel("slope", slopeValue);
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
     addAndMakeVisible(slopeBox);
 
@@ -304,6 +310,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
             return;
         ensureBandActiveFromEdit();
         mirrorToLinkedChannel("mix", static_cast<float>(mixSlider.getValue()));
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
 
     dynEnableToggle.setButtonText("Dynamic");
@@ -312,6 +319,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     dynEnableToggle.onClick = [this]
     {
         ensureBandActiveFromEdit();
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
 
     dynUpButton.setButtonText("UP");
@@ -325,6 +333,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
             param->setValueNotifyingHost(param->convertTo0to1(0.0f));
         dynUpButton.setToggleState(true, juce::dontSendNotification);
         dynDownButton.setToggleState(false, juce::dontSendNotification);
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
     dynDownButton.onClick = [this]()
     {
@@ -333,6 +342,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
             param->setValueNotifyingHost(param->convertTo0to1(1.0f));
         dynUpButton.setToggleState(false, juce::dontSendNotification);
         dynDownButton.setToggleState(true, juce::dontSendNotification);
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
     addAndMakeVisible(dynUpButton);
     addAndMakeVisible(dynDownButton);
@@ -343,6 +353,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     dynExternalToggle.onClick = [this]
     {
         ensureBandActiveFromEdit();
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
 
     thresholdSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
@@ -360,6 +371,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         if (suppressParamCallbacks)
             return;
         ensureBandActiveFromEdit();
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
 
     attackSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
@@ -377,6 +389,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         if (suppressParamCallbacks)
             return;
         ensureBandActiveFromEdit();
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
 
     releaseSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
@@ -394,6 +407,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         if (suppressParamCallbacks)
             return;
         ensureBandActiveFromEdit();
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
 
     autoScaleToggle.setButtonText("Auto Scale");
@@ -402,19 +416,18 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     autoScaleToggle.onClick = [this]
     {
         ensureBandActiveFromEdit();
+        cacheBandFromUi(selectedChannel, selectedBand);
     };
 
+    suppressParamCallbacks = true;
     updateAttachments();
     updateBandKnobColours();
-    if (auto* typeParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "type")))
-    {
-        const int typeIndex = static_cast<int>(typeParam->convertFrom0to1(typeParam->getValue()));
-        typeBox.setSelectedItemIndex(typeIndex, juce::dontSendNotification);
-    }
-    updateTypeUi();
     updateMsChoices();
     updateComboBoxWidths();
-    syncMsSelectionFromParam();
+    syncUiFromParams();
+    updateTypeUi();
+    suppressParamCallbacks = false;
+    refreshCacheFromParams(selectedChannel);
 }
 
 void BandControlsPanel::ensureBandActiveFromEdit()
@@ -435,7 +448,10 @@ BandControlsPanel::~BandControlsPanel()
 
 void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
 {
-    pushUiStateToParams();
+    cacheBandFromUi(selectedChannel, selectedBand);
+    applyCachedBandToParams(selectedChannel);
+    if (selectedChannel != channelIndex || selectedBand != bandIndex)
+        pushUiStateToParams();
     selectedChannel = juce::jlimit(0, ParamIDs::kMaxChannels - 1, channelIndex);
     selectedBand = juce::jlimit(0, ParamIDs::kBandsPerChannel - 1, bandIndex);
 
@@ -457,11 +473,13 @@ void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
     updateBandKnobColours();
     suppressParamCallbacks = true;
     updateAttachments();
-    updateTypeUi();
     updateMsChoices();
     updateComboBoxWidths();
-    syncMsSelectionFromParam();
+    restoreBandFromCache();
+    syncUiFromParams();
+    updateTypeUi();
     suppressParamCallbacks = false;
+    applyCachedBandToParams(selectedChannel);
 }
 
 void BandControlsPanel::pushUiStateToParams()
@@ -510,7 +528,7 @@ void BandControlsPanel::setChannelNames(const std::vector<juce::String>& names)
     channelNames = names;
     updateMsChoices();
     updateComboBoxWidths();
-    syncMsSelectionFromParam();
+    syncUiFromParams();
 }
 
 void BandControlsPanel::setTheme(const ThemeColors& newTheme)
@@ -582,8 +600,8 @@ void BandControlsPanel::updateBandKnobColours()
 void BandControlsPanel::setMsEnabled(bool enabled)
 {
     msEnabled = enabled;
-    msBox.setEnabled(true);
-    msBox.setAlpha(1.0f);
+    msBox.setEnabled(msEnabled);
+    msBox.setAlpha(msEnabled ? 1.0f : 0.5f);
 }
 
 
@@ -628,6 +646,7 @@ void BandControlsPanel::paint(juce::Graphics& g)
 void BandControlsPanel::timerCallback()
 {
     detectorDb = processor.getBandDetectorDb(selectedChannel, selectedBand);
+    cacheBandFromParams(selectedChannel, selectedBand);
     int soloCount = 0;
     int soloIndex = -1;
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
@@ -695,6 +714,158 @@ void BandControlsPanel::timerCallback()
     }
     repaint(detectorMeterBounds.getSmallestIntegerContainer());
 }
+
+void BandControlsPanel::cacheBandFromUi(int channelIndex, int bandIndex)
+{
+    if (channelIndex < 0 || channelIndex >= ParamIDs::kMaxChannels
+        || bandIndex < 0 || bandIndex >= ParamIDs::kBandsPerChannel)
+        return;
+
+    auto& state = bandStateCache[static_cast<size_t>(channelIndex)][static_cast<size_t>(bandIndex)];
+    state.freq = static_cast<float>(freqSlider.getValue());
+    state.gain = static_cast<float>(gainSlider.getValue());
+    state.q = static_cast<float>(qSlider.getValue());
+    state.type = static_cast<float>(typeBox.getSelectedItemIndex());
+    if (auto* param = parameters.getRawParameterValue(ParamIDs::bandParamId(channelIndex, bandIndex, "bypass")))
+        state.bypass = param->load();
+    if (! msChoiceMap.empty())
+    {
+        const int msIndex = msBox.getSelectedItemIndex();
+        if (msIndex >= 0 && msIndex < static_cast<int>(msChoiceMap.size()))
+            state.ms = static_cast<float>(msChoiceMap[static_cast<size_t>(msIndex)]);
+    }
+    const int slopeIndex = slopeBox.getSelectedItemIndex();
+    if (slopeIndex >= 0)
+        state.slope = static_cast<float>((slopeIndex + 1) * 6);
+    if (auto* param = parameters.getRawParameterValue(ParamIDs::bandParamId(channelIndex, bandIndex, "solo")))
+        state.solo = param->load();
+    state.mix = static_cast<float>(mixSlider.getValue());
+    state.dynEnable = dynEnableToggle.getToggleState() ? 1.0f : 0.0f;
+    state.dynMode = dynDownButton.getToggleState() ? 1.0f : 0.0f;
+    state.dynThresh = static_cast<float>(thresholdSlider.getValue());
+    state.dynAttack = static_cast<float>(attackSlider.getValue());
+    state.dynRelease = static_cast<float>(releaseSlider.getValue());
+    state.dynAuto = autoScaleToggle.getToggleState() ? 1.0f : 0.0f;
+    state.dynExternal = dynExternalToggle.getToggleState() ? 1.0f : 0.0f;
+    bandStateValid[static_cast<size_t>(channelIndex)][static_cast<size_t>(bandIndex)] = true;
+}
+
+void BandControlsPanel::cacheBandFromParams(int channelIndex, int bandIndex)
+{
+    if (channelIndex < 0 || channelIndex >= ParamIDs::kMaxChannels
+        || bandIndex < 0 || bandIndex >= ParamIDs::kBandsPerChannel)
+        return;
+
+    auto& state = bandStateCache[static_cast<size_t>(channelIndex)][static_cast<size_t>(bandIndex)];
+    auto readValue = [this, channelIndex](int band, const juce::String& suffix, float fallback)
+    {
+        if (auto* param = parameters.getRawParameterValue(ParamIDs::bandParamId(channelIndex, band, suffix)))
+            return param->load();
+        return fallback;
+    };
+
+    state.freq = readValue(bandIndex, "freq", state.freq);
+    state.gain = readValue(bandIndex, "gain", state.gain);
+    state.q = readValue(bandIndex, "q", state.q);
+    state.type = readValue(bandIndex, "type", state.type);
+    state.bypass = readValue(bandIndex, "bypass", state.bypass);
+    state.ms = readValue(bandIndex, "ms", state.ms);
+    state.slope = readValue(bandIndex, "slope", state.slope);
+    state.solo = readValue(bandIndex, "solo", state.solo);
+    state.mix = readValue(bandIndex, "mix", state.mix);
+    state.dynEnable = readValue(bandIndex, "dynEnable", state.dynEnable);
+    state.dynMode = readValue(bandIndex, "dynMode", state.dynMode);
+    state.dynThresh = readValue(bandIndex, "dynThresh", state.dynThresh);
+    state.dynAttack = readValue(bandIndex, "dynAttack", state.dynAttack);
+    state.dynRelease = readValue(bandIndex, "dynRelease", state.dynRelease);
+    state.dynAuto = readValue(bandIndex, "dynAuto", state.dynAuto);
+    state.dynExternal = readValue(bandIndex, "dynExternal", state.dynExternal);
+    bandStateValid[static_cast<size_t>(channelIndex)][static_cast<size_t>(bandIndex)] = true;
+}
+
+void BandControlsPanel::refreshCacheFromParams(int channelIndex)
+{
+    if (channelIndex < 0 || channelIndex >= ParamIDs::kMaxChannels)
+        return;
+
+    for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+        cacheBandFromParams(channelIndex, band);
+}
+
+void BandControlsPanel::applyCachedBandToParams(int channelIndex)
+{
+    if (channelIndex < 0 || channelIndex >= ParamIDs::kMaxChannels)
+        return;
+
+    auto setParamValue = [this, channelIndex](int band, const juce::String& suffix, float value)
+    {
+        if (auto* param = dynamic_cast<juce::RangedAudioParameter*>(
+                parameters.getParameter(ParamIDs::bandParamId(channelIndex, band, suffix))))
+        {
+            param->setValueNotifyingHost(param->convertTo0to1(value));
+        }
+    };
+
+    for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+    {
+        if (! bandStateValid[static_cast<size_t>(channelIndex)][static_cast<size_t>(band)])
+            continue;
+        const auto& state = bandStateCache[static_cast<size_t>(channelIndex)][static_cast<size_t>(band)];
+        setParamValue(band, "freq", state.freq);
+        setParamValue(band, "gain", state.gain);
+        setParamValue(band, "q", state.q);
+        setParamValue(band, "type", state.type);
+        setParamValue(band, "bypass", state.bypass);
+        setParamValue(band, "ms", state.ms);
+        setParamValue(band, "slope", state.slope);
+        setParamValue(band, "solo", state.solo);
+        setParamValue(band, "mix", state.mix);
+        setParamValue(band, "dynEnable", state.dynEnable);
+        setParamValue(band, "dynMode", state.dynMode);
+        setParamValue(band, "dynThresh", state.dynThresh);
+        setParamValue(band, "dynAttack", state.dynAttack);
+        setParamValue(band, "dynRelease", state.dynRelease);
+        setParamValue(band, "dynAuto", state.dynAuto);
+        setParamValue(band, "dynExternal", state.dynExternal);
+    }
+}
+
+void BandControlsPanel::restoreBandFromCache()
+{
+    if (selectedChannel < 0 || selectedChannel >= ParamIDs::kMaxChannels
+        || selectedBand < 0 || selectedBand >= ParamIDs::kBandsPerChannel)
+        return;
+
+    if (! bandStateValid[static_cast<size_t>(selectedChannel)][static_cast<size_t>(selectedBand)])
+        return;
+
+    const auto& state = bandStateCache[static_cast<size_t>(selectedChannel)][static_cast<size_t>(selectedBand)];
+    freqSlider.setValue(state.freq, juce::dontSendNotification);
+    gainSlider.setValue(state.gain, juce::dontSendNotification);
+    qSlider.setValue(state.q, juce::dontSendNotification);
+    if (static_cast<int>(state.type) >= 0)
+        typeBox.setSelectedItemIndex(static_cast<int>(state.type), juce::dontSendNotification);
+    const int slopeIndex = juce::jlimit(0, 15, static_cast<int>(std::round(state.slope / 6.0f)) - 1);
+    slopeBox.setSelectedItemIndex(slopeIndex, juce::dontSendNotification);
+    mixSlider.setValue(state.mix, juce::dontSendNotification);
+    dynEnableToggle.setToggleState(state.dynEnable > 0.5f, juce::dontSendNotification);
+    dynUpButton.setToggleState(state.dynMode < 0.5f, juce::dontSendNotification);
+    dynDownButton.setToggleState(state.dynMode > 0.5f, juce::dontSendNotification);
+    thresholdSlider.setValue(state.dynThresh, juce::dontSendNotification);
+    attackSlider.setValue(state.dynAttack, juce::dontSendNotification);
+    releaseSlider.setValue(state.dynRelease, juce::dontSendNotification);
+    autoScaleToggle.setToggleState(state.dynAuto > 0.5f, juce::dontSendNotification);
+    dynExternalToggle.setToggleState(state.dynExternal > 0.5f, juce::dontSendNotification);
+    if (! msChoiceMap.empty())
+    {
+        auto it = std::find(msChoiceMap.begin(), msChoiceMap.end(), static_cast<int>(state.ms));
+        const int uiIndex = (it != msChoiceMap.end())
+            ? static_cast<int>(std::distance(msChoiceMap.begin(), it))
+            : 0;
+        msBox.setSelectedItemIndex(uiIndex, juce::dontSendNotification);
+    }
+}
+
 
 void BandControlsPanel::mouseDoubleClick(const juce::MouseEvent& event)
 {
@@ -884,6 +1055,55 @@ void BandControlsPanel::updateAttachments()
     }
     updateComboBoxWidths();
 
+}
+
+void BandControlsPanel::syncUiFromParams()
+{
+    auto setSliderFromParam = [this](juce::Slider& slider, const juce::String& suffix)
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, suffix)))
+            slider.setValue(param->convertFrom0to1(param->getValue()), juce::dontSendNotification);
+    };
+    auto setToggleFromParam = [this](juce::ToggleButton& button, const juce::String& suffix)
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, suffix)))
+            button.setToggleState(param->getValue() > 0.5f, juce::dontSendNotification);
+    };
+
+    setSliderFromParam(freqSlider, "freq");
+    setSliderFromParam(gainSlider, "gain");
+    setSliderFromParam(qSlider, "q");
+    setSliderFromParam(mixSlider, "mix");
+    setSliderFromParam(thresholdSlider, "dynThresh");
+    setSliderFromParam(attackSlider, "dynAttack");
+    setSliderFromParam(releaseSlider, "dynRelease");
+
+    setToggleFromParam(dynEnableToggle, "dynEnable");
+    setToggleFromParam(autoScaleToggle, "dynAuto");
+    setToggleFromParam(dynExternalToggle, "dynExternal");
+
+    if (auto* typeParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "type")))
+    {
+        const int typeIndex = static_cast<int>(typeParam->convertFrom0to1(typeParam->getValue()));
+        typeBox.setSelectedItemIndex(typeIndex, juce::dontSendNotification);
+    }
+
+    if (auto* slopeParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "slope")))
+    {
+        const float slopeValue = slopeParam->convertFrom0to1(slopeParam->getValue());
+        const int slopeIndex = juce::jlimit(0, 15,
+                                            static_cast<int>(std::round(slopeValue / 6.0f)) - 1);
+        slopeBox.setSelectedItemIndex(slopeIndex, juce::dontSendNotification);
+    }
+
+    if (auto* dynModeParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynMode")))
+    {
+        const int mode = static_cast<int>(dynModeParam->convertFrom0to1(dynModeParam->getValue()));
+        dynUpButton.setToggleState(mode == 0, juce::dontSendNotification);
+        dynDownButton.setToggleState(mode == 1, juce::dontSendNotification);
+    }
+
+    syncMsSelectionFromParam();
 }
 
 void BandControlsPanel::resetSelectedBand()

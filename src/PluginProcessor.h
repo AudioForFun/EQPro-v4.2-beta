@@ -110,6 +110,8 @@ private:
     uint64_t buildSnapshot(eqdsp::ParamSnapshot& snapshot);
     void verifyBandIndependence();
     void logBandVerify(const juce::String& message);
+    void initLogging();
+    void shutdownLogging();
 
     juce::AudioProcessorValueTreeState parameters;
     juce::UndoManager undoManager;
@@ -145,8 +147,6 @@ private:
     bool verifyBands = false;
     bool verifyBandsDone = false;
     juce::File bandVerifyLogFile;
-    std::unique_ptr<juce::FileLogger> startupLogger;
-    juce::File startupLogFile;
 
     eqdsp::EqEngine eqEngine;
     eqdsp::AnalyzerTap analyzerPreTap;

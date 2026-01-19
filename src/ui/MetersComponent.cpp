@@ -76,6 +76,12 @@ void MetersComponent::paint(juce::Graphics& g)
     const auto phaseArea = meterArea.removeFromBottom(14.0f);
     const auto peakArea = meterArea.removeFromBottom(18.0f);
     const int channels = juce::jmax(1, static_cast<int>(rmsDb.size()));
+    auto getSafeValue = [](const std::vector<float>& values, int index, float fallback)
+    {
+        if (index >= 0 && index < static_cast<int>(values.size()))
+            return values[static_cast<size_t>(index)];
+        return fallback;
+    };
     const float gap = channels > 10 ? 2.0f : 4.0f;
     const float meterWidthRaw = (meterArea.getWidth() - gap * static_cast<float>(channels - 1))
         / static_cast<float>(channels);
@@ -147,12 +153,12 @@ void MetersComponent::paint(juce::Graphics& g)
                 ? channelLabels[ch]
                 : ("Ch " + juce::String(ch + 1));
         const float x = startX + ch * (meterWidth + gap);
-        const float holdValue = peakHoldDb.size() > static_cast<size_t>(ch)
-            ? peakHoldDb[static_cast<size_t>(ch)]
-            : peakDb[static_cast<size_t>(ch)];
+        const float rmsValue = getSafeValue(rmsDb, ch, kMinDb);
+        const float peakValue = getSafeValue(peakDb, ch, kMinDb);
+        const float holdValue = getSafeValue(peakHoldDb, ch, peakValue);
         drawMeter(x,
-                  rmsDb[static_cast<size_t>(ch)],
-                  peakDb[static_cast<size_t>(ch)],
+                  rmsValue,
+                  peakValue,
                   holdValue,
                   label);
     }

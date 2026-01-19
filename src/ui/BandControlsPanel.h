@@ -76,6 +76,7 @@ private:
     };
 
     void updateAttachments();
+    void syncUiFromParams();
     void updateTypeUi();
     int getCurrentTypeIndex() const;
     void copyBandState();
@@ -89,6 +90,11 @@ private:
     void updateBandKnobColours();
     void ensureBandActiveFromEdit();
     void pushUiStateToParams();
+    void cacheBandFromUi(int channelIndex, int bandIndex);
+    void cacheBandFromParams(int channelIndex, int bandIndex);
+    void refreshCacheFromParams(int channelIndex);
+    void applyCachedBandToParams(int channelIndex);
+    void restoreBandFromCache();
 
     struct BandState
     {
@@ -181,6 +187,8 @@ private:
     float detectorDb = -60.0f;
     std::vector<juce::String> channelNames;
     std::vector<int> msChoiceMap;
+    std::array<std::array<BandState, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels> bandStateCache {};
+    std::array<std::array<bool, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels> bandStateValid {};
 
     void resetSelectedBand();
     void updateComboBoxWidths();

@@ -16,7 +16,7 @@ constexpr float kMinDb = -60.0f;
 constexpr float kAnalyzerMinDb = -60.0f;
 constexpr float kAnalyzerMaxDb = 60.0f;
 constexpr float kPointRadius = 6.5f;
-constexpr float kHitRadius = 10.0f;
+constexpr float kHitRadius = 4.0f;
 constexpr float kSmoothingCoeff = 0.2f;
 
 const juce::String kParamFreqSuffix = "freq";
@@ -525,7 +525,8 @@ void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
     {
         if (event.mods.isRightButtonDown())
         {
-            float closest = kHitRadius * uiScale;
+            const float maxHit = kPointRadius * 0.5f * uiScale;
+            float closest = maxHit;
             int closestBand = -1;
             for (int i = 0; i < static_cast<int>(bandPoints.size()); ++i)
             {
@@ -536,7 +537,7 @@ void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
                     closestBand = i;
                 }
             }
-            if (closestBand >= 0)
+            if (closestBand >= 0 && closest <= maxHit)
             {
                 juce::PopupMenu menu;
                 menu.addItem("Reset to Default", [this, closestBand]()
@@ -578,7 +579,8 @@ void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
         }
     }
 
-    float closest = kHitRadius * uiScale;
+    const float maxHit = kPointRadius * 0.5f * uiScale;
+    float closest = maxHit;
     int closestBand = -1;
     for (int i = 0; i < static_cast<int>(bandPoints.size()); ++i)
     {
@@ -592,7 +594,7 @@ void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
 
     if (event.mods.isAltDown() && event.mods.isLeftButtonDown())
     {
-        if (closestBand >= 0)
+        if (closestBand >= 0 && closest <= maxHit)
         {
             resetBandToDefaults(closestBand, true);
             setSelectedBand(closestBand);
@@ -605,7 +607,7 @@ void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
         return;
     }
 
-    if (closestBand >= 0)
+    if (closestBand >= 0 && closest <= maxHit)
     {
         if (hasQHandles)
         {
@@ -787,7 +789,8 @@ void AnalyzerComponent::mouseMove(const juce::MouseEvent& event)
         return;
     }
 
-    float closest = kHitRadius * uiScale;
+    const float maxHit = kPointRadius * 0.5f * uiScale;
+    float closest = maxHit;
     int closestBand = -1;
     for (int i = 0; i < static_cast<int>(bandPoints.size()); ++i)
     {
@@ -798,7 +801,7 @@ void AnalyzerComponent::mouseMove(const juce::MouseEvent& event)
             closestBand = i;
         }
     }
-    hoverBand = closestBand;
+    hoverBand = (closestBand >= 0 && closest <= maxHit) ? closestBand : -1;
     repaint();
 }
 
@@ -1104,8 +1107,20 @@ void AnalyzerComponent::updateCurves()
         hashValue(getBandParameter(band, kParamMixSuffix));
     }
 
-    if (hash == lastCurveHash && selectedBand == lastCurveBand
-        && selectedChannel == lastCurveChannel)
+    const bool paramsUnchanged = (hash == lastCurveHash
+                                  && selectedChannel == lastCurveChannel
+                                  && lastCurveWidth == magnitudeArea.getWidth());
+    if (paramsUnchanged && selectedBand != lastCurveBand
+        && selectedBand >= 0
+        && selectedBand < static_cast<int>(perBandCurveDb.size())
+        && ! perBandCurveDb[static_cast<size_t>(selectedBand)].empty())
+    {
+        selectedBandCurveDb = perBandCurveDb[static_cast<size_t>(selectedBand)];
+        lastCurveBand = selectedBand;
+        return;
+    }
+
+    if (paramsUnchanged && selectedBand == lastCurveBand)
         return;
 
     lastCurveHash = hash;

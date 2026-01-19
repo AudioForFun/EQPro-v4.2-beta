@@ -18,6 +18,11 @@
 - Inactive bands are skipped early when mix is ~0 or gain is neutral (where safe).
 - Analyzer updates are skipped when the view is not visible.
 
+## Logging
+- On startup, the processor creates a per-run log file in `%USERPROFILE%/Documents/EQPro/Logs`.
+- If Documents is unavailable, logs fall back to `%APPDATA%/EQPro/Logs`.
+- Logs are shared across plugin instances and closed when the last instance is destroyed.
+
 ## DSP Pipeline (Milestone 1)
 - Per-channel processing pipeline with 12 fixed bands each.
 - Each band is a minimum-phase IIR biquad (RBJ formulas).

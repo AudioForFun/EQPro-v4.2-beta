@@ -4,13 +4,21 @@
 juce::AudioProcessorEditor* EQProAudioProcessor::createEditor()
 {
     logStartup("createEditor");
+    if (juce::JUCEApplicationBase::isStandaloneApp())
+    {
+        const bool useGenericUi =
+            juce::SystemStats::getEnvironmentVariable("EQPRO_STANDALONE_GENERIC_UI", "0").getIntValue() != 0;
+        logStartup("Standalone generic UI: " + juce::String(useGenericUi ? "true" : "false"));
+        if (useGenericUi)
+            return new juce::GenericAudioProcessorEditor(*this);
+    }
     return new EQProAudioProcessorEditor(*this);
 }
 
 namespace
 {
-constexpr int kEditorWidth = 980;
-constexpr int kEditorHeight = 660;
+constexpr int kEditorWidth = 1078;
+constexpr int kEditorHeight = 726;
 constexpr int kOuterMargin = 16;
 constexpr int kLeftPanelWidth = 0;
 constexpr int kRightPanelWidth = 180;
@@ -46,8 +54,11 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     processorRef.logStartup("Editor ctor begin");
     setLookAndFeel(&lookAndFeel);
     setWantsKeyboardFocus(true);
-    const bool enableOpenGL = juce::SystemStats::getEnvironmentVariable("EQPRO_OPENGL", "0")
-                                  .getIntValue() != 0;
+    bool enableOpenGL = juce::SystemStats::getEnvironmentVariable("EQPRO_OPENGL", "0")
+                            .getIntValue() != 0;
+    if (juce::JUCEApplicationBase::isStandaloneApp())
+        enableOpenGL = false;
+    processorRef.logStartup("OpenGL enabled: " + juce::String(enableOpenGL ? "true" : "false"));
     if (enableOpenGL)
     {
         openGLContext.setContinuousRepainting(false);
@@ -56,7 +67,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         openGLContext.setSwapInterval(1);
         openGLContext.attachTo(*this);
     }
-    analyzer.setInteractive(false);
+    analyzer.setInteractive(true);
     backgroundNoise = makeNoiseImage(128);
     startTimerHz(2);
 
@@ -962,6 +973,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     correlationLabel.setVisible(false);
     correlationBox.setVisible(false);
 
+    pendingWindowRescue = false;
     setResizable(false, false);
     setResizeLimits(kEditorWidth, kEditorHeight, kEditorWidth, kEditorHeight);
 
@@ -969,16 +981,24 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
 
     if (juce::JUCEApplicationBase::isStandaloneApp())
     {
-        auto& desktop = juce::Desktop::getInstance();
-        const auto& display = desktop.getDisplays().getMainDisplay();
-        const auto area = display.userArea;
-        if (! area.isEmpty())
+        pendingWindowRescue = false;
+        if (auto* peer = getPeer())
         {
-            const int targetW = juce::jmin(kEditorWidth, area.getWidth());
-            const int targetH = juce::jmin(kEditorHeight, area.getHeight());
-            setBounds(area.withSizeKeepingCentre(targetW, targetH));
-            setVisible(true);
-            toFront(true);
+            auto& desktop = juce::Desktop::getInstance();
+            const auto& display = desktop.getDisplays().getMainDisplay();
+            const auto area = display.userArea;
+            if (! area.isEmpty())
+            {
+                const int targetW = juce::jmin(kEditorWidth, area.getWidth());
+                const int targetH = juce::jmin(kEditorHeight, area.getHeight());
+                setBounds(area.withSizeKeepingCentre(targetW, targetH));
+                peer->setMinimised(false);
+                toFront(true);
+            }
+        }
+        else
+        {
+            processorRef.logStartup("Standalone editor: no peer yet, skip bounds");
         }
     }
     processorRef.logStartup("Editor ctor end");
@@ -987,8 +1007,10 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
 
 EQProAudioProcessorEditor::~EQProAudioProcessorEditor()
 {
+    processorRef.logStartup("Editor dtor begin");
     openGLContext.detach();
     setLookAndFeel(nullptr);
+    processorRef.logStartup("Editor dtor end");
 }
 
 bool EQProAudioProcessorEditor::syncToHostBounds()

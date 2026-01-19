@@ -188,6 +188,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     };
     freqSlider.onValueChange = [this]
     {
+        if (suppressParamCallbacks)
+            return;
         ensureBandActiveFromEdit();
         mirrorToLinkedChannel("freq", static_cast<float>(freqSlider.getValue()));
     };
@@ -204,6 +206,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     };
     gainSlider.onValueChange = [this]
     {
+        if (suppressParamCallbacks)
+            return;
         ensureBandActiveFromEdit();
         mirrorToLinkedChannel("gain", static_cast<float>(gainSlider.getValue()));
     };
@@ -219,6 +223,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     };
     qSlider.onValueChange = [this]
     {
+        if (suppressParamCallbacks)
+            return;
         ensureBandActiveFromEdit();
         mirrorToLinkedChannel("q", static_cast<float>(qSlider.getValue()));
     };
@@ -294,6 +300,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     addAndMakeVisible(mixSlider);
     mixSlider.onValueChange = [this]
     {
+        if (suppressParamCallbacks)
+            return;
         ensureBandActiveFromEdit();
         mirrorToLinkedChannel("mix", static_cast<float>(mixSlider.getValue()));
     };
@@ -349,6 +357,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     addAndMakeVisible(thresholdSlider);
     thresholdSlider.onValueChange = [this]
     {
+        if (suppressParamCallbacks)
+            return;
         ensureBandActiveFromEdit();
     };
 
@@ -364,6 +374,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     addAndMakeVisible(attackSlider);
     attackSlider.onValueChange = [this]
     {
+        if (suppressParamCallbacks)
+            return;
         ensureBandActiveFromEdit();
     };
 
@@ -379,6 +391,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     addAndMakeVisible(releaseSlider);
     releaseSlider.onValueChange = [this]
     {
+        if (suppressParamCallbacks)
+            return;
         ensureBandActiveFromEdit();
     };
 
@@ -440,11 +454,13 @@ void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
     const auto bandColour = ColorUtils::bandColour(selectedBand);
     titleLabel.setColour(juce::Label::textColourId, bandColour);
     updateBandKnobColours();
+    suppressParamCallbacks = true;
     updateAttachments();
     updateTypeUi();
     updateMsChoices();
     updateComboBoxWidths();
     syncMsSelectionFromParam();
+    suppressParamCallbacks = false;
 }
 
 void BandControlsPanel::setChannelNames(const std::vector<juce::String>& names)

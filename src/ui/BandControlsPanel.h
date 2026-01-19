@@ -175,6 +175,7 @@ private:
     ThemeColors theme = makeDarkTheme();
     CompactComboLookAndFeel compactComboLookAndFeel;
     bool msEnabled = true;
+    bool suppressParamCallbacks = false;
     std::optional<BandState> clipboard;
     float detectorDb = -60.0f;
     std::vector<juce::String> channelNames;

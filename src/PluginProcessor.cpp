@@ -358,6 +358,11 @@ void EQProAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 
 void EQProAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
+    const bool loadStateInStandalone =
+        juce::SystemStats::getEnvironmentVariable("EQPRO_LOAD_STATE", "0").getIntValue() != 0;
+    if (safeMode || (juce::JUCEApplicationBase::isStandaloneApp() && ! loadStateInStandalone))
+        return;
+
     std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
     if (xml != nullptr && xml->hasTagName(parameters.state.getType()))
         replaceStateSafely(juce::ValueTree::fromXml(*xml));

@@ -81,6 +81,7 @@ public:
     int getSelectedChannelIndex() const;
     float getBandDetectorDb(int channelIndex, int bandIndex) const;
     bool isSafeMode() const;
+    void logStartup(const juce::String& message);
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
@@ -147,6 +148,8 @@ private:
     bool verifyBands = false;
     bool verifyBandsDone = false;
     juce::File bandVerifyLogFile;
+    std::unique_ptr<juce::FileLogger> startupLogger;
+    juce::File startupLogFile;
 
     eqdsp::EqEngine eqEngine;
     eqdsp::AnalyzerTap analyzerPreTap;

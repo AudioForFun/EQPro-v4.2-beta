@@ -156,6 +156,17 @@ EQProAudioProcessor::EQProAudioProcessor()
         safeMode = true;
     safeModeMarker.replaceWithText("1");
 
+    startupLogFile = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                         .getChildFile("EQPro_startup_" + juce::Time::getCurrentTime()
+                             .formatted("%Y%m%d_%H%M%S") + ".log");
+    startupLogger.reset(juce::FileLogger::createDefaultAppLogger(
+        startupLogFile.getParentDirectory().getFullPathName(),
+        startupLogFile.getFileName(),
+        "EQ Pro startup log"));
+    if (startupLogger)
+        juce::Logger::setCurrentLogger(startupLogger.get());
+    logStartup("EQProAudioProcessor ctor");
+
     verifyBands =
         juce::SystemStats::getEnvironmentVariable("EQPRO_VERIFY_BANDS", "0").getIntValue() != 0;
     bandVerifyLogFile = juce::File::getSpecialLocation(juce::File::tempDirectory)
@@ -169,6 +180,7 @@ EQProAudioProcessor::EQProAudioProcessor()
         safeMode = true;
 
     initializeParamPointers();
+    logStartup("Processor init done");
     startTimerHz(10);
 }
 
@@ -178,6 +190,9 @@ EQProAudioProcessor::~EQProAudioProcessor()
     linearPhasePool.removeAllJobs(true, 2000);
     if (safeModeMarker.existsAsFile())
         safeModeMarker.deleteFile();
+    logStartup("Processor dtor");
+    juce::Logger::setCurrentLogger(nullptr);
+    startupLogger.reset();
 }
 
 void EQProAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -672,6 +687,12 @@ float EQProAudioProcessor::getBandDetectorDb(int channelIndex, int bandIndex) co
 bool EQProAudioProcessor::isSafeMode() const
 {
     return safeMode;
+}
+
+void EQProAudioProcessor::logStartup(const juce::String& message)
+{
+    if (auto* logger = juce::Logger::getCurrentLogger())
+        logger->writeToLog(message);
 }
 
 void EQProAudioProcessor::logBandVerify(const juce::String& message)

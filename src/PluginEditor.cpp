@@ -3,6 +3,7 @@
 
 juce::AudioProcessorEditor* EQProAudioProcessor::createEditor()
 {
+    logStartup("createEditor");
     if (isSafeMode())
         return new EQProSafeEditor(*this);
     return new EQProAudioProcessorEditor(*this);
@@ -44,6 +45,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
       spectralPanel(p.getParameters()),
       correlation(p)
 {
+    processorRef.logStartup("Editor ctor begin");
     setLookAndFeel(&lookAndFeel);
     setWantsKeyboardFocus(true);
     const bool enableOpenGL = juce::SystemStats::getEnvironmentVariable("EQPRO_OPENGL", "0")
@@ -978,6 +980,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         setVisible(true);
         toFront(true);
     }
+    processorRef.logStartup("Editor ctor end");
 }
 
 EQProSafeEditor::EQProSafeEditor(EQProAudioProcessor& p)

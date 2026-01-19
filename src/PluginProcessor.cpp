@@ -148,14 +148,6 @@ EQProAudioProcessor::EQProAudioProcessor()
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       parameters(*this, &undoManager, "PARAMETERS", createParameterLayout())
 {
-    const bool disableSafeMode =
-        juce::SystemStats::getEnvironmentVariable("EQPRO_DISABLE_SAFE_MODE", "0").getIntValue() != 0;
-    safeModeMarker = juce::File::getSpecialLocation(juce::File::tempDirectory)
-                         .getChildFile("EQPro_safe_mode.flag");
-    if (safeModeMarker.existsAsFile() && ! disableSafeMode)
-        safeMode = true;
-    safeModeMarker.replaceWithText("1");
-
     startupLogFile = juce::File::getSpecialLocation(juce::File::tempDirectory)
                          .getChildFile("EQPro_startup_" + juce::Time::getCurrentTime()
                              .formatted("%Y%m%d_%H%M%S") + ".log");
@@ -174,11 +166,6 @@ EQProAudioProcessor::EQProAudioProcessor()
     if (verifyBands)
         bandVerifyLogFile.deleteFile();
 
-    const bool fullUiRequested =
-        juce::SystemStats::getEnvironmentVariable("EQPRO_FULL_UI", "0").getIntValue() != 0;
-    if (juce::JUCEApplicationBase::isStandaloneApp() && ! fullUiRequested)
-        safeMode = true;
-
     initializeParamPointers();
     logStartup("Processor init done");
     startTimerHz(10);
@@ -188,8 +175,6 @@ EQProAudioProcessor::~EQProAudioProcessor()
 {
     stopTimer();
     linearPhasePool.removeAllJobs(true, 2000);
-    if (safeModeMarker.existsAsFile())
-        safeModeMarker.deleteFile();
     logStartup("Processor dtor");
     juce::Logger::setCurrentLogger(nullptr);
     startupLogger.reset();
@@ -380,7 +365,7 @@ void EQProAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     const bool loadStateInStandalone =
         juce::SystemStats::getEnvironmentVariable("EQPRO_LOAD_STATE", "0").getIntValue() != 0;
-    if (safeMode || (juce::JUCEApplicationBase::isStandaloneApp() && ! loadStateInStandalone))
+    if (juce::JUCEApplicationBase::isStandaloneApp() && ! loadStateInStandalone)
         return;
 
     std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
@@ -682,11 +667,6 @@ int EQProAudioProcessor::getSelectedChannelIndex() const
 float EQProAudioProcessor::getBandDetectorDb(int channelIndex, int bandIndex) const
 {
     return eqEngine.getEqDsp().getDetectorDb(channelIndex, bandIndex);
-}
-
-bool EQProAudioProcessor::isSafeMode() const
-{
-    return safeMode;
 }
 
 void EQProAudioProcessor::logStartup(const juce::String& message)

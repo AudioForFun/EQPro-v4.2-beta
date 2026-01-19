@@ -155,13 +155,3 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EQProAudioProcessorEditor)
 };
 
-class EQProSafeEditor final : public juce::AudioProcessorEditor
-{
-public:
-    explicit EQProSafeEditor(EQProAudioProcessor&);
-    void paint(juce::Graphics&) override;
-    void resized() override;
-
-private:
-    juce::Label infoLabel;
-};

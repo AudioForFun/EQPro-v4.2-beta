@@ -4,8 +4,6 @@
 juce::AudioProcessorEditor* EQProAudioProcessor::createEditor()
 {
     logStartup("createEditor");
-    if (isSafeMode())
-        return new EQProSafeEditor(*this);
     return new EQProAudioProcessorEditor(*this);
 }
 
@@ -983,37 +981,6 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     processorRef.logStartup("Editor ctor end");
 }
 
-EQProSafeEditor::EQProSafeEditor(EQProAudioProcessor& p)
-    : juce::AudioProcessorEditor(&p)
-{
-    infoLabel.setText("EQ Pro launched in Safe Mode.\n"
-                      "Set EQPRO_FULL_UI=1 to force full UI in standalone.",
-                      juce::dontSendNotification);
-    infoLabel.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(infoLabel);
-    setSize(520, 160);
-
-    if (juce::JUCEApplicationBase::isStandaloneApp())
-    {
-        auto& desktop = juce::Desktop::getInstance();
-        const auto display = desktop.getDisplays().getMainDisplay();
-        const auto area = display.userArea;
-        setBounds(area.withSizeKeepingCentre(getWidth(), getHeight()));
-        setAlwaysOnTop(true);
-        setVisible(true);
-        toFront(true);
-    }
-}
-
-void EQProSafeEditor::paint(juce::Graphics& g)
-{
-    g.fillAll(juce::Colour(0xff0b0f15));
-}
-
-void EQProSafeEditor::resized()
-{
-    infoLabel.setBounds(getLocalBounds().reduced(16));
-}
 
 EQProAudioProcessorEditor::~EQProAudioProcessorEditor()
 {

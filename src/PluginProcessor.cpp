@@ -156,6 +156,13 @@ EQProAudioProcessor::EQProAudioProcessor()
         safeMode = true;
     safeModeMarker.replaceWithText("1");
 
+    verifyBands =
+        juce::SystemStats::getEnvironmentVariable("EQPRO_VERIFY_BANDS", "0").getIntValue() != 0;
+    bandVerifyLogFile = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                            .getChildFile("EQPro_band_verify.log");
+    if (verifyBands)
+        bandVerifyLogFile.deleteFile();
+
     initializeParamPointers();
     startTimerHz(10);
 }
@@ -657,6 +664,69 @@ bool EQProAudioProcessor::isSafeMode() const
     return safeMode;
 }
 
+void EQProAudioProcessor::logBandVerify(const juce::String& message)
+{
+    if (! verifyBands)
+        return;
+    bandVerifyLogFile.appendText(message + "\n");
+    if (auto* logger = juce::Logger::getCurrentLogger())
+        logger->writeToLog(message);
+}
+
+void EQProAudioProcessor::verifyBandIndependence()
+{
+    const int channel = 0;
+    const char* suffixes[] { kParamFreqSuffix, kParamGainSuffix, kParamQSuffix, kParamMixSuffix };
+    std::array<std::array<float, ParamIDs::kBandsPerChannel>, 4> baseline {};
+    for (int s = 0; s < 4; ++s)
+    {
+        for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+        {
+            if (auto* param = parameters.getParameter(ParamIDs::bandParamId(channel, band, suffixes[s])))
+                baseline[static_cast<size_t>(s)][static_cast<size_t>(band)] = param->getValue();
+        }
+    }
+
+    logBandVerify("Band verify start");
+    for (int s = 0; s < 4; ++s)
+    {
+        const juce::String suffix(suffixes[s]);
+        for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+        {
+            auto* target = parameters.getParameter(ParamIDs::bandParamId(channel, band, suffix));
+            if (target == nullptr)
+                continue;
+            const float defaultValue = target->getDefaultValue();
+            target->setValueNotifyingHost(defaultValue);
+
+            for (int other = 0; other < ParamIDs::kBandsPerChannel; ++other)
+            {
+                if (other == band)
+                    continue;
+                auto* param = parameters.getParameter(ParamIDs::bandParamId(channel, other, suffix));
+                if (param == nullptr)
+                    continue;
+                const float current = param->getValue();
+                const float before = baseline[static_cast<size_t>(s)][static_cast<size_t>(other)];
+                if (std::abs(current - before) > 0.0005f)
+                {
+                    logBandVerify("Cross-band change: " + suffix + " band " + juce::String(band + 1)
+                        + " -> band " + juce::String(other + 1));
+                }
+            }
+
+            for (int restoreBand = 0; restoreBand < ParamIDs::kBandsPerChannel; ++restoreBand)
+            {
+                auto* param = parameters.getParameter(ParamIDs::bandParamId(channel, restoreBand, suffix));
+                if (param == nullptr)
+                    continue;
+                param->setValueNotifyingHost(baseline[static_cast<size_t>(s)][static_cast<size_t>(restoreBand)]);
+            }
+        }
+    }
+    logBandVerify("Band verify end");
+}
+
 void EQProAudioProcessor::initializeParamPointers()
 {
     globalBypassParam = parameters.getRawParameterValue(ParamIDs::globalBypass);
@@ -936,6 +1006,12 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 
 void EQProAudioProcessor::timerCallback()
 {
+    if (verifyBands && ! verifyBandsDone)
+    {
+        verifyBandsDone = true;
+        verifyBandIndependence();
+    }
+
     cachedChannelNames = getCurrentChannelNames();
     const int nextIndex = 1 - activeSnapshot.load();
     const uint64_t hash = buildSnapshot(snapshots[nextIndex]);

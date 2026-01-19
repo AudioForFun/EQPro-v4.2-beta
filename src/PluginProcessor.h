@@ -108,6 +108,8 @@ private:
     void initializeParamPointers();
     void timerCallback() override;
     uint64_t buildSnapshot(eqdsp::ParamSnapshot& snapshot);
+    void verifyBandIndependence();
+    void logBandVerify(const juce::String& message);
 
     juce::AudioProcessorValueTreeState parameters;
     juce::UndoManager undoManager;
@@ -142,6 +144,9 @@ private:
 
     bool safeMode = false;
     juce::File safeModeMarker;
+    bool verifyBands = false;
+    bool verifyBandsDone = false;
+    juce::File bandVerifyLogFile;
 
     eqdsp::EqEngine eqEngine;
     eqdsp::AnalyzerTap analyzerPreTap;

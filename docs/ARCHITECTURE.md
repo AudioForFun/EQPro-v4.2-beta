@@ -68,7 +68,9 @@
 - Natural: short linear-phase FIR (lower latency).
 - Linear: long linear-phase FIR with selectable quality and host latency reporting.
 - Global dry/wet alignment uses internal sample-accurate delay compensation in linear modes.
-- Linear-phase IRs are windowed (Hann) and rebuilt only when parameters change.
+- Linear-phase IRs are windowed (Hann/Blackman/Kaiser) and rebuilt only when parameters change.
+- Natural/Linear modes use **adaptive tap lengths** based on band complexity (Q/gain/slope/active bands).
+- Linear modes include a **mixed-phase blend** to preserve transients while keeping phase smooth.
 - Optional oversampling parameter is present but currently disabled in the DSP path.
 - Character modes (Gentle/Warm) apply a soft saturator (oversampled when enabled).
 

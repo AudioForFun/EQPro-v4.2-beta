@@ -20,6 +20,13 @@ SlopeConfig slopeFromDb(float slopeDb)
     return { juce::jmax(0, stages), useOnePole };
 }
 
+float detectorWeightFromFreq(float freqHz)
+{
+    const float clamped = juce::jlimit(20.0f, 20000.0f, freqHz);
+    const float norm = std::log2(clamped / 1000.0f);
+    return juce::jlimit(0.6f, 1.4f, 1.0f + 0.2f * norm);
+}
+
 float computeDynamicGain(const eqdsp::BandParams& params, float detectorDb)
 {
     if (! params.dynamicEnabled)
@@ -132,14 +139,19 @@ void EQDSP::prepare(double sampleRate, int maxBlockSize, int channels)
             cachedParams[ch][band].bypassed = false;
             cachedParams[ch][band].mix = 1.0f;
             detectorEnv[ch][band] = 0.0f;
+            detectorEnvRms[ch][band] = 0.0f;
             detectorDb[ch][band].store(-60.0f);
             dynamicGainDb[ch][band].store(0.0f);
             smoothFreq[ch][band].reset(sampleRateHz, 0.02);
             smoothGain[ch][band].reset(sampleRateHz, 0.02);
             smoothQ[ch][band].reset(sampleRateHz, 0.02);
+            smoothMix[ch][band].reset(sampleRateHz, 0.02);
+            smoothDynThresh[ch][band].reset(sampleRateHz, 0.02);
             smoothFreq[ch][band].setCurrentAndTargetValue(cachedParams[ch][band].frequencyHz);
             smoothGain[ch][band].setCurrentAndTargetValue(cachedParams[ch][band].gainDb);
             smoothQ[ch][band].setCurrentAndTargetValue(cachedParams[ch][band].q);
+            smoothMix[ch][band].setCurrentAndTargetValue(cachedParams[ch][band].mix);
+            smoothDynThresh[ch][band].setCurrentAndTargetValue(cachedParams[ch][band].thresholdDb);
             soloFilters[ch][band].prepare(sampleRateHz);
         }
     }
@@ -166,6 +178,7 @@ void EQDSP::reset()
             soloFilters[ch][band].reset();
             detectorFilters[ch][band].reset();
             detectorEnv[ch][band] = 0.0f;
+            detectorEnvRms[ch][band] = 0.0f;
             detectorDb[ch][band].store(-60.0f);
             dynamicGainDb[ch][band].store(0.0f);
         }
@@ -217,6 +230,8 @@ void EQDSP::updateBandParams(int channelIndex, int bandIndex, const BandParams& 
     smoothFreq[channelIndex][bandIndex].setTargetValue(params.frequencyHz);
     smoothGain[channelIndex][bandIndex].setTargetValue(params.gainDb);
     smoothQ[channelIndex][bandIndex].setTargetValue(params.q);
+    smoothMix[channelIndex][bandIndex].setTargetValue(params.mix);
+    smoothDynThresh[channelIndex][bandIndex].setTargetValue(params.thresholdDb);
 }
 
 void EQDSP::updateMsBandParams(int bandIndex, const BandParams& params)
@@ -300,9 +315,13 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 smoothFreq[ch][band].skip(samples);
                 smoothGain[ch][band].skip(samples);
                 smoothQ[ch][band].skip(samples);
+                smoothMix[ch][band].skip(samples);
+                smoothDynThresh[ch][band].skip(samples);
                 params.frequencyHz = smoothFreq[ch][band].getCurrentValue();
                 params.gainDb = smoothGain[ch][band].getCurrentValue();
                 params.q = smoothQ[ch][band].getCurrentValue();
+                params.mix = smoothMix[ch][band].getCurrentValue();
+                params.thresholdDb = smoothDynThresh[ch][band].getCurrentValue();
                 params.q = applyQMode(params);
                 params.type = FilterType::bandPass;
                 params.gainDb = smartSoloEnabled ? 6.0f : 0.0f;
@@ -348,6 +367,28 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             acc += std::abs(left[i] - right[i]);
         linkStereoDetectors = acc < 1.0e-5f * static_cast<float>(checkCount);
     }
+
+    auto updateDetector = [this](int channel, int band, float detSample,
+                                 float attackCoeff, float releaseCoeff,
+                                 float freqHz) -> float
+    {
+        const float weighted = detSample * detectorWeightFromFreq(freqHz);
+        float& peakEnv = detectorEnv[channel][band];
+        float& rmsEnv = detectorEnvRms[channel][band];
+        const float absVal = std::abs(weighted);
+        const float coeff = absVal > peakEnv ? attackCoeff : releaseCoeff;
+        peakEnv = coeff * peakEnv + (1.0f - coeff) * absVal;
+        const float sq = weighted * weighted;
+        const float coeffRms = sq > rmsEnv ? attackCoeff : releaseCoeff;
+        rmsEnv = coeffRms * rmsEnv + (1.0f - coeffRms) * sq;
+        const float rms = std::sqrt(rmsEnv);
+        // Blend peak and RMS for smoother, more musical dynamics.
+        constexpr float kPeakBlend = 0.6f;
+        const float detector = (kPeakBlend * peakEnv) + ((1.0f - kPeakBlend) * rms);
+        const float detDb = juce::Decibels::gainToDecibels(detector, -60.0f);
+        detectorDb[channel][band].store(detDb);
+        return detDb;
+    };
 
     if (useMs)
     {
@@ -413,9 +454,13 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             smoothFreq[0][band].skip(samples);
             smoothGain[0][band].skip(samples);
             smoothQ[0][band].skip(samples);
+            smoothMix[0][band].skip(samples);
+            smoothDynThresh[0][band].skip(samples);
             params.frequencyHz = smoothFreq[0][band].getCurrentValue();
             params.gainDb = smoothGain[0][band].getCurrentValue();
             params.q = smoothQ[0][band].getCurrentValue();
+            params.mix = smoothMix[0][band].getCurrentValue();
+            params.thresholdDb = smoothDynThresh[0][band].getCurrentValue();
             params.q = applyQMode(params);
             const float mix = juce::jlimit(0.0f, 1.0f, params.mix);
             const float staticGainDb = params.gainDb;
@@ -487,12 +532,9 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     const float detSample = (target == 2)
                         ? detectorFilters[1][band].processSample(detInput)
                         : detectorFilters[0][band].processSample(detInput);
-                    float& env = (target == 2) ? detectorEnv[1][band] : detectorEnv[0][band];
-                    const float absVal = std::abs(detSample);
-                    const float coeff = absVal > env ? attackCoeff : releaseCoeff;
-                    env = coeff * env + (1.0f - coeff) * absVal;
-                    const float detDb = juce::Decibels::gainToDecibels(env, -60.0f);
-                    detectorDb[0][band].store(detDb);
+                    const float detDb = updateDetector(0, band, detSample,
+                                                       attackCoeff, releaseCoeff,
+                                                       params.frequencyHz);
 
                     if (isHpLp && slopeConfig.useOnePole)
                     {
@@ -542,12 +584,9 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                         ? detectorMsBuffer.getReadPointer(0)[i]
                         : dryM;
                     const float detSample = detectorFilters[0][band].processSample(detInput);
-                    float& env = detectorEnv[0][band];
-                    const float absVal = std::abs(detSample);
-                    const float coeff = absVal > env ? attackCoeff : releaseCoeff;
-                    env = coeff * env + (1.0f - coeff) * absVal;
-                    const float detDb = juce::Decibels::gainToDecibels(env, -60.0f);
-                    detectorDb[0][band].store(detDb);
+                    const float detDb = updateDetector(0, band, detSample,
+                                                       attackCoeff, releaseCoeff,
+                                                       params.frequencyHz);
                     if (isHpLp && slopeConfig.useOnePole)
                         m = msOnePoles[0][band].processSample(m);
 
@@ -588,12 +627,9 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                         ? detectorMsBuffer.getReadPointer(1)[i]
                         : dryS;
                     const float detSample = detectorFilters[1][band].processSample(detInput);
-                    float& env = detectorEnv[1][band];
-                    const float absVal = std::abs(detSample);
-                    const float coeff = absVal > env ? attackCoeff : releaseCoeff;
-                    env = coeff * env + (1.0f - coeff) * absVal;
-                    const float detDb = juce::Decibels::gainToDecibels(env, -60.0f);
-                    detectorDb[1][band].store(detDb);
+                    const float detDb = updateDetector(1, band, detSample,
+                                                       attackCoeff, releaseCoeff,
+                                                       params.frequencyHz);
                     if (isHpLp && slopeConfig.useOnePole)
                         s = msOnePoles[1][band].processSample(s);
 
@@ -769,12 +805,9 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     {
                         const float detInput = detData != nullptr ? detData[i] : dry;
                         const float detSample = detectorFilters[ch][band].processSample(detInput);
-                        float& env = detectorEnv[ch][band];
-                        const float absVal = std::abs(detSample);
-                        const float coeff = absVal > env ? attackCoeff : releaseCoeff;
-                        env = coeff * env + (1.0f - coeff) * absVal;
-                        detDb = juce::Decibels::gainToDecibels(env, -60.0f);
-                        detectorDb[ch][band].store(detDb);
+                        detDb = updateDetector(ch, band, detSample,
+                                               attackCoeff, releaseCoeff,
+                                               params.frequencyHz);
                         if (detTempWrite != nullptr)
                             detTempWrite[i] = detDb;
                     }

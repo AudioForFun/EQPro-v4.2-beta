@@ -100,6 +100,14 @@ Usage:
 - Dynamic EQ now exposes **per-band dynamic gain delta (dB)** to the UI, and the analyzer curves
   reflect real-time gain reduction/expansion.
 
+## v3.2 Beta Updates (DSP/UI Boundary)
+- Natural/Linear modes now use **adaptive FIR tap lengths** based on band complexity
+  (active band count, Q, gain, slope) to improve clarity without unnecessary latency.
+- Linear-phase window selection now **auto-optimizes** (Hann/Blackman/Kaiser) for better stop-band attenuation.
+- Linear modes add a **mixed-phase blend** (minimum-phase correction path) for improved transient response.
+- Dynamic EQ detector now uses **peak/RMS blending** and **frequency weighting** for smoother, more musical action.
+- Per-band **mix/threshold smoothing** reduces zippering during automation or UI tweaks.
+
 ## Call Flow (Simplified)
 1. UI updates APVTS parameters.
 2. `timerCallback` builds `ParamSnapshot` and swaps it.

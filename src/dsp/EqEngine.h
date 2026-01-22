@@ -47,6 +47,10 @@ private:
     int dryDelayWritePos = 0;
     int mixDelaySamples = 0;
     int maxDelaySamples = 8192;
+    juce::AudioBuffer<float> minPhaseBuffer;
+    juce::AudioBuffer<float> minPhaseDelayBuffer;
+    int minPhaseDelayWritePos = 0;
+    int minPhaseDelaySamples = 0;
     juce::AudioBuffer<float> oversampledBuffer;
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;
 
@@ -76,5 +80,7 @@ private:
 
     void updateDryDelay(int latencySamples, int maxBlockSize, int numChannels);
     void applyDryDelay(juce::AudioBuffer<float>& dry, int numSamples, int delaySamples);
+    void updateMinPhaseDelay(int latencySamples, int maxBlockSize, int numChannels);
+    void applyMinPhaseDelay(juce::AudioBuffer<float>& buffer, int numSamples, int delaySamples);
 };
 } // namespace eqdsp

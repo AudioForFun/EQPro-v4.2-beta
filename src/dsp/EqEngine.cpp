@@ -25,6 +25,12 @@ void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
     dryDelayBuffer.clear();
     dryDelayWritePos = 0;
     mixDelaySamples = 0;
+    minPhaseBuffer.setSize(numChannels, maxBlockSize);
+    minPhaseBuffer.clear();
+    minPhaseDelayBuffer.setSize(numChannels, maxPreparedBlockSize + maxDelaySamples + 1);
+    minPhaseDelayBuffer.clear();
+    minPhaseDelayWritePos = 0;
+    minPhaseDelaySamples = 0;
     oversampledBuffer.setSize(numChannels, maxBlockSize * 4);
     oversampledBuffer.clear();
 
@@ -50,6 +56,9 @@ void EqEngine::reset()
     dryDelayBuffer.clear();
     dryDelayWritePos = 0;
     mixDelaySamples = 0;
+    minPhaseDelayBuffer.clear();
+    minPhaseDelayWritePos = 0;
+    minPhaseDelaySamples = 0;
 }
 
 void EqEngine::process(juce::AudioBuffer<float>& buffer,
@@ -207,6 +216,31 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     }
     else
     {
+        const int samples = buffer.getNumSamples();
+        const int latencySamples = getLatencySamples();
+        float mixedPhaseAmount = snapshot.phaseMode == 1 ? 0.22f : 0.12f;
+        mixedPhaseAmount *= (1.0f - 0.08f * snapshot.linearQuality);
+        mixedPhaseAmount = juce::jlimit(0.08f, 0.25f, mixedPhaseAmount);
+
+        if (mixedPhaseAmount > 0.0f)
+        {
+            if (minPhaseBuffer.getNumChannels() != numChannels
+                || minPhaseBuffer.getNumSamples() < samples)
+            {
+                minPhaseBuffer.setSize(numChannels, samples);
+            }
+            for (int ch = 0; ch < numChannels; ++ch)
+                juce::FloatVectorOperations::copy(minPhaseBuffer.getWritePointer(ch),
+                                                  buffer.getReadPointer(ch), samples);
+            // Minimum-phase pass for transient preservation in linear modes.
+            eqDsp.process(minPhaseBuffer, detectorBuffer);
+            if (latencySamples > 0)
+            {
+                updateMinPhaseDelay(latencySamples, samples, numChannels);
+                applyMinPhaseDelay(minPhaseBuffer, samples, latencySamples);
+            }
+        }
+
         const bool useMs = numChannels >= 2
             && std::any_of(snapshot.msTargets.begin(), snapshot.msTargets.end(), [](int v) { return v != 0; });
 
@@ -241,6 +275,18 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
         else
         {
             linearPhaseEq.process(buffer);
+        }
+
+        if (mixedPhaseAmount > 0.0f)
+        {
+            const float dryMix = 1.0f - mixedPhaseAmount;
+            for (int ch = 0; ch < numChannels; ++ch)
+            {
+                auto* wet = buffer.getWritePointer(ch);
+                const auto* minPhase = minPhaseBuffer.getReadPointer(ch);
+                for (int i = 0; i < samples; ++i)
+                    wet[i] = wet[i] * dryMix + minPhase[i] * mixedPhaseAmount;
+            }
         }
     }
 
@@ -409,52 +455,44 @@ void EqEngine::updateLinearPhase(const ParamSnapshot& snapshot, double sampleRat
         return;
     }
 
-    int taps = 256;
-    if (snapshot.phaseMode == 1)
+    // Adaptive taps: increase FIR length for complex band settings.
+    float maxQ = 0.0f;
+    float maxGain = 0.0f;
+    float maxSlope = 0.0f;
+    int activeBands = 0;
+    for (int ch = 0; ch < snapshot.numChannels; ++ch)
     {
-        switch (snapshot.linearQuality)
+        for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
         {
-            case 0: taps = 128; break;
-            case 1: taps = 256; break;
-            case 2: taps = 512; break;
-            case 3: taps = 1024; break;
-            case 4: taps = 2048; break;
-            default: taps = 256; break;
+            const auto& b = snapshot.bands[ch][band];
+            if (b.bypassed || b.mix <= 0.0005f)
+                continue;
+            ++activeBands;
+            maxQ = std::max(maxQ, b.q);
+            maxGain = std::max(maxGain, std::abs(b.gainDb));
+            maxSlope = std::max(maxSlope, b.slopeDb);
         }
     }
-    else
-    {
-        switch (snapshot.linearQuality)
-        {
-            case 0: taps = 512; break;
-            case 1: taps = 1024; break;
-            case 2: taps = 2048; break;
-            case 3: taps = 4096; break;
-            case 4: taps = 8192; break;
-            default: taps = 1024; break;
-        }
-    }
+
+    int complexityBoost = 0;
+    if (maxQ >= 10.0f || maxGain >= 18.0f || maxSlope >= 48.0f || activeBands >= 8)
+        complexityBoost = 1;
+    if (maxQ >= 14.0f || maxGain >= 30.0f || maxSlope >= 72.0f || activeBands >= 10)
+        complexityBoost = 2;
+
+    const int quality = juce::jlimit(0, 4, snapshot.linearQuality);
+    const int index = juce::jmin(4, quality + complexityBoost);
+    const std::array<int, 5> naturalTaps { 128, 256, 512, 1024, 2048 };
+    const std::array<int, 5> linearTaps { 512, 1024, 2048, 4096, 8192 };
+    const int taps = snapshot.phaseMode == 1 ? naturalTaps[static_cast<size_t>(index)]
+                                             : linearTaps[static_cast<size_t>(index)];
 
     const uint64_t hash = computeParamsHash(snapshot);
     if (hash == lastParamHash && taps == lastTaps && snapshot.phaseMode == lastPhaseMode
         && snapshot.linearQuality == lastLinearQuality && snapshot.linearWindow == lastWindowIndex)
         return;
 
-    int headSize = 0;
-    if (snapshot.phaseMode == 1)
-        headSize = taps / 2;
-    else
-    {
-        switch (snapshot.linearQuality)
-        {
-            case 0: headSize = 128; break;
-            case 1: headSize = 256; break;
-            case 2: headSize = 512; break;
-            case 3: headSize = 1024; break;
-            case 4: headSize = 2048; break;
-            default: headSize = 256; break;
-        }
-    }
+    const int headSize = snapshot.phaseMode == 1 ? (taps / 2) : (taps / 4);
 
     linearPhaseEq.configurePartitioning(headSize);
     linearPhaseMsEq.configurePartitioning(headSize);
@@ -514,7 +552,14 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, doubl
 
     int windowIndex = snapshot.linearWindow;
     if (windowIndex == 0)
-        windowIndex = snapshot.linearQuality >= 3 ? 1 : 0;
+    {
+        if (snapshot.linearQuality >= 4)
+            windowIndex = 2; // Kaiser for maximum stop-band attenuation.
+        else if (snapshot.linearQuality >= 2)
+            windowIndex = 1; // Blackman for smoother bands.
+        else
+            windowIndex = 0; // Hann for lowest latency.
+    }
     const auto method = windowIndex == 1
         ? juce::dsp::WindowingFunction<float>::blackman
         : (windowIndex == 2 ? juce::dsp::WindowingFunction<float>::kaiser
@@ -814,6 +859,58 @@ void EqEngine::applyDryDelay(juce::AudioBuffer<float>& dry, int numSamples, int 
         }
     }
     dryDelayWritePos = (writePos + numSamples) % bufferSize;
+}
+
+void EqEngine::updateMinPhaseDelay(int latencySamples, int maxBlockSize, int numChannels)
+{
+    const int targetDelay = juce::jmax(0, latencySamples);
+    maxPreparedBlockSize = juce::jmax(maxPreparedBlockSize, maxBlockSize);
+    const int neededSize = maxPreparedBlockSize + maxDelaySamples + 1;
+    if (minPhaseDelayBuffer.getNumChannels() != numChannels
+        || minPhaseDelayBuffer.getNumSamples() != neededSize)
+    {
+        minPhaseDelayBuffer.setSize(numChannels, neededSize);
+        minPhaseDelayBuffer.clear();
+        minPhaseDelayWritePos = 0;
+    }
+
+    if (targetDelay != minPhaseDelaySamples)
+    {
+        minPhaseDelaySamples = targetDelay;
+        minPhaseDelayBuffer.clear();
+        minPhaseDelayWritePos = 0;
+    }
+}
+
+void EqEngine::applyMinPhaseDelay(juce::AudioBuffer<float>& buffer, int numSamples, int delaySamples)
+{
+    if (delaySamples <= 0)
+        return;
+
+    const int bufferSize = minPhaseDelayBuffer.getNumSamples();
+    if (bufferSize <= 1)
+        return;
+    delaySamples = juce::jmin(delaySamples, bufferSize - 1);
+
+    int writePos = minPhaseDelayWritePos;
+    const int channels = juce::jmin(buffer.getNumChannels(), minPhaseDelayBuffer.getNumChannels());
+    for (int ch = 0; ch < channels; ++ch)
+    {
+        auto* delayData = minPhaseDelayBuffer.getWritePointer(ch);
+        auto* data = buffer.getWritePointer(ch);
+        int localWrite = writePos;
+        for (int i = 0; i < numSamples; ++i)
+        {
+            delayData[localWrite] = data[i];
+            int readPos = localWrite - delaySamples;
+            if (readPos < 0)
+                readPos += bufferSize;
+            data[i] = delayData[readPos];
+            if (++localWrite >= bufferSize)
+                localWrite = 0;
+        }
+    }
+    minPhaseDelayWritePos = (writePos + numSamples) % bufferSize;
 }
 
 EQDSP& EqEngine::getEqDsp()

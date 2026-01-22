@@ -42,6 +42,10 @@ private:
         smoothGain {};
     std::array<std::array<juce::SmoothedValue<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
         smoothQ {};
+    std::array<std::array<juce::SmoothedValue<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        smoothMix {};
+    std::array<std::array<juce::SmoothedValue<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        smoothDynThresh {};
     std::array<std::array<Biquad, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
         soloFilters {};
     juce::AudioBuffer<float> scratchBuffer;
@@ -55,6 +59,8 @@ private:
         detectorFilters {};
     std::array<std::array<float, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
         detectorEnv {};
+    std::array<std::array<float, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        detectorEnvRms {};
     std::array<std::array<std::atomic<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
         detectorDb {};
     std::array<std::array<std::atomic<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>

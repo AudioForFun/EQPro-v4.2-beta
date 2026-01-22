@@ -743,6 +743,11 @@ float EQProAudioProcessor::getBandDetectorDb(int channelIndex, int bandIndex) co
     return eqEngine.getEqDsp().getDetectorDb(channelIndex, bandIndex);
 }
 
+float EQProAudioProcessor::getBandDynamicGainDb(int channelIndex, int bandIndex) const
+{
+    return eqEngine.getEqDsp().getDynamicGainDb(channelIndex, bandIndex);
+}
+
 void EQProAudioProcessor::logStartup(const juce::String& message)
 {
     if (auto* logger = juce::Logger::getCurrentLogger())
@@ -979,7 +984,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
         ParamIDs::smartSolo, "Smart Solo",
         false));
 
-    const juce::NormalisableRange<float> freqRange(20.0f, 192000.0f, 0.01f, 0.5f);
+    const juce::NormalisableRange<float> freqRange(20.0f, 20000.0f, 0.01f, 0.5f);
     const juce::NormalisableRange<float> gainRange(-48.0f, 48.0f, 0.01f);
     const juce::NormalisableRange<float> qRange(0.1f, 18.0f, 0.01f, 0.5f);
 

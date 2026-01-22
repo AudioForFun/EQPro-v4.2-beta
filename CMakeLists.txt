@@ -1,6 +1,20 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(EQPro VERSION 3.0.0)
+project(EQPro VERSION 3.1.0)
+
+# Generate a Windows version resource with the project version.
+set(EQPRO_VERSION_RC "${CMAKE_CURRENT_BINARY_DIR}/EQProVersion.rc")
+string(REPLACE "." ";" EQPRO_VERSION_LIST "${PROJECT_VERSION}")
+list(LENGTH EQPRO_VERSION_LIST EQPRO_VERSION_PARTS)
+if (EQPRO_VERSION_PARTS LESS 4)
+    list(APPEND EQPRO_VERSION_LIST 0)
+endif()
+list(JOIN EQPRO_VERSION_LIST "," EQPRO_VERSION_COMMAS)
+configure_file(
+    "${CMAKE_CURRENT_LIST_DIR}/resources/EQProVersion.rc.in"
+    "${EQPRO_VERSION_RC}"
+    @ONLY
+)
 
 # Set this to your local JUCE path or pass -DJUCE_DIR=... when configuring.
 if (NOT DEFINED JUCE_DIR)
@@ -86,7 +100,8 @@ target_compile_definitions(EQPro PUBLIC
     JUCE_USE_CURL=0
     JUCE_IGNORE_VST3_MISMATCHED_PARAMETER_ID_WARNING=1
     EQPRO_VERSION="${PROJECT_VERSION}"
-    EQPRO_ITERATION="3.0 beta"
+    EQPRO_ITERATION="3.1 beta"
+    JUCE_USER_DEFINED_RC_FILE="${EQPRO_VERSION_RC}"
 )
 
 target_link_libraries(EQPro PRIVATE

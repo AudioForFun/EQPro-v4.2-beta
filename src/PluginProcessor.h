@@ -80,6 +80,7 @@ public:
     int getSelectedBandIndex() const;
     int getSelectedChannelIndex() const;
     float getBandDetectorDb(int channelIndex, int bandIndex) const;
+    float getBandDynamicGainDb(int channelIndex, int bandIndex) const;
     void logStartup(const juce::String& message);
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

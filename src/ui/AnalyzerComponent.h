@@ -57,6 +57,7 @@ private:
 
     void setBandParameter(int bandIndex, const juce::String& suffix, float value);
     float getBandParameter(int bandIndex, const juce::String& suffix) const;
+    float getBandDynamicGainDb(int bandIndex) const;
     bool getBandBypassed(int bandIndex) const;
     int getBandType(int bandIndex) const;
 

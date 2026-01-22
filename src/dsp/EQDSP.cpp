@@ -133,6 +133,7 @@ void EQDSP::prepare(double sampleRate, int maxBlockSize, int channels)
             cachedParams[ch][band].mix = 1.0f;
             detectorEnv[ch][band] = 0.0f;
             detectorDb[ch][band].store(-60.0f);
+            dynamicGainDb[ch][band].store(0.0f);
             smoothFreq[ch][band].reset(sampleRateHz, 0.02);
             smoothGain[ch][band].reset(sampleRateHz, 0.02);
             smoothQ[ch][band].reset(sampleRateHz, 0.02);
@@ -166,6 +167,7 @@ void EQDSP::reset()
             detectorFilters[ch][band].reset();
             detectorEnv[ch][band] = 0.0f;
             detectorDb[ch][band].store(-60.0f);
+            dynamicGainDb[ch][band].store(0.0f);
         }
 }
 
@@ -241,6 +243,15 @@ float EQDSP::getDetectorDb(int channelIndex, int bandIndex) const
     if (bandIndex < 0 || bandIndex >= ParamIDs::kBandsPerChannel)
         return -60.0f;
     return detectorDb[channelIndex][bandIndex].load();
+}
+
+float EQDSP::getDynamicGainDb(int channelIndex, int bandIndex) const
+{
+    if (channelIndex < 0 || channelIndex >= numChannels)
+        return 0.0f;
+    if (bandIndex < 0 || bandIndex >= ParamIDs::kBandsPerChannel)
+        return 0.0f;
+    return dynamicGainDb[channelIndex][bandIndex].load();
 }
 
 void EQDSP::process(juce::AudioBuffer<float>& buffer,
@@ -445,6 +456,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
 
             if (target == 0)
             {
+                dynamicGainDb[0][band].store(0.0f);
                 if (isHpLp && slopeConfig.useOnePole)
                 {
                     msOnePoles[0][band].setLowPass(params.frequencyHz);
@@ -501,6 +513,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                         const float deltaGain = juce::Decibels::decibelsToGain(deltaDb);
                         m *= deltaGain;
                         s *= deltaGain;
+                        this->dynamicGainDb[0][band].store(deltaDb);
                     }
 
                     const float mDelta = (m - dryM) * mix;
@@ -511,6 +524,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             }
             else if (target == 1)
             {
+                dynamicGainDb[0][band].store(0.0f);
                 if (isHpLp && slopeConfig.useOnePole)
                 {
                     if (params.type == FilterType::lowPass)
@@ -547,6 +561,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                         const float dynamicGainDb = computeDynamicGain(params, detDb);
                         const float deltaDb = dynamicGainDb - staticGainDb;
                         m *= juce::Decibels::decibelsToGain(deltaDb);
+                        this->dynamicGainDb[0][band].store(deltaDb);
                     }
 
                     const float mDelta = (m - dryM) * mix;
@@ -555,6 +570,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             }
             else if (target == 2)
             {
+                dynamicGainDb[1][band].store(0.0f);
                 if (isHpLp && slopeConfig.useOnePole)
                 {
                     if (params.type == FilterType::lowPass)
@@ -591,6 +607,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                         const float dynamicGainDb = computeDynamicGain(params, detDb);
                         const float deltaDb = dynamicGainDb - staticGainDb;
                         s *= juce::Decibels::decibelsToGain(deltaDb);
+                        this->dynamicGainDb[1][band].store(deltaDb);
                     }
 
                     const float sDelta = (s - dryS) * mix;
@@ -734,6 +751,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             const float* detTempRead = linkDetector ? detectorTemp.getReadPointer(0) : nullptr;
 
             juce::ignoreUnused(detData);
+            dynamicGainDb[ch][band].store(0.0f);
 
             for (int i = 0; i < samples; ++i)
             {
@@ -773,6 +791,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     const float dynamicGainDb = computeDynamicGain(params, detDb);
                     const float deltaDb = dynamicGainDb - staticGainDb;
                     sample *= juce::Decibels::decibelsToGain(deltaDb);
+                    this->dynamicGainDb[ch][band].store(deltaDb);
                 }
 
                 channelData[i] += (sample - dry) * mix;

@@ -23,6 +23,7 @@ public:
     void setMsTargets(const std::array<int, ParamIDs::kBandsPerChannel>& targets);
     void setBandChannelMasks(const std::array<uint32_t, ParamIDs::kBandsPerChannel>& masks);
     float getDetectorDb(int channelIndex, int bandIndex) const;
+    float getDynamicGainDb(int channelIndex, int bandIndex) const;
     void process(juce::AudioBuffer<float>& buffer,
                  const juce::AudioBuffer<float>* detectorBuffer = nullptr);
 
@@ -56,6 +57,8 @@ private:
         detectorEnv {};
     std::array<std::array<std::atomic<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
         detectorDb {};
+    std::array<std::array<std::atomic<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        dynamicGainDb {};
     juce::AudioBuffer<float> msBuffer;
     juce::AudioBuffer<float> msDryBuffer;
     juce::AudioBuffer<float> detectorMsBuffer;

@@ -92,6 +92,14 @@ Usage:
   - Cache access remains on the message thread; no audio-thread reads/writes.
 - Analyzer point hit-testing now requires a **tighter center hit** to avoid overlapping band selection.
 
+## v3.1 Beta Updates (DSP/UI Boundary)
+- Band `freq` parameter is now capped at **20 kHz** across all channels/bands.
+- The dark theme background and analyzer panel are now **true black** (no dark grey gradient or noise overlay).
+- Band colour palette for 1–12 is **fully unique** (no repeated blue band LEDs).
+- Analyzer curves now include a **band-coloured translucent fill** under each active band.
+- Dynamic EQ now exposes **per-band dynamic gain delta (dB)** to the UI, and the analyzer curves
+  reflect real-time gain reduction/expansion.
+
 ## Call Flow (Simplified)
 1. UI updates APVTS parameters.
 2. `timerCallback` builds `ParamSnapshot` and swaps it.

@@ -115,7 +115,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(phaseLabel);
 
     phaseModeBox.addItemList(juce::StringArray("Real-time", "Natural", "Linear"), 1);
-    phaseModeBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff0f141a));
+    phaseModeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     phaseModeBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     phaseModeBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
     addAndMakeVisible(phaseModeBox);
@@ -130,7 +130,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
 
     linearQualityBox.addItemList(
         juce::StringArray("Low", "Medium", "High", "Very High", "Intensive"), 1);
-    linearQualityBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff0f141a));
+    linearQualityBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     linearQualityBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     linearQualityBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
     addAndMakeVisible(linearQualityBox);
@@ -144,7 +144,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(windowLabel);
 
     linearWindowBox.addItemList(juce::StringArray("Hann", "Blackman", "Kaiser"), 1);
-    linearWindowBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff0f141a));
+    linearWindowBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     linearWindowBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     linearWindowBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
     addAndMakeVisible(linearWindowBox);
@@ -160,7 +160,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(oversamplingLabel);
 
     oversamplingBox.addItemList(juce::StringArray("Off", "2x", "4x"), 1);
-    oversamplingBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff0f141a));
+    oversamplingBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     oversamplingBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     oversamplingBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
     addAndMakeVisible(oversamplingBox);
@@ -176,7 +176,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(characterLabel);
 
     characterBox.addItemList(juce::StringArray("Off", "Gentle", "Warm"), 1);
-    characterBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff0f141a));
+    characterBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     characterBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     characterBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
     addAndMakeVisible(characterBox);
@@ -190,7 +190,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(qModeLabel);
 
     qModeBox.addItemList(juce::StringArray("Constant", "Proportional"), 1);
-    qModeBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff0f141a));
+    qModeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     qModeBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     qModeBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
     addAndMakeVisible(qModeBox);
@@ -244,7 +244,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(analyzerRangeLabel);
 
     analyzerRangeBox.addItemList(juce::StringArray("3 dB", "6 dB", "12 dB", "30 dB"), 1);
-    analyzerRangeBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff0f141a));
+    analyzerRangeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     analyzerRangeBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     analyzerRangeBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
     addAndMakeVisible(analyzerRangeBox);
@@ -258,7 +258,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(analyzerSpeedLabel);
 
     analyzerSpeedBox.addItemList(juce::StringArray("Slow", "Normal", "Fast"), 1);
-    analyzerSpeedBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff0f141a));
+    analyzerSpeedBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     analyzerSpeedBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     analyzerSpeedBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
     addAndMakeVisible(analyzerSpeedBox);
@@ -272,7 +272,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(analyzerViewLabel);
 
     analyzerViewBox.addItemList(juce::StringArray("Both", "Pre", "Post"), 1);
-    analyzerViewBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff0f141a));
+    analyzerViewBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     analyzerViewBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     analyzerViewBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
     addAndMakeVisible(analyzerViewBox);
@@ -317,7 +317,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         processorRef.getParameters(), ParamIDs::midiLearn, midiLearnToggle);
 
     midiTargetBox.addItemList(juce::StringArray("Gain", "Freq", "Q"), 1);
-    midiTargetBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff0f141a));
+    midiTargetBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     midiTargetBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     midiTargetBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
     addAndMakeVisible(midiTargetBox);
@@ -477,7 +477,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(applyLabel);
 
     applyTargetBox.addItemList(juce::StringArray("Selected", "All"), 1);
-    applyTargetBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff0f141a));
+    applyTargetBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     applyTargetBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     applyTargetBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
     applyTargetBox.setSelectedItemIndex(processorRef.getPresetApplyTarget(),
@@ -507,7 +507,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         "Bright",
         "Cut Low",
         "Cut High"), 1);
-    presetBox.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff0f141a));
+    presetBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     presetBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     presetBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
     presetBox.setSelectedItemIndex(processorRef.getPresetSelection(),
@@ -1127,20 +1127,7 @@ void EQProAudioProcessorEditor::refreshChannelLayout()
 
 void EQProAudioProcessorEditor::paint(juce::Graphics& g)
 {
-    juce::ColourGradient bg(theme.background.brighter(0.02f),
-                            0.0f, 0.0f,
-                            theme.background.darker(0.04f),
-                            0.0f, static_cast<float>(getHeight()),
-                            false);
-    g.setGradientFill(bg);
-    g.fillAll();
-    if (backgroundNoise.isValid())
-    {
-        g.setOpacity(0.08f);
-        g.setTiledImageFill(backgroundNoise, 0, 0, 1.0f);
-        g.fillRect(getLocalBounds());
-        g.setOpacity(1.0f);
-    }
+    g.fillAll(theme.background);
     auto frameBounds = getLocalBounds().toFloat().reduced(6.0f);
     juce::ColourGradient sheen(theme.panel.withAlpha(0.35f),
                                frameBounds.getTopLeft(),

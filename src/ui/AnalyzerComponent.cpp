@@ -114,22 +114,13 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     auto plotArea = getPlotArea();
     auto magnitudeArea = getMagnitudeArea();
     const float scale = uiScale;
-    juce::ColourGradient grad(theme.analyzerBg, plotArea.getTopLeft().toFloat(),
-                              theme.panel, plotArea.getBottomLeft().toFloat(), false);
-    g.setGradientFill(grad);
+    g.setColour(theme.analyzerBg);
     g.fillRect(plotArea);
 
     g.setColour(theme.panelOutline);
     g.drawRect(plotArea);
 
-    juce::ColourGradient vignette(juce::Colours::transparentBlack,
-                                  plotArea.getCentreX(), plotArea.getY(),
-                                  theme.panel.darker(0.35f).withAlpha(0.35f),
-                                  plotArea.getCentreX(), plotArea.getBottom(),
-                                  false);
-    g.setGradientFill(vignette);
-    g.fillRect(plotArea);
-    g.setColour(theme.panel.darker(0.4f).withAlpha(0.6f));
+    g.setColour(theme.panelOutline.withAlpha(0.5f));
     g.drawRect(plotArea.reduced(1.0f), 1.0f);
 
     g.setColour(theme.grid);
@@ -305,6 +296,34 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
             const auto bandColour = ColorUtils::bandColour(band);
             const bool isSelected = band == selectedBand;
+            const float baseline = gainToY(kAnalyzerMinDb);
+            juce::Path bandFill;
+            bool fillStarted = false;
+            float lastX = plotArea.getX();
+            for (int x = 0; x < static_cast<int>(curve.size()); ++x)
+            {
+                const float db = std::max(curveFloor, curve[static_cast<size_t>(x)]);
+                const float px = plotArea.getX() + static_cast<float>(x);
+                const float py = gainToY(db);
+                if (! fillStarted)
+                {
+                    bandFill.startNewSubPath(px, baseline);
+                    bandFill.lineTo(px, py);
+                    fillStarted = true;
+                }
+                else
+                {
+                    bandFill.lineTo(px, py);
+                }
+                lastX = px;
+            }
+            if (fillStarted)
+            {
+                bandFill.lineTo(lastX, baseline);
+                bandFill.closeSubPath();
+                g.setColour(bandColour.withAlpha(isSelected ? 0.22f : 0.14f));
+                g.fillPath(bandFill);
+            }
             g.setColour(bandColour.withAlpha(isSelected ? 0.9f : 0.65f));
             g.strokePath(bandPath, juce::PathStrokeType((isSelected ? 2.0f : 1.6f) * scale));
         }
@@ -1105,6 +1124,7 @@ void AnalyzerComponent::updateCurves()
         hashValue(getBandParameter(band, kParamBypassSuffix));
         hashValue(getBandParameter(band, kParamSlopeSuffix));
         hashValue(getBandParameter(band, kParamMixSuffix));
+        hashValue(getBandDynamicGainDb(band));
     }
 
     const bool paramsUnchanged = (hash == lastCurveHash
@@ -1156,6 +1176,7 @@ void AnalyzerComponent::updateCurves()
         hashBand(getBandParameter(band, kParamTypeSuffix));
         hashBand(getBandParameter(band, kParamBypassSuffix));
         hashBand(getBandParameter(band, kParamSlopeSuffix));
+        hashBand(getBandDynamicGainDb(band));
         bandDirty[static_cast<size_t>(band)] = bandHash != perBandCurveHash[static_cast<size_t>(band)];
         perBandCurveHash[static_cast<size_t>(band)] = bandHash;
     }
@@ -1171,11 +1192,15 @@ void AnalyzerComponent::updateCurves()
             std::complex<double> response { 1.0, 0.0 };
             if (bandActive[band])
             {
+                const float dynamicDeltaDb = getBandDynamicGainDb(band);
                 if (bandDirty[static_cast<size_t>(band)])
                 {
                     response = computeBandResponse(band, freq);
+                    const float magnitude = static_cast<float>(std::abs(response))
+                        * juce::Decibels::decibelsToGain(dynamicDeltaDb);
                     perBandCurveDb[static_cast<size_t>(band)][static_cast<size_t>(x)] =
-                        juce::Decibels::gainToDecibels(static_cast<float>(std::abs(response)), minDb);
+                        juce::Decibels::gainToDecibels(magnitude, minDb);
+                    response = std::complex<double>(magnitude, 0.0);
                 }
                 else
                 {
@@ -1194,8 +1219,11 @@ void AnalyzerComponent::updateCurves()
         const double mag = std::abs(total);
         eqCurveDb[static_cast<size_t>(x)] =
             juce::Decibels::gainToDecibels(static_cast<float>(mag), minDb);
+        const float selectedDynamicDb = getBandDynamicGainDb(selectedBand);
         selectedBandCurveDb[static_cast<size_t>(x)] =
-            juce::Decibels::gainToDecibels(static_cast<float>(std::abs(computeBandResponse(selectedBand, freq))), minDb);
+            juce::Decibels::gainToDecibels(static_cast<float>(std::abs(computeBandResponse(selectedBand, freq)))
+                                               * juce::Decibels::decibelsToGain(selectedDynamicDb),
+                                           minDb);
     }
 }
 
@@ -1372,7 +1400,7 @@ float AnalyzerComponent::gainToY(float gainDb) const
 float AnalyzerComponent::getMaxFreq() const
 {
     const float nyquist = lastSampleRate * 0.5f;
-    const float preferredMax = 40000.0f;
+    const float preferredMax = 20000.0f;
     const float maxFreq = std::min(preferredMax, nyquist);
     return std::max(kMinFreq * 1.1f, maxFreq);
 }
@@ -1424,6 +1452,11 @@ float AnalyzerComponent::getBandParameter(int bandIndex, const juce::String& suf
         return param->load();
 
     return 0.0f;
+}
+
+float AnalyzerComponent::getBandDynamicGainDb(int bandIndex) const
+{
+    return processorRef.getBandDynamicGainDb(selectedChannel, bandIndex);
 }
 
 bool AnalyzerComponent::getBandBypassed(int bandIndex) const

@@ -1,4 +1,4 @@
-# EQ Pro (JUCE) - 3.5 beta
+# EQ Pro (JUCE) - 3.6 beta
 
 Work-in-progress JUCE multi-channel EQ plugin.
 
@@ -21,7 +21,7 @@ cmake --build build --config Release
 - Standalone audio device restore is disabled by default; set `EQPRO_LOAD_AUDIO_STATE=1` to enable.
 - Standalone window position restore is disabled by default; set `EQPRO_LOAD_WINDOW_POS=1` to enable.
 
-## Processing Modes (v3.5 beta)
+## Processing Modes (v3.6 beta)
 - Real-time: minimum-phase IIR (0 latency).
 - Natural: short linear-phase FIR with adaptive tap length and mixed-phase blend.
 - Linear: long linear-phase FIR with adaptive taps and mixed-phase blend.

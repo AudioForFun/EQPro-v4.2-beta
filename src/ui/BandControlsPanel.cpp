@@ -93,9 +93,13 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     pasteButton.onClick = [this] { pasteBandState(); };
     addAndMakeVisible(pasteButton);
 
-    defaultButton.setButtonText("Reset");
+    defaultButton.setButtonText("Reset Band");
     defaultButton.onClick = [this] { resetSelectedBand(); };
     addAndMakeVisible(defaultButton);
+
+    resetAllButton.setButtonText("Reset All");
+    resetAllButton.onClick = [this] { resetAllBands(); };
+    addAndMakeVisible(resetAllButton);
 
     for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
     {
@@ -559,6 +563,7 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     copyButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     pasteButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     defaultButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
+    resetAllButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
     {
         auto& button = bandSelectButtons[static_cast<size_t>(i)];
@@ -887,10 +892,12 @@ void BandControlsPanel::resized()
 
     auto headerRow = left.removeFromTop(rowHeight);
     titleLabel.setBounds(headerRow.removeFromLeft(100));
-    const int btnW = 52;
+    const int btnW = 58;
+    const int resetW = 86;
     copyButton.setBounds(headerRow.removeFromLeft(btnW));
     pasteButton.setBounds(headerRow.removeFromLeft(btnW));
-    defaultButton.setBounds(headerRow.removeFromLeft(btnW));
+    defaultButton.setBounds(headerRow.removeFromLeft(resetW));
+    resetAllButton.setBounds(headerRow.removeFromLeft(resetW));
     eqSectionLabel.setBounds(headerRow);
 
     left.removeFromTop(2);
@@ -1114,6 +1121,43 @@ void BandControlsPanel::resetSelectedBand()
         bypassParam->setValueNotifyingHost(0.0f);
     if (auto* soloParam = parameters.getParameter(ParamIDs::bandParamId(channel, band, "solo")))
         soloParam->setValueNotifyingHost(0.0f);
+
+    cacheBandFromParams(channel, band);
+}
+
+void BandControlsPanel::resetAllBands()
+{
+    const int channel = selectedChannel;
+    auto resetParam = [this, channel](int band, const juce::String& suffix)
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(channel, band, suffix)))
+            param->setValueNotifyingHost(param->getDefaultValue());
+    };
+
+    for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+    {
+        resetParam(band, "freq");
+        resetParam(band, "gain");
+        resetParam(band, "q");
+        resetParam(band, "type");
+        resetParam(band, "ms");
+        resetParam(band, "slope");
+        resetParam(band, "solo");
+        resetParam(band, "mix");
+        resetParam(band, "dynEnable");
+        resetParam(band, "dynMode");
+        resetParam(band, "dynThresh");
+        resetParam(band, "dynAttack");
+        resetParam(band, "dynRelease");
+        resetParam(band, "dynAuto");
+        resetParam(band, "dynExternal");
+        if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(channel, band, "bypass")))
+            bypassParam->setValueNotifyingHost(0.0f);
+        if (auto* soloParam = parameters.getParameter(ParamIDs::bandParamId(channel, band, "solo")))
+            soloParam->setValueNotifyingHost(0.0f);
+
+        cacheBandFromParams(channel, band);
+    }
 }
 
 void BandControlsPanel::updateComboBoxWidths()

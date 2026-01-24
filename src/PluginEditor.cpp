@@ -938,8 +938,8 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     presetSectionLabel.setVisible(false);
     presetLabel.setVisible(false);
     presetBox.setVisible(false);
-    savePresetButton.setVisible(false);
-    loadPresetButton.setVisible(false);
+    savePresetButton.setVisible(true);
+    loadPresetButton.setVisible(true);
     copyInstanceButton.setVisible(false);
     pasteInstanceButton.setVisible(false);
     presetBrowserLabel.setVisible(false);
@@ -1206,6 +1206,16 @@ void EQProAudioProcessorEditor::resized()
     globalMixSlider.setBounds(topBar.removeFromLeft(mixSliderWidth)
                                   .withSizeKeepingCentre(mixSliderWidth, globalBypassHeight + 8));
     topBar.removeFromLeft(static_cast<int>(10 * uiScale));
+    const int actionBtnW = static_cast<int>(60 * uiScale);
+    undoButton.setBounds(topBar.removeFromLeft(actionBtnW)
+                             .withSizeKeepingCentre(actionBtnW, globalBypassHeight));
+    redoButton.setBounds(topBar.removeFromLeft(actionBtnW)
+                             .withSizeKeepingCentre(actionBtnW, globalBypassHeight));
+    savePresetButton.setBounds(topBar.removeFromLeft(actionBtnW)
+                                   .withSizeKeepingCentre(actionBtnW, globalBypassHeight));
+    loadPresetButton.setBounds(topBar.removeFromLeft(actionBtnW)
+                                   .withSizeKeepingCentre(actionBtnW, globalBypassHeight));
+    topBar.removeFromLeft(static_cast<int>(8 * uiScale));
     const int deltaWidth = static_cast<int>(70 * uiScale);
     presetDeltaToggle.setBounds(topBar.removeFromLeft(deltaWidth)
                                     .withSizeKeepingCentre(deltaWidth, globalBypassHeight));

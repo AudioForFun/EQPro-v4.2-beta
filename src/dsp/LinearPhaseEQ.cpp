@@ -4,6 +4,7 @@ namespace eqdsp
 {
 void LinearPhaseEQ::prepare(double sampleRate, int maxBlockSize, int channels)
 {
+    const juce::SpinLock::ScopedLockType lock(convolverLock);
     sampleRateHz = sampleRate;
     numChannels = juce::jlimit(0, ParamIDs::kMaxChannels, channels);
 
@@ -31,6 +32,7 @@ void LinearPhaseEQ::prepare(double sampleRate, int maxBlockSize, int channels)
 
 void LinearPhaseEQ::reset()
 {
+    const juce::SpinLock::ScopedLockType lock(convolverLock);
     for (int ch = 0; ch < numChannels; ++ch)
         if (convolutions[ch] != nullptr)
             convolutions[ch]->reset();
@@ -38,6 +40,7 @@ void LinearPhaseEQ::reset()
 
 void LinearPhaseEQ::loadImpulse(int channelIndex, juce::AudioBuffer<float>&& impulse, double sampleRate)
 {
+    const juce::SpinLock::ScopedLockType lock(convolverLock);
     if (channelIndex < 0 || channelIndex >= numChannels)
         return;
 
@@ -49,7 +52,7 @@ void LinearPhaseEQ::loadImpulse(int channelIndex, juce::AudioBuffer<float>&& imp
         sampleRate,
         juce::dsp::Convolution::Stereo::no,
         juce::dsp::Convolution::Trim::yes,
-        juce::dsp::Convolution::Normalise::no);
+        juce::dsp::Convolution::Normalise::yes);
 }
 
 void LinearPhaseEQ::process(juce::AudioBuffer<float>& buffer)
@@ -59,6 +62,9 @@ void LinearPhaseEQ::process(juce::AudioBuffer<float>& buffer)
 
 void LinearPhaseEQ::processRange(juce::AudioBuffer<float>& buffer, int startChannel, int count)
 {
+    const juce::SpinLock::ScopedTryLockType lock(convolverLock);
+    if (! lock.isLocked())
+        return; // Avoid blocking the audio thread during IR rebuilds.
     if (count <= 0 || startChannel < 0)
         return;
 
@@ -79,6 +85,7 @@ void LinearPhaseEQ::processRange(juce::AudioBuffer<float>& buffer, int startChan
 
 void LinearPhaseEQ::configurePartitioning(int headSize)
 {
+    const juce::SpinLock::ScopedLockType lock(convolverLock);
     if (this->headSize == headSize && hasSpec)
         return;
 

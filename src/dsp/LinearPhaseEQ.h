@@ -28,5 +28,6 @@ private:
     juce::dsp::ProcessSpec lastSpec {};
     bool hasSpec = false;
     int headSize = 0;
+    juce::SpinLock convolverLock;
 };
 } // namespace eqdsp

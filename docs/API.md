@@ -115,6 +115,12 @@ Usage:
 - **Dynamic EQ UI and processing are disabled** (controls hidden; processing bypassed) until reintroduced.
 - Goniometer replaces the dynamic panel area and uses **soft-clipped scaling** for stable visualization.
 
+## v3.6 Beta Updates (DSP/UI Boundary)
+- Linear/Natural convolution is now **thread-safe during impulse rebuilds**, preventing silent blocks
+  when FIR partitions are updated at lower quality settings.
+- Added **Undo/Redo** and **Save/Load preset** actions to the top bar for faster workflow.
+- Added **Reset Band** (renamed from Reset) and **Reset All** actions in the band section.
+
 ## Call Flow (Simplified)
 1. UI updates APVTS parameters.
 2. `timerCallback` builds `ParamSnapshot` and swaps it.

@@ -124,6 +124,7 @@ private:
     juce::Label titleLabel;
     juce::Label eqSectionLabel;
     juce::TextButton defaultButton;
+    juce::TextButton resetAllButton;
     std::array<BandSelectButton, ParamIDs::kBandsPerChannel> bandSelectButtons;
     std::array<SoloToggleButton, ParamIDs::kBandsPerChannel> bandSoloButtons;
     juce::Label freqLabel;
@@ -191,6 +192,7 @@ private:
     std::array<std::array<bool, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels> bandStateValid {};
 
     void resetSelectedBand();
+    void resetAllBands();
     void updateComboBoxWidths();
     int comboWidthType = 0;
     int comboWidthMs = 0;

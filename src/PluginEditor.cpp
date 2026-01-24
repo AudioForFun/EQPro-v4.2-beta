@@ -851,7 +851,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     addAndMakeVisible(snapshotStoreButton);
 
-    correlationLabel.setText("Corr", juce::dontSendNotification);
+    correlationLabel.setText("Gonio", juce::dontSendNotification);
     correlationLabel.setJustificationType(juce::Justification::centredLeft);
     correlationLabel.setFont(kLabelFontSize);
     addAndMakeVisible(correlationLabel);
@@ -1220,7 +1220,7 @@ void EQProAudioProcessorEditor::resized()
 
     auto controlsArea = leftContent;
     auto metersArea = rightPanel;
-    const int trimSize = static_cast<int>(86 * uiScale);
+    const int trimSize = static_cast<int>(72 * uiScale);
     const int trimLabelHeight = static_cast<int>(14 * uiScale);
     auto trimArea = metersArea.removeFromBottom(trimSize + trimLabelHeight + static_cast<int>(10 * uiScale));
     auto outputArea = trimArea.removeFromLeft(trimArea.getWidth() / 2);
@@ -1230,17 +1230,19 @@ void EQProAudioProcessorEditor::resized()
     autoGainToggle.setBounds(trimArea.withSizeKeepingCentre(static_cast<int>(60 * uiScale),
                                                             static_cast<int>(22 * uiScale)));
 
-    auto meterTop = metersArea;
-    auto corrArea = meterTop.removeFromBottom(static_cast<int>(meterTop.getHeight() * 0.40f));
-    correlation.setBounds(corrArea);
-    meters.setBounds(meterTop);
+    meters.setBounds(metersArea);
     const int processingRowHeight = static_cast<int>(28 * uiScale);
     auto processingRow = controlsArea.removeFromBottom(processingRowHeight);
     phaseLabel.setBounds(processingRow.removeFromLeft(static_cast<int>(70 * uiScale)));
     phaseModeBox.setBounds(processingRow.removeFromLeft(static_cast<int>(140 * uiScale)));
     qualityLabel.setBounds(processingRow.removeFromLeft(static_cast<int>(70 * uiScale)));
     linearQualityBox.setBounds(processingRow.removeFromLeft(static_cast<int>(120 * uiScale)));
-    bandControls.setBounds(controlsArea.reduced(static_cast<int>(6 * uiScale), 0));
+    const auto bandArea = controlsArea.reduced(static_cast<int>(6 * uiScale), 0);
+    bandControls.setBounds(bandArea);
+    auto gonioArea = bandArea;
+    gonioArea = gonioArea.removeFromRight(static_cast<int>(bandArea.getWidth() * 0.38f));
+    gonioArea = gonioArea.reduced(static_cast<int>(6 * uiScale));
+    correlation.setBounds(gonioArea);
 
     spectralPanel.setBounds({0, 0, 0, 0});
 

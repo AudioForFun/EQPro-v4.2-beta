@@ -108,6 +108,13 @@ Usage:
 - Dynamic EQ detector now uses **peak/RMS blending** and **frequency weighting** for smoother, more musical action.
 - Per-band **mix/threshold smoothing** reduces zippering during automation or UI tweaks.
 
+## v3.5 Beta Updates (DSP/UI Boundary)
+- Linear/Natural FIR build now uses **per-band mix-aware magnitude** and excludes MS-only bands
+  from the full linear path to avoid double-processing.
+- Linear/Natural output is **RMS-calibrated to realtime** for consistent meter levels across modes/quality.
+- **Dynamic EQ UI and processing are disabled** (controls hidden; processing bypassed) until reintroduced.
+- Goniometer replaces the dynamic panel area and uses **soft-clipped scaling** for stable visualization.
+
 ## Call Flow (Simplified)
 1. UI updates APVTS parameters.
 2. `timerCallback` builds `ParamSnapshot` and swaps it.

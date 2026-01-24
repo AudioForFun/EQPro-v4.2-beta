@@ -28,6 +28,5 @@ private:
     std::vector<float> rmsDb;
     std::vector<float> peakDb;
     std::vector<float> peakHoldDb;
-    float phaseValue = 0.0f;
     ThemeColors theme = makeDarkTheme();
 };

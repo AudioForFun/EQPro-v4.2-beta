@@ -1,5 +1,5 @@
 #define MyAppName "EQ Pro"
-#define MyAppVersion "3.2.0-beta"
+#define MyAppVersion "3.5.0-beta"
 #define MyAppPublisher "DidAudio"
 #define MyAppURL "https://github.com/AudioForFun/EQPro"
 #define BuildDir "..\build\EQPro_artefacts\Release"
@@ -41,5 +41,10 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\EQ Pro.exe"; Tasks: desktop
 
 [Run]
 Filename: "{app}\EQ Pro.exe"; Description: "Launch EQ Pro"; Flags: nowait postinstall skipifsilent
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}"
+Type: filesandordirs; Name: "{commoncf}\VST3\EQ Pro.vst3"
+Type: files; Name: "{commonpf}\VSTPlugins\EQ Pro.dll"
 
 

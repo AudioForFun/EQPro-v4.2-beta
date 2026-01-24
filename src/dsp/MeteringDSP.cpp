@@ -4,6 +4,7 @@ namespace
 {
 constexpr float kMinDb = -120.0f;
 constexpr float kEpsilon = 1.0e-12f;
+constexpr int kScopeDecim = 4;
 }
 
 namespace eqdsp
@@ -23,6 +24,8 @@ void MeteringDSP::reset()
     }
 
     correlation = 0.0f;
+    scopeWritePos.store(0, std::memory_order_release);
+    scopeDecimCounter = 0;
 }
 
 void MeteringDSP::process(const juce::AudioBuffer<float>& buffer, int numChannels)
@@ -45,14 +48,13 @@ void MeteringDSP::process(const juce::AudioBuffer<float>& buffer, int numChannel
     {
         const int a = juce::jlimit(0, channels - 1, corrA);
         const int b = juce::jlimit(0, channels - 1, corrB);
-        if (a == b)
-            return;
 
         const auto* left = buffer.getReadPointer(a);
         const auto* right = buffer.getReadPointer(b);
         double sumLR = 0.0;
         double sumL2 = 0.0;
         double sumR2 = 0.0;
+        int writePos = scopeWritePos.load(std::memory_order_relaxed);
 
         for (int i = 0; i < samples; ++i)
         {
@@ -61,11 +63,25 @@ void MeteringDSP::process(const juce::AudioBuffer<float>& buffer, int numChannel
             sumLR += l * r;
             sumL2 += l * l;
             sumR2 += r * r;
+
+            scopeDecimCounter++;
+            if (scopeDecimCounter >= kScopeDecim)
+            {
+                scopeDecimCounter = 0;
+                float x = static_cast<float>(0.5 * (l + r));
+                float y = static_cast<float>(0.5 * (l - r));
+                x = juce::jlimit(-1.0f, 1.0f, x);
+                y = juce::jlimit(-1.0f, 1.0f, y);
+                scopeX[static_cast<size_t>(writePos)] = x;
+                scopeY[static_cast<size_t>(writePos)] = y;
+                writePos = (writePos + 1) % kScopePoints;
+            }
         }
 
         const double denom = std::sqrt(sumL2 * sumR2) + kEpsilon;
         const float target = static_cast<float>(sumLR / denom);
         correlation = smooth(correlation, target, correlationSmooth);
+        scopeWritePos.store(writePos, std::memory_order_release);
     }
 }
 
@@ -78,6 +94,26 @@ ChannelMeterState MeteringDSP::getChannelState(int channelIndex) const
 float MeteringDSP::getCorrelation() const
 {
     return correlation;
+}
+
+int MeteringDSP::copyScopePoints(juce::Point<float>* dest, int maxPoints, int& writePos) const
+{
+    if (dest == nullptr || maxPoints <= 0)
+    {
+        writePos = 0;
+        return 0;
+    }
+
+    const int count = juce::jmin(kScopePoints, maxPoints);
+    const int end = scopeWritePos.load(std::memory_order_acquire);
+    writePos = end;
+
+    for (int i = 0; i < count; ++i)
+    {
+        const int idx = (end - count + i + kScopePoints) % kScopePoints;
+        dest[i] = { scopeX[static_cast<size_t>(idx)], scopeY[static_cast<size_t>(idx)] };
+    }
+    return count;
 }
 
 void MeteringDSP::setCorrelationPair(int channelA, int channelB)

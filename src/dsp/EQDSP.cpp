@@ -306,22 +306,35 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             const auto* in = scratchBuffer.getReadPointer(ch);
             for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
             {
-                if (! cachedParams[ch][band].solo)
+                const int target = (ch < 2) ? msTargets[band] : 0;
+                const int paramSource = (target == 0 || target == 3) ? 0 : ch;
+                if (! cachedParams[paramSource][band].solo)
                     continue;
                 if ((bandChannelMasks[band] & (1u << static_cast<uint32_t>(ch))) == 0)
                     continue;
 
-                auto params = cachedParams[ch][band];
-                smoothFreq[ch][band].skip(samples);
-                smoothGain[ch][band].skip(samples);
-                smoothQ[ch][band].skip(samples);
-                smoothMix[ch][band].skip(samples);
-                smoothDynThresh[ch][band].skip(samples);
-                params.frequencyHz = smoothFreq[ch][band].getCurrentValue();
-                params.gainDb = smoothGain[ch][band].getCurrentValue();
-                params.q = smoothQ[ch][band].getCurrentValue();
-                params.mix = smoothMix[ch][band].getCurrentValue();
-                params.thresholdDb = smoothDynThresh[ch][band].getCurrentValue();
+                auto params = cachedParams[paramSource][band];
+                if (paramSource == ch)
+                {
+                    smoothFreq[ch][band].skip(samples);
+                    smoothGain[ch][band].skip(samples);
+                    smoothQ[ch][band].skip(samples);
+                    smoothMix[ch][band].skip(samples);
+                    smoothDynThresh[ch][band].skip(samples);
+                    params.frequencyHz = smoothFreq[ch][band].getCurrentValue();
+                    params.gainDb = smoothGain[ch][band].getCurrentValue();
+                    params.q = smoothQ[ch][band].getCurrentValue();
+                    params.mix = smoothMix[ch][band].getCurrentValue();
+                    params.thresholdDb = smoothDynThresh[ch][band].getCurrentValue();
+                }
+                else
+                {
+                    params.frequencyHz = smoothFreq[paramSource][band].getCurrentValue();
+                    params.gainDb = smoothGain[paramSource][band].getCurrentValue();
+                    params.q = smoothQ[paramSource][band].getCurrentValue();
+                    params.mix = smoothMix[paramSource][band].getCurrentValue();
+                    params.thresholdDb = smoothDynThresh[paramSource][band].getCurrentValue();
+                }
                 params.q = applyQMode(params);
                 params.type = FilterType::bandPass;
                 params.gainDb = smartSoloEnabled ? 6.0f : 0.0f;
@@ -462,6 +475,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             params.mix = smoothMix[0][band].getCurrentValue();
             params.thresholdDb = smoothDynThresh[0][band].getCurrentValue();
             params.q = applyQMode(params);
+            params.dynamicEnabled = false;
             const float mix = juce::jlimit(0.0f, 1.0f, params.mix);
             const float staticGainDb = params.gainDb;
 
@@ -480,6 +494,10 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             detectorFilters[1][band].update(detectorParams);
 
             const int stages = isTilt ? 2 : (isHpLp ? slopeConfig.stages : 1);
+            const bool isSixDb = isHpLp && slopeConfig.stages == 0 && slopeConfig.useOnePole;
+            const float resonanceMix = isSixDb
+                ? juce::jlimit(0.0f, 0.8f, (params.q - 0.707f) / 6.0f)
+                : 0.0f;
 
             if (isTilt)
             {
@@ -497,6 +515,14 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     msFilters[0][band][stage].update(params);
                     msFilters[1][band][stage].update(params);
                 }
+            }
+            if (resonanceMix > 0.0f)
+            {
+                BandParams resParams = params;
+                resParams.type = FilterType::bandPass;
+                resParams.gainDb = 0.0f;
+                msFilters[0][band][0].update(resParams);
+                msFilters[1][band][0].update(resParams);
             }
 
             if (target == 0)
@@ -521,6 +547,13 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     const float dryS = drySide[i];
                     float m = dryM;
                     float s = dryS;
+                    float resM = 0.0f;
+                    float resS = 0.0f;
+                    if (resonanceMix > 0.0f)
+                    {
+                        resM = msFilters[0][band][0].processSample(dryM);
+                        resS = msFilters[1][band][0].processSample(dryS);
+                    }
 
                     const float detM = bandUseExternal
                         ? detectorMsBuffer.getReadPointer(0)[i]
@@ -547,14 +580,19 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                         m = msFilters[0][band][stage].processSample(m);
                         s = msFilters[1][band][stage].processSample(s);
                     }
+                    if (resonanceMix > 0.0f)
+                    {
+                        m += resM * resonanceMix;
+                        s += resS * resonanceMix;
+                    }
 
                     if (params.dynamicEnabled)
                     {
                         const float dynamicGainDb = computeDynamicGain(params, detDb);
                         const float deltaDb = dynamicGainDb - staticGainDb;
                         const float deltaGain = juce::Decibels::decibelsToGain(deltaDb);
-                        m *= deltaGain;
-                        s *= deltaGain;
+                        m = dryM + (m - dryM) * deltaGain;
+                        s = dryS + (s - dryS) * deltaGain;
                         this->dynamicGainDb[0][band].store(deltaDb);
                     }
 
@@ -580,6 +618,9 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 {
                     const float dryM = dryMid[i];
                     float m = dryM;
+                    float resM = 0.0f;
+                    if (resonanceMix > 0.0f)
+                        resM = msFilters[0][band][0].processSample(dryM);
                     const float detInput = bandUseExternal
                         ? detectorMsBuffer.getReadPointer(0)[i]
                         : dryM;
@@ -594,12 +635,15 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     {
                         m = msFilters[0][band][stage].processSample(m);
                     }
+                    if (resonanceMix > 0.0f)
+                        m += resM * resonanceMix;
 
                     if (params.dynamicEnabled)
                     {
                         const float dynamicGainDb = computeDynamicGain(params, detDb);
                         const float deltaDb = dynamicGainDb - staticGainDb;
-                        m *= juce::Decibels::decibelsToGain(deltaDb);
+                        const float deltaGain = juce::Decibels::decibelsToGain(deltaDb);
+                        m = dryM + (m - dryM) * deltaGain;
                         this->dynamicGainDb[0][band].store(deltaDb);
                     }
 
@@ -623,6 +667,9 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 {
                     const float dryS = drySide[i];
                     float s = dryS;
+                    float resS = 0.0f;
+                    if (resonanceMix > 0.0f)
+                        resS = msFilters[1][band][0].processSample(dryS);
                     const float detInput = bandUseExternal
                         ? detectorMsBuffer.getReadPointer(1)[i]
                         : dryS;
@@ -637,12 +684,15 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     {
                         s = msFilters[1][band][stage].processSample(s);
                     }
+                    if (resonanceMix > 0.0f)
+                        s += resS * resonanceMix;
 
                     if (params.dynamicEnabled)
                     {
                         const float dynamicGainDb = computeDynamicGain(params, detDb);
                         const float deltaDb = dynamicGainDb - staticGainDb;
-                        s *= juce::Decibels::decibelsToGain(deltaDb);
+                        const float deltaGain = juce::Decibels::decibelsToGain(deltaDb);
+                        s = dryS + (s - dryS) * deltaGain;
                         this->dynamicGainDb[1][band].store(deltaDb);
                     }
 
@@ -674,17 +724,18 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             const int target = (ch < 2) ? msTargets[band] : 0;
             if (useMs && ch < 2 && (target == 0 || target == 1 || target == 2))
                 continue;
-            if (ch == 0 && target == 4)
+            if (ch == 1 && target == 4)
                 continue;
-            if (ch == 1 && target == 3)
+            if (ch == 0 && target == 5)
                 continue;
             if ((bandChannelMasks[band] & (1u << static_cast<uint32_t>(ch))) == 0)
                 continue;
 
-            if (cachedParams[ch][band].bypassed)
+            const int paramSource = (target == 0 || target == 3) ? 0 : ch;
+            if (cachedParams[paramSource][band].bypassed)
                 continue;
 
-            auto params = cachedParams[ch][band];
+            auto params = cachedParams[paramSource][band];
             const bool bandUseExternal = externalAvailable && params.useExternalDetector;
             if (params.mix <= 0.0001f)
                 continue;
@@ -694,13 +745,23 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             const bool isBell = params.type == FilterType::bell;
             const float tiltQ = (params.type == FilterType::flatTilt) ? 0.5f : -1.0f;
             const auto slopeConfig = slopeFromDb(params.slopeDb);
-            smoothFreq[ch][band].skip(samples);
-            smoothGain[ch][band].skip(samples);
-            smoothQ[ch][band].skip(samples);
-            params.frequencyHz = smoothFreq[ch][band].getCurrentValue();
-            params.gainDb = smoothGain[ch][band].getCurrentValue();
-            params.q = smoothQ[ch][band].getCurrentValue();
+            if (paramSource == ch)
+            {
+                smoothFreq[ch][band].skip(samples);
+                smoothGain[ch][band].skip(samples);
+                smoothQ[ch][band].skip(samples);
+                params.frequencyHz = smoothFreq[ch][band].getCurrentValue();
+                params.gainDb = smoothGain[ch][band].getCurrentValue();
+                params.q = smoothQ[ch][band].getCurrentValue();
+            }
+            else
+            {
+                params.frequencyHz = smoothFreq[paramSource][band].getCurrentValue();
+                params.gainDb = smoothGain[paramSource][band].getCurrentValue();
+                params.q = smoothQ[paramSource][band].getCurrentValue();
+            }
             params.q = applyQMode(params);
+            params.dynamicEnabled = false;
             const float mix = juce::jlimit(0.0f, 1.0f, params.mix);
             const float staticGainDb = params.gainDb;
             if (! params.dynamicEnabled && (isBell || isShelf || isTilt)
@@ -721,6 +782,10 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             detectorFilters[ch][band].update(detectorParams);
 
             const int stages = isTilt ? 2 : (isHpLp ? slopeConfig.stages : 1);
+            const bool isSixDb = isHpLp && slopeConfig.stages == 0 && slopeConfig.useOnePole;
+            const float resonanceMix = isSixDb
+                ? juce::jlimit(0.0f, 0.8f, (params.q - 0.707f) / 6.0f)
+                : 0.0f;
             if (isTilt)
             {
                 const auto lowParams = makeTiltParams(params, false, tiltQ);
@@ -732,6 +797,13 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             {
                 for (int stage = 0; stage < stages; ++stage)
                     filters[ch][band][stage].update(params);
+            }
+            if (resonanceMix > 0.0f)
+            {
+                BandParams resParams = params;
+                resParams.type = FilterType::bandPass;
+                resParams.gainDb = 0.0f;
+                filters[ch][band][0].update(resParams);
             }
 
             if (isHpLp && slopeConfig.useOnePole)
@@ -793,6 +865,9 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             {
                 const float dry = dryData[i];
                 float sample = dry;
+                float res = 0.0f;
+                if (resonanceMix > 0.0f)
+                    res = filters[ch][band][0].processSample(dry);
 
                 float detDb = 0.0f;
                 if (params.dynamicEnabled)
@@ -818,12 +893,15 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
 
                 for (int stage = 0; stage < stages; ++stage)
                     sample = filters[ch][band][stage].processSample(sample);
+                if (resonanceMix > 0.0f)
+                    sample += res * resonanceMix;
 
                 if (params.dynamicEnabled)
                 {
                     const float dynamicGainDb = computeDynamicGain(params, detDb);
                     const float deltaDb = dynamicGainDb - staticGainDb;
-                    sample *= juce::Decibels::decibelsToGain(deltaDb);
+                    const float deltaGain = juce::Decibels::decibelsToGain(deltaDb);
+                    sample = dry + (sample - dry) * deltaGain;
                     this->dynamicGainDb[ch][band].store(deltaDb);
                 }
 

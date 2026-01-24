@@ -42,7 +42,7 @@ const juce::StringArray kMsChoices {
     "All",
     "Mid",
     "Side",
-    "L/R",
+    "Stereo",
     "Left",
     "Right",
     "Mono",
@@ -514,6 +514,11 @@ float EQProAudioProcessor::getCorrelation() const
     return meterTap.getCorrelation();
 }
 
+int EQProAudioProcessor::getGoniometerPoints(juce::Point<float>* dest, int maxPoints, int& writePos) const
+{
+    return meterTap.copyScopePoints(dest, maxPoints, writePos);
+}
+
 juce::StringArray EQProAudioProcessor::getCorrelationPairNames()
 {
     const int channelCount = juce::jlimit(0, ParamIDs::kMaxChannels, getTotalNumInputChannels());
@@ -740,12 +745,14 @@ int EQProAudioProcessor::getSelectedChannelIndex() const
 
 float EQProAudioProcessor::getBandDetectorDb(int channelIndex, int bandIndex) const
 {
-    return eqEngine.getEqDsp().getDetectorDb(channelIndex, bandIndex);
+    juce::ignoreUnused(channelIndex, bandIndex);
+    return -60.0f;
 }
 
 float EQProAudioProcessor::getBandDynamicGainDb(int channelIndex, int bandIndex) const
 {
-    return eqEngine.getEqDsp().getDynamicGainDb(channelIndex, bandIndex);
+    juce::ignoreUnused(channelIndex, bandIndex);
+    return 0.0f;
 }
 
 void EQProAudioProcessor::logStartup(const juce::String& message)
@@ -1140,6 +1147,29 @@ void EQProAudioProcessor::timerCallback()
     {
         lastSnapshotHash = hash;
         activeSnapshot.store(nextIndex);
+    }
+
+    static int rmsLogTick = 0;
+    static int lastLogMode = -1;
+    static int lastLogQuality = -1;
+    if (++rmsLogTick >= 30)
+    {
+        rmsLogTick = 0;
+        const int mode = eqEngine.getLastRmsPhaseMode();
+        const int quality = eqEngine.getLastRmsQuality();
+        const float preDb = eqEngine.getLastPreRmsDb();
+        const float postDb = eqEngine.getLastPostRmsDb();
+        if (mode != lastLogMode || quality != lastLogQuality
+            || std::abs(postDb - preDb) > 0.5f)
+        {
+            lastLogMode = mode;
+            lastLogQuality = quality;
+            logStartup("RMS delta: mode=" + juce::String(mode)
+                       + " quality=" + juce::String(quality)
+                       + " pre=" + juce::String(preDb, 2) + " dB"
+                       + " post=" + juce::String(postDb, 2) + " dB"
+                       + " delta=" + juce::String(postDb - preDb, 2) + " dB");
+        }
     }
 }
 
@@ -1587,7 +1617,7 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
         ? 0xFFFFFFFFu
         : (numChannels > 0 ? ((1u << static_cast<uint32_t>(numChannels)) - 1u) : 0u);
 
-    const auto& channelNames = cachedChannelNames;
+    const auto& channelNames = cachedChannelNames.empty() ? getCurrentChannelNames() : cachedChannelNames;
     auto findIndex = [&channelNames](const juce::String& name) -> int
     {
         for (int i = 0; i < static_cast<int>(channelNames.size()); ++i)
@@ -1595,33 +1625,43 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
                 return i;
         return -1;
     };
+    auto maskForIndex = [&](int index) -> uint32_t
+    {
+        return (index >= 0 && index < numChannels) ? (1u << static_cast<uint32_t>(index)) : 0u;
+    };
     auto maskFor = [&](const juce::String& name) -> uint32_t
     {
         const int idx = findIndex(name);
-        return idx >= 0 ? (1u << static_cast<uint32_t>(idx)) : 0u;
+        return maskForIndex(idx);
     };
     auto maskForPair = [&](const juce::String& left, const juce::String& right) -> uint32_t
     {
         return maskFor(left) | maskFor(right);
     };
+    const int sourceChannel = juce::jlimit(0, numChannels - 1, selectedChannelIndex.load());
+    const int lIndex = findIndex("L");
+    const int rIndex = findIndex("R");
+    const uint32_t maskL = maskForIndex(lIndex >= 0 ? lIndex : 0);
+    const uint32_t maskR = maskForIndex(rIndex >= 0 ? rIndex : (numChannels > 1 ? 1 : -1));
+    const uint32_t maskStereo = maskL | maskR;
 
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
     {
-        const int target = snapshot.bands[0][band].msTarget;
+        const int target = snapshot.bands[sourceChannel][band].msTarget;
         int msTarget = 0;
         uint32_t mask = maskAll;
 
         switch (target)
         {
             case 0: mask = maskAll; break;
-            case 1: msTarget = 1; mask = maskForPair("L", "R"); break;
-            case 2: msTarget = 2; mask = maskForPair("L", "R"); break;
-            case 3: mask = maskForPair("L", "R"); break;
-            case 4: mask = maskFor("L"); break;
-            case 5: mask = maskFor("R"); break;
-            case 6: msTarget = 1; mask = maskForPair("L", "R"); break;
-            case 7: mask = maskFor("L"); break;
-            case 8: mask = maskFor("R"); break;
+            case 1: msTarget = 1; mask = maskStereo; break;
+            case 2: msTarget = 2; mask = maskStereo; break;
+            case 3: mask = maskStereo; break;
+            case 4: mask = maskL; break;
+            case 5: mask = maskR; break;
+            case 6: msTarget = 1; mask = maskStereo; break;
+            case 7: mask = maskL; break;
+            case 8: mask = maskR; break;
             case 9: mask = maskFor("C"); break;
             case 10: mask = maskFor("LFE"); break;
             case 11: mask = maskFor("Ls"); break;
@@ -1658,6 +1698,12 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
 
         snapshot.msTargets[band] = msTarget;
         snapshot.bandChannelMasks[band] = mask;
+
+        if (target == 0 || target == 3)
+        {
+            for (int ch = 1; ch < numChannels; ++ch)
+                snapshot.bands[ch][band] = snapshot.bands[sourceChannel][band];
+        }
     }
 
     auto hash = uint64_t { 1469598103934665603ull };

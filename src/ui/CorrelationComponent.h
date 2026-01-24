@@ -20,9 +20,8 @@ private:
     void timerCallback() override;
 
     EQProAudioProcessor& processorRef;
-    float correlation = 0.0f;
-    static constexpr int kHistorySize = 120;
-    std::array<float, kHistorySize> history {};
-    int historyIndex = 0;
+    static constexpr int kScopePoints = 512;
+    std::array<juce::Point<float>, kScopePoints> scopePoints {};
+    int scopePointCount = 0;
     ThemeColors theme = makeDarkTheme();
 };

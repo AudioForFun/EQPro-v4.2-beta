@@ -47,6 +47,7 @@ public:
     juce::String getCurrentLayoutDescription() const;
     eqdsp::ChannelMeterState getMeterState(int channelIndex) const;
     float getCorrelation() const;
+    int getGoniometerPoints(juce::Point<float>* dest, int maxPoints, int& writePos) const;
     juce::StringArray getCorrelationPairNames();
     void setCorrelationPairIndex(int index);
     int getCorrelationPairIndex() const;

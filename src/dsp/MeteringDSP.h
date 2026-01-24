@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <JuceHeader.h>
 #include "../util/ParamIDs.h"
 
@@ -15,6 +16,8 @@ struct ChannelMeterState
 class MeteringDSP
 {
 public:
+    static constexpr int kScopePoints = 512;
+
     void prepare(double sampleRate);
     void reset();
     void process(const juce::AudioBuffer<float>& buffer, int numChannels);
@@ -22,6 +25,7 @@ public:
 
     ChannelMeterState getChannelState(int channelIndex) const;
     float getCorrelation() const;
+    int copyScopePoints(juce::Point<float>* dest, int maxPoints, int& writePos) const;
 
 private:
     float computeRmsDb(const float* data, int numSamples) const;
@@ -38,5 +42,9 @@ private:
     float peakSmooth = 0.2f;
     int corrA = 0;
     int corrB = 1;
+    std::array<float, kScopePoints> scopeX {};
+    std::array<float, kScopePoints> scopeY {};
+    std::atomic<int> scopeWritePos { 0 };
+    int scopeDecimCounter = 0;
 };
 } // namespace eqdsp

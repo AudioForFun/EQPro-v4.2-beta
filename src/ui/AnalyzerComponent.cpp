@@ -164,37 +164,28 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         }
     }
 
-    bool hasPre = false;
-    bool hasPost = false;
-    for (int i = 0; i < fftBins; ++i)
-    {
-        if (preMagnitudes[i] > kAnalyzerMinDb + 2.0f)
-            hasPre = true;
-        if (postMagnitudes[i] > kAnalyzerMinDb + 2.0f)
-            hasPost = true;
-        if (hasPre && hasPost)
-            break;
-    }
-
     const int viewIndex = parameters.getRawParameterValue(ParamIDs::analyzerView) != nullptr
         ? static_cast<int>(parameters.getRawParameterValue(ParamIDs::analyzerView)->load())
         : 0;
     const bool drawPre = viewIndex != 2;
     const bool drawPost = viewIndex != 1;
 
-    if (hasPre && drawPre)
+    const juce::Colour preColour(0xff0f766e);
+    const juce::Colour postColour(0xfff472b6);
+
+    if (drawPre)
     {
-        g.setColour(theme.accent.withAlpha(0.2f));
+        g.setColour(preColour.withAlpha(0.2f));
         g.strokePath(prePath, juce::PathStrokeType(3.0f * scale));
-        g.setColour(theme.accent.withAlpha(0.75f));
+        g.setColour(preColour.withAlpha(0.85f));
         g.strokePath(prePath, juce::PathStrokeType(1.4f * scale));
     }
 
-    if (hasPost && drawPost)
+    if (drawPost)
     {
-        g.setColour(theme.accentAlt.withAlpha(0.25f));
+        g.setColour(postColour.withAlpha(0.25f));
         g.strokePath(postPath, juce::PathStrokeType(3.0f * scale));
-        g.setColour(theme.accentAlt.withAlpha(0.85f));
+        g.setColour(postColour.withAlpha(0.9f));
         g.strokePath(postPath, juce::PathStrokeType(1.5f * scale));
     }
 
@@ -237,11 +228,11 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         for (int i = 0; i < items.size(); ++i)
         {
             auto line = row.removeFromTop(rowH);
-            juce::Colour swatchColour = theme.accent;
+            juce::Colour swatchColour = preColour;
             if (items[i] == "Post")
-                swatchColour = theme.accentAlt;
+                swatchColour = postColour;
             else if (items[i] == "Ext")
-                swatchColour = theme.accentAlt.withAlpha(0.6f);
+                swatchColour = postColour.withAlpha(0.6f);
             g.setColour(swatchColour);
             g.fillRoundedRectangle(line.removeFromLeft(swatch), 2.0f);
             g.setColour(theme.textMuted);
@@ -1047,10 +1038,14 @@ void AnalyzerComponent::updateFft()
     const bool wantPre = viewIndex != 2;
     const bool wantPost = viewIndex != 1;
 
-    if (wantPre && preFifo.pull(timeBuffer.data(), fftSize) == fftSize)
+    if (wantPre)
     {
-        std::fill(fftDataPre.begin(), fftDataPre.end(), 0.0f);
-        juce::FloatVectorOperations::copy(fftDataPre.data(), timeBuffer.data(), fftSize);
+        const int pulled = preFifo.pull(timeBuffer.data(), fftSize);
+        if (pulled > 0)
+        {
+            std::fill(fftDataPre.begin(), fftDataPre.end(), 0.0f);
+            juce::FloatVectorOperations::copy(fftDataPre.data(), timeBuffer.data(),
+                                              juce::jmin(pulled, fftSize));
         window.multiplyWithWindowingTable(fftDataPre.data(), fftSize);
         fft.performFrequencyOnlyForwardTransform(fftDataPre.data());
 
@@ -1061,11 +1056,16 @@ void AnalyzerComponent::updateFft()
             preMagnitudes[i] = Smoothing::smooth(preMagnitudes[i], mag, kSmoothingCoeff);
         }
     }
+    }
 
-    if (wantPost && postFifo.pull(timeBuffer.data(), fftSize) == fftSize)
+    if (wantPost)
     {
-        std::fill(fftDataPost.begin(), fftDataPost.end(), 0.0f);
-        juce::FloatVectorOperations::copy(fftDataPost.data(), timeBuffer.data(), fftSize);
+        const int pulled = postFifo.pull(timeBuffer.data(), fftSize);
+        if (pulled > 0)
+        {
+            std::fill(fftDataPost.begin(), fftDataPost.end(), 0.0f);
+            juce::FloatVectorOperations::copy(fftDataPost.data(), timeBuffer.data(),
+                                              juce::jmin(pulled, fftSize));
         window.multiplyWithWindowingTable(fftDataPost.data(), fftSize);
         fft.performFrequencyOnlyForwardTransform(fftDataPost.data());
 
@@ -1075,6 +1075,7 @@ void AnalyzerComponent::updateFft()
                                                             minDb);
             postMagnitudes[i] = Smoothing::smooth(postMagnitudes[i], mag, kSmoothingCoeff);
         }
+    }
     }
 
     const bool showExternal = parameters.getRawParameterValue(ParamIDs::analyzerExternal) != nullptr
@@ -1157,7 +1158,21 @@ void AnalyzerComponent::updateCurves()
     std::array<bool, ParamIDs::kBandsPerChannel> bandActive {};
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
     {
-        bandActive[band] = ! getBandBypassed(band);
+        const float mix = getBandParameter(band, kParamMixSuffix);
+        const float gainDb = getBandParameter(band, kParamGainSuffix);
+        const int type = getBandType(band);
+        const bool dynEnabled = getBandParameter(band, kParamDynEnableSuffix) > 0.5f;
+        const bool isBell = type == static_cast<int>(eqdsp::FilterType::bell);
+        const bool isShelf = type == static_cast<int>(eqdsp::FilterType::lowShelf)
+            || type == static_cast<int>(eqdsp::FilterType::highShelf);
+        const bool isTilt = type == static_cast<int>(eqdsp::FilterType::tilt)
+            || type == static_cast<int>(eqdsp::FilterType::flatTilt);
+        const bool skipZeroGain = ! dynEnabled && (isBell || isShelf || isTilt)
+            && std::abs(gainDb) < 0.0001f;
+
+        bandActive[band] = ! getBandBypassed(band)
+            && mix > 0.0001f
+            && ! skipZeroGain;
         perBandActive[band] = bandActive[band];
     }
 
@@ -1176,10 +1191,37 @@ void AnalyzerComponent::updateCurves()
         hashBand(getBandParameter(band, kParamTypeSuffix));
         hashBand(getBandParameter(band, kParamBypassSuffix));
         hashBand(getBandParameter(band, kParamSlopeSuffix));
+        hashBand(getBandParameter(band, kParamMixSuffix));
+        hashBand(getBandParameter(band, kParamDynEnableSuffix));
         hashBand(getBandDynamicGainDb(band));
         bandDirty[static_cast<size_t>(band)] = bandHash != perBandCurveHash[static_cast<size_t>(band)];
         perBandCurveHash[static_cast<size_t>(band)] = bandHash;
     }
+
+    const bool selectedValid = selectedBand >= 0 && selectedBand < ParamIDs::kBandsPerChannel;
+    float selectedMix = 0.0f;
+    float selectedGainDb = 0.0f;
+    int selectedType = 0;
+    bool selectedDynEnabled = false;
+    if (selectedValid)
+    {
+        selectedMix = getBandParameter(selectedBand, kParamMixSuffix);
+        selectedGainDb = getBandParameter(selectedBand, kParamGainSuffix);
+        selectedType = getBandType(selectedBand);
+        selectedDynEnabled = getBandParameter(selectedBand, kParamDynEnableSuffix) > 0.5f;
+    }
+    const bool selectedIsBell = selectedType == static_cast<int>(eqdsp::FilterType::bell);
+    const bool selectedIsShelf = selectedType == static_cast<int>(eqdsp::FilterType::lowShelf)
+        || selectedType == static_cast<int>(eqdsp::FilterType::highShelf);
+    const bool selectedIsTilt = selectedType == static_cast<int>(eqdsp::FilterType::tilt)
+        || selectedType == static_cast<int>(eqdsp::FilterType::flatTilt);
+    const bool selectedSkipZeroGain = selectedValid && ! selectedDynEnabled
+        && (selectedIsBell || selectedIsShelf || selectedIsTilt)
+        && std::abs(selectedGainDb) < 0.0001f;
+    const bool selectedActive = selectedValid
+        && ! getBandBypassed(selectedBand)
+        && selectedMix > 0.0001f
+        && ! selectedSkipZeroGain;
 
     for (int x = 0; x < width; ++x)
     {
@@ -1193,14 +1235,22 @@ void AnalyzerComponent::updateCurves()
             if (bandActive[band])
             {
                 const float dynamicDeltaDb = getBandDynamicGainDb(band);
+                const float mix = juce::jlimit(0.0f, 1.0f, getBandParameter(band, kParamMixSuffix));
                 if (bandDirty[static_cast<size_t>(band)])
                 {
                     response = computeBandResponse(band, freq);
-                    const float magnitude = static_cast<float>(std::abs(response))
-                        * juce::Decibels::decibelsToGain(dynamicDeltaDb);
+                    if (std::abs(dynamicDeltaDb) > 0.0001f)
+                    {
+                        const double deltaGain = juce::Decibels::decibelsToGain(dynamicDeltaDb);
+                        response = std::complex<double>(1.0, 0.0)
+                            + (response - std::complex<double>(1.0, 0.0)) * deltaGain;
+                    }
+                    const auto mixed = std::complex<double>(1.0, 0.0)
+                        + static_cast<double>(mix) * (response - std::complex<double>(1.0, 0.0));
+                    const float magnitude = static_cast<float>(std::abs(mixed));
                     perBandCurveDb[static_cast<size_t>(band)][static_cast<size_t>(x)] =
                         juce::Decibels::gainToDecibels(magnitude, minDb);
-                    response = std::complex<double>(magnitude, 0.0);
+                    response = mixed;
                 }
                 else
                 {
@@ -1219,16 +1269,32 @@ void AnalyzerComponent::updateCurves()
         const double mag = std::abs(total);
         eqCurveDb[static_cast<size_t>(x)] =
             juce::Decibels::gainToDecibels(static_cast<float>(mag), minDb);
-        const float selectedDynamicDb = getBandDynamicGainDb(selectedBand);
-        selectedBandCurveDb[static_cast<size_t>(x)] =
-            juce::Decibels::gainToDecibels(static_cast<float>(std::abs(computeBandResponse(selectedBand, freq)))
-                                               * juce::Decibels::decibelsToGain(selectedDynamicDb),
-                                           minDb);
+        if (selectedActive)
+        {
+            std::complex<double> selectedResponse = computeBandResponse(selectedBand, freq);
+            const float selectedDynamicDb = getBandDynamicGainDb(selectedBand);
+            if (std::abs(selectedDynamicDb) > 0.0001f)
+            {
+                const double deltaGain = juce::Decibels::decibelsToGain(selectedDynamicDb);
+                selectedResponse = std::complex<double>(1.0, 0.0)
+                    + (selectedResponse - std::complex<double>(1.0, 0.0)) * deltaGain;
+            }
+            const float mix = juce::jlimit(0.0f, 1.0f, selectedMix);
+            selectedResponse = std::complex<double>(1.0, 0.0)
+                + static_cast<double>(mix) * (selectedResponse - std::complex<double>(1.0, 0.0));
+            selectedBandCurveDb[static_cast<size_t>(x)] =
+                juce::Decibels::gainToDecibels(static_cast<float>(std::abs(selectedResponse)), minDb);
+        }
+        else
+        {
+            selectedBandCurveDb[static_cast<size_t>(x)] = minDb;
+        }
     }
 }
 
 void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>& area)
 {
+    const auto gridColour = juce::Colour(0xffbfbfbf);
     g.setColour(theme.textMuted);
     const float scale = uiScale;
     g.setFont(12.5f * scale);
@@ -1248,7 +1314,7 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
                                    static_cast<float>(labelArea.getBottom()),
                                    static_cast<float>(labelArea.getY()));
         const bool major = (static_cast<int>(db) % 12 == 0);
-        g.setColour(theme.grid.withAlpha(major ? 0.7f : 0.45f));
+        g.setColour(gridColour.withAlpha(major ? 0.7f : 0.45f));
         g.drawLine(static_cast<float>(area.getX()), y,
                    static_cast<float>(area.getRight()), y, major ? 1.4f : 1.0f);
         if (major)
@@ -1280,7 +1346,7 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
         const bool major = (f == 10.0f || f == 20.0f || f == 50.0f || f == 100.0f || f == 200.0f || f == 500.0f
             || f == 1000.0f || f == 2000.0f || f == 5000.0f || f == 10000.0f || f == 20000.0f || f == 40000.0f
             || f == 60000.0f);
-        g.setColour(major ? theme.grid.withAlpha(0.8f) : theme.grid.withAlpha(0.45f));
+        g.setColour(major ? gridColour.withAlpha(0.8f) : gridColour.withAlpha(0.45f));
         g.drawVerticalLine(static_cast<int>(x), static_cast<float>(area.getY()),
                            static_cast<float>(area.getBottom()));
         if (major && x + labelWidth <= area.getRight() && (x - lastLabelX) >= minLabelSpacing)
@@ -1325,7 +1391,7 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
 
     const float db = 0.0f;
     const int y = static_cast<int>(gainToY(db));
-    g.setColour(theme.grid.withAlpha(0.6f));
+    g.setColour(gridColour.withAlpha(0.6f));
     g.drawHorizontalLine(y, static_cast<float>(area.getX()), static_cast<float>(area.getRight()));
     g.setColour(theme.textMuted);
     g.drawFittedText("0 dB",
@@ -1630,9 +1696,25 @@ std::complex<double> AnalyzerComponent::computeBandResponse(int bandIndex, float
         const float remainder = clamped - static_cast<float>(stages) * 12.0f;
         const bool useOnePole = (remainder >= 6.0f) || stages == 0;
         if (stages > 0)
+        {
             response = std::pow(response, stages);
+        }
+        else
+        {
+            // 6 dB/oct uses only the one-pole stage (no biquad contribution).
+            response = { 1.0, 0.0 };
+        }
         if (useOnePole)
             response *= onePoleResponse(freq, frequency);
+        if (stages == 0 && useOnePole)
+        {
+            const float resonanceMix = juce::jlimit(0.0f, 0.8f, (q - 0.707f) / 6.0f);
+            if (resonanceMix > 0.0f)
+            {
+                const auto bandPass = computeResponseForType(eqdsp::FilterType::bandPass, 0.0, -1.0);
+                response += bandPass * static_cast<double>(resonanceMix);
+            }
+        }
     }
 
     return response;

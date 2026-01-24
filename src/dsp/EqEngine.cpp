@@ -91,6 +91,21 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     eqDspOversampled.setQMode(snapshot.qMode);
     eqDspOversampled.setQModeAmount(snapshot.qModeAmount);
 
+    const int preSamples = buffer.getNumSamples();
+    const int preChannels = juce::jmax(1, buffer.getNumChannels());
+    double preSum = 0.0;
+    for (int ch = 0; ch < preChannels; ++ch)
+    {
+        const float* data = buffer.getReadPointer(ch);
+        for (int i = 0; i < preSamples; ++i)
+            preSum += static_cast<double>(data[i]) * static_cast<double>(data[i]);
+    }
+    const double preRms = std::sqrt(preSum / static_cast<double>(preSamples * preChannels));
+    lastPreRmsDb.store(juce::Decibels::gainToDecibels(static_cast<float>(preRms), -120.0f),
+                       std::memory_order_relaxed);
+    lastRmsPhaseMode.store(snapshot.phaseMode, std::memory_order_relaxed);
+    lastRmsQuality.store(snapshot.linearQuality, std::memory_order_relaxed);
+
     if (buffer.getNumChannels() > 0)
     {
         const float* data = buffer.getReadPointer(0);
@@ -218,9 +233,37 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     {
         const int samples = buffer.getNumSamples();
         const int latencySamples = getLatencySamples();
-        float mixedPhaseAmount = snapshot.phaseMode == 1 ? 0.22f : 0.12f;
-        mixedPhaseAmount *= (1.0f - 0.08f * snapshot.linearQuality);
-        mixedPhaseAmount = juce::jlimit(0.08f, 0.25f, mixedPhaseAmount);
+        if (calibBuffer.getNumChannels() != numChannels
+            || calibBuffer.getNumSamples() < samples)
+        {
+            calibBuffer.setSize(numChannels, samples);
+        }
+        for (int ch = 0; ch < numChannels; ++ch)
+            juce::FloatVectorOperations::copy(calibBuffer.getWritePointer(ch),
+                                              buffer.getReadPointer(ch), samples);
+        float mixedPhaseAmount = 0.0f;
+        bool hasSubtractive = false;
+        for (int ch = 0; ch < numChannels && ! hasSubtractive; ++ch)
+        {
+            for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+            {
+                const auto& b = snapshot.bands[ch][band];
+                if (b.bypassed || b.mix <= 0.0005f)
+                    continue;
+                const auto filterType = static_cast<eqdsp::FilterType>(b.type);
+                if (filterType == eqdsp::FilterType::lowPass
+                    || filterType == eqdsp::FilterType::highPass
+                    || filterType == eqdsp::FilterType::allPass)
+                    continue;
+                if (b.gainDb < -0.001f)
+                {
+                    hasSubtractive = true;
+                    break;
+                }
+            }
+        }
+        if (hasSubtractive)
+            mixedPhaseAmount = 0.0f;
 
         if (mixedPhaseAmount > 0.0f)
         {
@@ -288,6 +331,9 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                     wet[i] = wet[i] * dryMix + minPhase[i] * mixedPhaseAmount;
             }
         }
+
+        // Realtime reference pass for post-mode RMS calibration.
+        eqDsp.process(calibBuffer, detectorBuffer);
     }
 
     spectralDsp.setEnabled(snapshot.spectralEnabled);
@@ -316,6 +362,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
         }
     }
 
+    float autoGainDb = 0.0f;
     if (snapshot.autoGainEnabled)
     {
         float sumDb = 0.0f;
@@ -340,8 +387,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
         if (count > 0)
         {
             const float avgDb = sumDb / static_cast<float>(count);
-            const float autoGainDb = juce::jlimit(-12.0f, 12.0f, -avgDb * snapshot.gainScale);
-            buffer.applyGain(juce::Decibels::decibelsToGain(autoGainDb));
+            autoGainDb = juce::jlimit(-12.0f, 12.0f, -avgDb * (snapshot.gainScale * 0.01f));
         }
     }
 
@@ -371,7 +417,8 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     if (snapshot.phaseInvert)
         buffer.applyGain(-1.0f);
 
-    outputTrimGainSmoothed.setTargetValue(juce::Decibels::decibelsToGain(snapshot.outputTrimDb));
+    outputTrimGainSmoothed.setTargetValue(
+        juce::Decibels::decibelsToGain(snapshot.outputTrimDb + autoGainDb));
     if (outputTrimGainSmoothed.isSmoothing()
         || std::abs(snapshot.outputTrimDb) > 0.001f)
     {
@@ -383,11 +430,75 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             buffer.applyGainRamp(ch, 0, numSamples, startGain, endGain);
     }
 
+    if (snapshot.phaseMode != 0)
+    {
+        // Match linear/natural output level to realtime RMS for consistent meters.
+        const int numSamples = buffer.getNumSamples();
+        const int refChannels = juce::jmin(numChannels, calibBuffer.getNumChannels());
+        auto mixSmoothed = globalMixSmoothed;
+        if (applyGlobalMix)
+        {
+            const float wetStart = mixSmoothed.getCurrentValue();
+            mixSmoothed.skip(numSamples);
+            const float wetEnd = mixSmoothed.getCurrentValue();
+            const float wetStep = (wetEnd - wetStart) / static_cast<float>(numSamples);
+            float wet = wetStart;
+            for (int i = 0; i < numSamples; ++i)
+            {
+                const float dryGain = 1.0f - wet;
+                for (int ch = 0; ch < refChannels; ++ch)
+                {
+                    auto* data = calibBuffer.getWritePointer(ch);
+                    const float dry = dryBuffer.getReadPointer(ch)[i];
+                    data[i] = dry * dryGain + data[i] * wet;
+                }
+                wet += wetStep;
+            }
+        }
+
+        auto trimSmoothed = outputTrimGainSmoothed;
+        const float startGain = trimSmoothed.getCurrentValue();
+        trimSmoothed.skip(numSamples);
+        const float endGain = trimSmoothed.getCurrentValue();
+        for (int ch = 0; ch < refChannels; ++ch)
+            calibBuffer.applyGainRamp(ch, 0, numSamples, startGain, endGain);
+
+        auto computeRms = [](const juce::AudioBuffer<float>& buf, int channels) -> double
+        {
+            const int n = buf.getNumSamples();
+            double sum = 0.0;
+            for (int ch = 0; ch < channels; ++ch)
+            {
+                const float* data = buf.getReadPointer(ch);
+                for (int i = 0; i < n; ++i)
+                    sum += static_cast<double>(data[i]) * static_cast<double>(data[i]);
+            }
+            return std::sqrt(sum / static_cast<double>(n * juce::jmax(1, channels)));
+        };
+        const double refRms = computeRms(calibBuffer, refChannels);
+        const double linRms = computeRms(buffer, numChannels);
+        if (refRms > 1.0e-9 && linRms > 1.0e-9)
+            buffer.applyGain(static_cast<float>(refRms / linRms));
+    }
+
     if (++meterSkipCounter >= meterSkipFactor)
     {
         meterTap.process(buffer, numChannels);
         meterSkipCounter = 0;
     }
+
+    const int postSamples = buffer.getNumSamples();
+    const int postChannels = juce::jmax(1, buffer.getNumChannels());
+    double postSum = 0.0;
+    for (int ch = 0; ch < postChannels; ++ch)
+    {
+        const float* data = buffer.getReadPointer(ch);
+        for (int i = 0; i < postSamples; ++i)
+            postSum += static_cast<double>(data[i]) * static_cast<double>(data[i]);
+    }
+    const double postRms = std::sqrt(postSum / static_cast<double>(postSamples * postChannels));
+    lastPostRmsDb.store(juce::Decibels::gainToDecibels(static_cast<float>(postRms), -120.0f),
+                        std::memory_order_relaxed);
 
     if (buffer.getNumChannels() > 0)
     {
@@ -423,6 +534,26 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                 postTap.push(temp, idx);
         }
     }
+}
+
+float EqEngine::getLastPreRmsDb() const
+{
+    return lastPreRmsDb.load(std::memory_order_relaxed);
+}
+
+float EqEngine::getLastPostRmsDb() const
+{
+    return lastPostRmsDb.load(std::memory_order_relaxed);
+}
+
+int EqEngine::getLastRmsPhaseMode() const
+{
+    return lastRmsPhaseMode.load(std::memory_order_relaxed);
+}
+
+int EqEngine::getLastRmsQuality() const
+{
+    return lastRmsQuality.load(std::memory_order_relaxed);
 }
 
 void EqEngine::setOversampling(int index)
@@ -576,6 +707,8 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, doubl
     {
         std::fill(firData.begin(), firData.end(), 0.0f);
         const double nyquist = sampleRate * 0.5;
+        std::vector<float> desiredMag;
+        desiredMag.resize(static_cast<size_t>(fftSize / 2 + 1), 1.0f);
 
         for (int bin = 0; bin <= fftSize / 2; ++bin)
         {
@@ -594,7 +727,7 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, doubl
                     continue;
 
                 const double mix = b.mix;
-                const double gainDb = b.gainDb * mix;
+                const double gainDb = b.gainDb;
                 const double q = std::max(0.1f, b.q);
                 const double freqParam = b.frequencyHz;
                 const int type = b.type;
@@ -752,8 +885,13 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, doubl
                         mag *= onePoleMag(freqParam, freq);
                 }
 
-                totalMag *= mag;
+                const double mixedMag = 1.0 + mix * (mag - 1.0);
+                totalMag *= mixedMag;
             }
+
+            totalMag = std::max(1.0e-4, totalMag);
+            if (bin <= fftSize / 2)
+                desiredMag[static_cast<size_t>(bin)] = static_cast<float>(totalMag);
 
             firData[static_cast<size_t>(bin) * 2] = static_cast<float>(totalMag);
             firData[static_cast<size_t>(bin) * 2 + 1] = 0.0f;
@@ -764,6 +902,29 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, doubl
             firImpulse[static_cast<size_t>(i)] = firData[static_cast<size_t>(i)] / static_cast<float>(fftSize);
 
         firWindow->multiplyWithWindowingTable(firImpulse.data(), taps);
+
+        std::fill(firData.begin(), firData.end(), 0.0f);
+        for (int i = 0; i < taps; ++i)
+            firData[static_cast<size_t>(i)] = firImpulse[static_cast<size_t>(i)];
+        firFft->performRealOnlyForwardTransform(firData.data());
+
+        double numerator = 0.0;
+        double denominator = 0.0;
+        for (int bin = 0; bin <= fftSize / 2; ++bin)
+        {
+            const double re = firData[static_cast<size_t>(bin) * 2];
+            const double im = firData[static_cast<size_t>(bin) * 2 + 1];
+            const double actualMag = std::sqrt(re * re + im * im);
+            const double targetMag = desiredMag[static_cast<size_t>(bin)];
+            numerator += targetMag * actualMag;
+            denominator += actualMag * actualMag;
+        }
+        const double scale = (denominator > 1.0e-9) ? (numerator / denominator) : 1.0;
+        if (std::abs(scale - 1.0) > 1.0e-6)
+        {
+            for (int i = 0; i < taps; ++i)
+                firImpulse[static_cast<size_t>(i)] = static_cast<float>(firImpulse[static_cast<size_t>(i)] * scale);
+        }
         juce::AudioBuffer<float> impulse(1, taps);
         impulse.copyFrom(0, 0, firImpulse.data(), taps);
         return impulse;
@@ -773,7 +934,10 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, doubl
     {
         auto impulse = buildImpulse(ch, [&](int band)
         {
-            return (snapshot.bandChannelMasks[band] & (1u << static_cast<uint32_t>(ch))) != 0;
+            if ((snapshot.bandChannelMasks[band] & (1u << static_cast<uint32_t>(ch))) == 0)
+                return false;
+            const int target = snapshot.msTargets[band];
+            return target != 1 && target != 2 && target != 6;
         });
         linearPhaseEq.loadImpulse(ch, std::move(impulse), sampleRate);
     }

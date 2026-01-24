@@ -73,7 +73,6 @@ void MetersComponent::paint(juce::Graphics& g)
     g.drawRoundedRectangle(bounds.reduced(2.5f), 6.0f, 1.0f);
 
     auto meterArea = bounds.reduced(8.0f, 12.0f);
-    const auto phaseArea = meterArea.removeFromBottom(14.0f);
     const auto peakArea = meterArea.removeFromBottom(18.0f);
     const int channels = juce::jmax(1, static_cast<int>(rmsDb.size()));
     auto getSafeValue = [](const std::vector<float>& values, int index, float fallback)
@@ -178,20 +177,6 @@ void MetersComponent::paint(juce::Graphics& g)
     g.drawFittedText("Peak " + juce::String(peakDbValue, 1) + " dB",
                      peakArea.toNearestInt(), juce::Justification::centred, 1);
 
-    g.setColour(theme.panel);
-    g.fillRoundedRectangle(phaseArea, 4.0f);
-    const float midX = phaseArea.getCentreX();
-    const float phaseNorm = juce::jlimit(-1.0f, 1.0f, phaseValue);
-    const float phaseX = juce::jmap(phaseNorm, -1.0f, 1.0f, phaseArea.getX(), phaseArea.getRight());
-    g.setColour(theme.grid.withAlpha(0.5f));
-    g.drawLine(midX, phaseArea.getY() + 2.0f, midX, phaseArea.getBottom() - 2.0f, 1.0f);
-    g.setColour(theme.accentAlt.withAlpha(0.4f));
-    g.drawLine(midX, phaseArea.getCentreY(), phaseX, phaseArea.getCentreY(), 4.0f);
-    g.setColour(theme.accentAlt);
-    g.drawLine(midX, phaseArea.getCentreY(), phaseX, phaseArea.getCentreY(), 2.0f);
-    g.setColour(theme.textMuted);
-    g.setFont(11.0f);
-    g.drawFittedText("Phase", phaseArea.toNearestInt(), juce::Justification::centred, 1);
 }
 
 void MetersComponent::resized()
@@ -221,7 +206,6 @@ void MetersComponent::timerCallback()
             hold = juce::jmax(currentPeak, hold - 0.7f);
     }
 
-    phaseValue = processorRef.getCorrelation();
     repaint();
 }
 

@@ -1,10 +1,10 @@
 #include "CorrelationComponent.h"
 #include "../PluginProcessor.h"
+#include <cmath>
 
 CorrelationComponent::CorrelationComponent(EQProAudioProcessor& processor)
     : processorRef(processor)
 {
-    history.fill(0.0f);
     startTimerHz(30);
 }
 
@@ -20,53 +20,52 @@ void CorrelationComponent::paint(juce::Graphics& g)
     g.drawRoundedRectangle(bounds, 8.0f, 1.0f);
 
     const auto titleArea = bounds.removeFromTop(18.0f);
-    const auto meterArea = bounds.withTrimmedBottom(bounds.getHeight() * 0.45f);
-    const auto historyArea = bounds.removeFromBottom(bounds.getHeight() * 0.45f);
+    auto scopeArea = bounds.reduced(6.0f, 6.0f);
+    const float size = juce::jmin(scopeArea.getWidth(), scopeArea.getHeight());
+    scopeArea = scopeArea.withSizeKeepingCentre(size, size);
 
-    const float midX = meterArea.getCentreX();
+    g.setColour(theme.panel.darker(0.1f));
+    g.fillRect(scopeArea);
+    g.setColour(juce::Colour(0xff6b7280));
+    g.drawRect(scopeArea, 1.2f);
+
+    const auto centre = scopeArea.getCentre();
+    const float radius = size * 0.46f;
     g.setColour(theme.grid.withAlpha(0.5f));
-    g.drawLine(midX, meterArea.getY() + 4.0f, midX, meterArea.getBottom() - 4.0f, 1.0f);
+    g.drawLine(centre.x, scopeArea.getY() + 4.0f, centre.x, scopeArea.getBottom() - 4.0f, 1.0f);
+    g.drawLine(scopeArea.getX() + 4.0f, centre.y, scopeArea.getRight() - 4.0f, centre.y, 1.0f);
     g.setColour(theme.grid.withAlpha(0.35f));
-    g.drawLine(meterArea.getX() + meterArea.getWidth() * 0.25f,
-               meterArea.getY() + 6.0f,
-               meterArea.getX() + meterArea.getWidth() * 0.25f,
-               meterArea.getBottom() - 6.0f, 1.0f);
-    g.drawLine(meterArea.getX() + meterArea.getWidth() * 0.75f,
-               meterArea.getY() + 6.0f,
-               meterArea.getX() + meterArea.getWidth() * 0.75f,
-               meterArea.getBottom() - 6.0f, 1.0f);
+    g.drawLine(scopeArea.getX() + 6.0f, scopeArea.getY() + 6.0f,
+               scopeArea.getRight() - 6.0f, scopeArea.getBottom() - 6.0f, 1.0f);
+    g.drawLine(scopeArea.getRight() - 6.0f, scopeArea.getY() + 6.0f,
+               scopeArea.getX() + 6.0f, scopeArea.getBottom() - 6.0f, 1.0f);
+    g.drawEllipse(scopeArea.reduced(size * 0.07f), 1.0f);
 
-    const float norm = (correlation + 1.0f) * 0.5f;
-    const float posX = meterArea.getX() + norm * meterArea.getWidth();
-    g.setColour(theme.accent.withAlpha(0.3f));
-    g.drawLine(posX, meterArea.getY() + 5.0f, posX, meterArea.getBottom() - 5.0f, 6.0f);
-    g.setColour(theme.accent);
-    g.drawLine(posX, meterArea.getY() + 6.0f, posX, meterArea.getBottom() - 6.0f, 3.0f);
-
-    juce::Path historyPath;
-    for (int i = 0; i < kHistorySize; ++i)
+    if (scopePointCount > 1)
     {
-        const int idx = (historyIndex + i) % kHistorySize;
-        const float x = historyArea.getX() + (static_cast<float>(i) / (kHistorySize - 1)) * historyArea.getWidth();
-        const float y = juce::jmap(history[static_cast<size_t>(idx)], -1.0f, 1.0f,
-                                   historyArea.getBottom(), historyArea.getY());
-        if (i == 0)
-            historyPath.startNewSubPath(x, y);
-        else
-            historyPath.lineTo(x, y);
+        juce::Path scopePath;
+        constexpr float kBaseGain = 0.6f;
+        constexpr float kSoftClip = 2.0f;
+        const float clipNorm = std::tanh(kSoftClip);
+        for (int i = 0; i < scopePointCount; ++i)
+        {
+            const auto& p = scopePoints[static_cast<size_t>(i)];
+            const float sx = std::tanh(p.x * kBaseGain * kSoftClip) / clipNorm;
+            const float sy = std::tanh(p.y * kBaseGain * kSoftClip) / clipNorm;
+            const float x = centre.x + sx * radius;
+            const float y = centre.y - sy * radius;
+            if (i == 0)
+                scopePath.startNewSubPath(x, y);
+            else
+                scopePath.lineTo(x, y);
+        }
+        g.setColour(theme.accent.withAlpha(0.7f));
+        g.strokePath(scopePath, juce::PathStrokeType(1.1f));
     }
-    g.setColour(theme.accentAlt.withAlpha(0.25f));
-    g.strokePath(historyPath, juce::PathStrokeType(4.0f));
-    g.setColour(theme.accentAlt.withAlpha(0.8f));
-    g.strokePath(historyPath, juce::PathStrokeType(1.8f));
 
     g.setColour(theme.textMuted);
     g.setFont(12.0f);
-    g.drawFittedText("Correlation", titleArea.toNearestInt(),
-                     juce::Justification::centred, 1);
-
-    const juce::String valueText = juce::String(correlation, 2);
-    g.drawFittedText(valueText, meterArea.toNearestInt().withTrimmedTop(16),
+    g.drawFittedText("Goniometer", titleArea.toNearestInt(),
                      juce::Justification::centred, 1);
 }
 
@@ -82,8 +81,10 @@ void CorrelationComponent::setTheme(const ThemeColors& newTheme)
 
 void CorrelationComponent::timerCallback()
 {
-    correlation = processorRef.getCorrelation();
-    history[static_cast<size_t>(historyIndex)] = correlation;
-    historyIndex = (historyIndex + 1) % kHistorySize;
+    int writePos = 0;
+    scopePointCount = processorRef.getGoniometerPoints(scopePoints.data(),
+                                                       static_cast<int>(scopePoints.size()),
+                                                       writePos);
+    juce::ignoreUnused(writePos);
     repaint();
 }

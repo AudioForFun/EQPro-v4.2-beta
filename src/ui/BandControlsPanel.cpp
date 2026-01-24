@@ -21,7 +21,7 @@ const juce::StringArray kMsChoices {
     "All",
     "Mid",
     "Side",
-    "L/R",
+    "Stereo",
     "Left",
     "Right",
     "Mono",
@@ -961,42 +961,20 @@ void BandControlsPanel::resized()
 
     left.removeFromTop(2);
     auto togglesRow = left.removeFromTop(rowHeight);
-    juce::ignoreUnused(togglesRow);
+    juce::ignoreUnused(togglesRow, eqKnobTop, right);
 
-    // Dynamic panel (right column)
-    const int padBeforeDynHeader = juce::jmax(0, eqKnobTop
-                                                     - (right.getY() + rowHeight + 4));
-    right.removeFromTop(padBeforeDynHeader);
-    auto dynRow = right.removeFromTop(rowHeight);
-    dynEnableToggle.setBounds(dynRow.removeFromLeft(88));
-    dynUpButton.setBounds(dynRow.removeFromLeft(48));
-    dynDownButton.setBounds(dynRow.removeFromLeft(56));
-    autoScaleToggle.setBounds(dynRow.removeFromLeft(82));
-    dynExternalToggle.setBounds(dynRow);
-
-    right.removeFromTop(4);
-    auto dynKnobs = right.removeFromTop(knobRowHeight);
-    const int dynKnobWidth = (dynKnobs.getWidth() - gap * 2) / 3;
-    auto threshArea = dynKnobs.removeFromLeft(dynKnobWidth);
-    thresholdLabel.setBounds(threshArea.removeFromTop(labelHeight));
-    thresholdSlider.setBounds(squareKnob(threshArea).withSizeKeepingCentre(knobSize, knobSize));
-    dynKnobs.removeFromLeft(gap);
-    auto attackArea = dynKnobs.removeFromLeft(dynKnobWidth);
-    attackLabel.setBounds(attackArea.removeFromTop(labelHeight));
-    attackSlider.setBounds(squareKnob(attackArea).withSizeKeepingCentre(knobSize, knobSize));
-    dynKnobs.removeFromLeft(gap);
-    auto releaseArea = dynKnobs.removeFromLeft(dynKnobWidth);
-    releaseLabel.setBounds(releaseArea.removeFromTop(labelHeight));
-    releaseSlider.setBounds(squareKnob(releaseArea).withSizeKeepingCentre(knobSize, knobSize));
-
-    right.removeFromTop(4);
-    auto detectorArea = right.removeFromTop(208);
-    const int detectorSize = std::min(detectorArea.getWidth(), detectorArea.getHeight());
-    detectorMeterBounds = juce::Rectangle<int>(detectorSize, detectorSize)
-                              .withCentre(detectorArea.getCentre())
-                              .toFloat();
-
-    left.removeFromTop(2);
+    dynEnableToggle.setBounds({0, 0, 0, 0});
+    dynUpButton.setBounds({0, 0, 0, 0});
+    dynDownButton.setBounds({0, 0, 0, 0});
+    autoScaleToggle.setBounds({0, 0, 0, 0});
+    dynExternalToggle.setBounds({0, 0, 0, 0});
+    thresholdLabel.setBounds({0, 0, 0, 0});
+    thresholdSlider.setBounds({0, 0, 0, 0});
+    attackLabel.setBounds({0, 0, 0, 0});
+    attackSlider.setBounds({0, 0, 0, 0});
+    releaseLabel.setBounds({0, 0, 0, 0});
+    releaseSlider.setBounds({0, 0, 0, 0});
+    detectorMeterBounds = {};
 }
 
 void BandControlsPanel::updateAttachments()
@@ -1176,14 +1154,17 @@ void BandControlsPanel::updateTypeUi()
     slopeBox.setAlpha(isHpLp ? 1.0f : 0.5f);
     const bool isTilt = (typeIndex == 8 || typeIndex == 9);
     juce::ignoreUnused(isTilt);
-    dynEnableToggle.setVisible(true);
-    dynUpButton.setVisible(true);
-    dynDownButton.setVisible(true);
-    thresholdSlider.setVisible(true);
-    attackSlider.setVisible(true);
-    releaseSlider.setVisible(true);
-    autoScaleToggle.setVisible(true);
-    dynExternalToggle.setVisible(true);
+    dynEnableToggle.setVisible(false);
+    dynUpButton.setVisible(false);
+    dynDownButton.setVisible(false);
+    thresholdLabel.setVisible(false);
+    attackLabel.setVisible(false);
+    releaseLabel.setVisible(false);
+    thresholdSlider.setVisible(false);
+    attackSlider.setVisible(false);
+    releaseSlider.setVisible(false);
+    autoScaleToggle.setVisible(false);
+    dynExternalToggle.setVisible(false);
 }
 
 int BandControlsPanel::getMsParamValue() const

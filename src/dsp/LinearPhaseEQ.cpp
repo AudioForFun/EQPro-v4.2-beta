@@ -49,7 +49,7 @@ void LinearPhaseEQ::loadImpulse(int channelIndex, juce::AudioBuffer<float>&& imp
         sampleRate,
         juce::dsp::Convolution::Stereo::no,
         juce::dsp::Convolution::Trim::yes,
-        juce::dsp::Convolution::Normalise::yes);
+        juce::dsp::Convolution::Normalise::no);
 }
 
 void LinearPhaseEQ::process(juce::AudioBuffer<float>& buffer)

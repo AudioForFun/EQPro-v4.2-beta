@@ -31,6 +31,10 @@ public:
     EQDSP& getEqDsp();
     const EQDSP& getEqDsp() const;
     LinearPhaseEQ& getLinearPhaseEq();
+    float getLastPreRmsDb() const;
+    float getLastPostRmsDb() const;
+    int getLastRmsPhaseMode() const;
+    int getLastRmsQuality() const;
 
 private:
     uint64_t computeParamsHash(const ParamSnapshot& snapshot) const;
@@ -51,6 +55,7 @@ private:
     juce::AudioBuffer<float> minPhaseDelayBuffer;
     int minPhaseDelayWritePos = 0;
     int minPhaseDelaySamples = 0;
+    juce::AudioBuffer<float> calibBuffer;
     juce::AudioBuffer<float> oversampledBuffer;
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;
 
@@ -77,6 +82,10 @@ private:
     std::vector<float> firImpulse;
     std::unique_ptr<juce::dsp::WindowingFunction<float>> firWindow;
     int firWindowMethod = -1;
+    std::atomic<float> lastPreRmsDb { -120.0f };
+    std::atomic<float> lastPostRmsDb { -120.0f };
+    std::atomic<int> lastRmsPhaseMode { 0 };
+    std::atomic<int> lastRmsQuality { 0 };
 
     void updateDryDelay(int latencySamples, int maxBlockSize, int numChannels);
     void applyDryDelay(juce::AudioBuffer<float>& dry, int numSamples, int delaySamples);

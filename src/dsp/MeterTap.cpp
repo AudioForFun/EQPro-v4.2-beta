@@ -27,6 +27,11 @@ float MeterTap::getCorrelation() const
     return meters.getCorrelation();
 }
 
+int MeterTap::copyScopePoints(juce::Point<float>* dest, int maxPoints, int& writePos) const
+{
+    return meters.copyScopePoints(dest, maxPoints, writePos);
+}
+
 void MeterTap::setCorrelationPair(int channelA, int channelB)
 {
     meters.setCorrelationPair(channelA, channelB);

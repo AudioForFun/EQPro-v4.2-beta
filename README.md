@@ -1,6 +1,18 @@
-# EQ Pro (JUCE) - 3.6 beta
+# EQ Pro (JUCE) - 3.7 beta
 
 Work-in-progress JUCE multi-channel EQ plugin.
+
+## Product Description
+EQ Pro is a precision multi-channel EQ with real-time visualization, flexible band
+control, and multiple processing modes for transparent or surgical work.
+
+## Key Features
+- 12 fully parametric bands per channel with per-band mix.
+- Real-time analyzer with pre/post curves and band overlays.
+- Natural and Linear phase modes with adaptive FIR lengths.
+- Goniometer + stereo correlation metering.
+- Auto gain with RMS-based matching for consistent level.
+- Preset save/load and per-band copy/paste workflow.
 
 ## Requirements
 - JUCE (download from https://juce.com)
@@ -21,7 +33,7 @@ cmake --build build --config Release
 - Standalone audio device restore is disabled by default; set `EQPRO_LOAD_AUDIO_STATE=1` to enable.
 - Standalone window position restore is disabled by default; set `EQPRO_LOAD_WINDOW_POS=1` to enable.
 
-## Processing Modes (v3.6 beta)
+## Processing Modes (v3.7 beta)
 - Real-time: minimum-phase IIR (0 latency).
 - Natural: short linear-phase FIR with adaptive tap length and mixed-phase blend.
 - Linear: long linear-phase FIR with adaptive taps and mixed-phase blend.

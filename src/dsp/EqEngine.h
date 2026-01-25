@@ -38,7 +38,7 @@ public:
 
 private:
     uint64_t computeParamsHash(const ParamSnapshot& snapshot) const;
-    void rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, double sampleRate);
+    void rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int headSize, double sampleRate);
     void updateOversampling(const ParamSnapshot& snapshot, double sampleRate, int maxBlockSize, int channels);
     EQDSP eqDsp;
     EQDSP eqDspOversampled;
@@ -61,6 +61,7 @@ private:
 
     juce::SmoothedValue<float> globalMixSmoothed;
     juce::SmoothedValue<float> outputTrimGainSmoothed;
+    juce::SmoothedValue<float> autoGainSmoothed;
 
     int oversamplingIndex = 0;
     int maxPreparedBlockSize = 0;

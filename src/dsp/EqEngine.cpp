@@ -38,6 +38,8 @@ void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
     globalMixSmoothed.setCurrentAndTargetValue(1.0f);
     outputTrimGainSmoothed.reset(sampleRate, 0.02);
     outputTrimGainSmoothed.setCurrentAndTargetValue(1.0f);
+    autoGainSmoothed.reset(sampleRate, 0.08);
+    autoGainSmoothed.setCurrentAndTargetValue(0.0f);
 
     meterSkipFactor = 1;
     if (sampleRateHz >= 256000.0)
@@ -59,6 +61,7 @@ void EqEngine::reset()
     minPhaseDelayBuffer.clear();
     minPhaseDelayWritePos = 0;
     minPhaseDelaySamples = 0;
+    autoGainSmoothed.setCurrentAndTargetValue(0.0f);
 }
 
 void EqEngine::process(juce::AudioBuffer<float>& buffer,
@@ -69,6 +72,18 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                        MeterTap& meterTap)
 {
     const int numChannels = juce::jmin(buffer.getNumChannels(), snapshot.numChannels);
+    auto computeRms = [](const juce::AudioBuffer<float>& buf, int channels) -> double
+    {
+        const int n = buf.getNumSamples();
+        double sum = 0.0;
+        for (int ch = 0; ch < channels; ++ch)
+        {
+            const float* data = buf.getReadPointer(ch);
+            for (int i = 0; i < n; ++i)
+                sum += static_cast<double>(data[i]) * static_cast<double>(data[i]);
+        }
+        return std::sqrt(sum / static_cast<double>(n * juce::jmax(1, channels)));
+    };
     if (debugToneEnabled.load())
     {
         const int samples = buffer.getNumSamples();
@@ -91,16 +106,8 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     eqDspOversampled.setQMode(snapshot.qMode);
     eqDspOversampled.setQModeAmount(snapshot.qModeAmount);
 
-    const int preSamples = buffer.getNumSamples();
     const int preChannels = juce::jmax(1, buffer.getNumChannels());
-    double preSum = 0.0;
-    for (int ch = 0; ch < preChannels; ++ch)
-    {
-        const float* data = buffer.getReadPointer(ch);
-        for (int i = 0; i < preSamples; ++i)
-            preSum += static_cast<double>(data[i]) * static_cast<double>(data[i]);
-    }
-    const double preRms = std::sqrt(preSum / static_cast<double>(preSamples * preChannels));
+    const double preRms = computeRms(buffer, preChannels);
     lastPreRmsDb.store(juce::Decibels::gainToDecibels(static_cast<float>(preRms), -120.0f),
                        std::memory_order_relaxed);
     lastRmsPhaseMode.store(snapshot.phaseMode, std::memory_order_relaxed);
@@ -242,98 +249,109 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             juce::FloatVectorOperations::copy(calibBuffer.getWritePointer(ch),
                                               buffer.getReadPointer(ch), samples);
         float mixedPhaseAmount = 0.0f;
-        bool hasSubtractive = false;
-        for (int ch = 0; ch < numChannels && ! hasSubtractive; ++ch)
-        {
-            for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+            bool hasSubtractive = false;
+            for (int ch = 0; ch < numChannels && ! hasSubtractive; ++ch)
             {
-                const auto& b = snapshot.bands[ch][band];
-                if (b.bypassed || b.mix <= 0.0005f)
-                    continue;
-                const auto filterType = static_cast<eqdsp::FilterType>(b.type);
-                if (filterType == eqdsp::FilterType::lowPass
-                    || filterType == eqdsp::FilterType::highPass
-                    || filterType == eqdsp::FilterType::allPass)
-                    continue;
-                if (b.gainDb < -0.001f)
+                for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
                 {
-                    hasSubtractive = true;
-                    break;
+                    const auto& b = snapshot.bands[ch][band];
+                    if (b.bypassed || b.mix <= 0.0005f)
+                        continue;
+                    const auto filterType = static_cast<eqdsp::FilterType>(b.type);
+                    if (filterType == eqdsp::FilterType::lowPass
+                        || filterType == eqdsp::FilterType::highPass
+                        || filterType == eqdsp::FilterType::allPass)
+                        continue;
+                    if (b.gainDb < -0.001f)
+                    {
+                        hasSubtractive = true;
+                        break;
+                    }
                 }
             }
-        }
-        if (hasSubtractive)
-            mixedPhaseAmount = 0.0f;
+            if (hasSubtractive)
+                mixedPhaseAmount = 0.0f;
 
-        if (mixedPhaseAmount > 0.0f)
-        {
-            if (minPhaseBuffer.getNumChannels() != numChannels
-                || minPhaseBuffer.getNumSamples() < samples)
+            if (mixedPhaseAmount > 0.0f)
             {
-                minPhaseBuffer.setSize(numChannels, samples);
-            }
-            for (int ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::copy(minPhaseBuffer.getWritePointer(ch),
-                                                  buffer.getReadPointer(ch), samples);
-            // Minimum-phase pass for transient preservation in linear modes.
-            eqDsp.process(minPhaseBuffer, detectorBuffer);
-            if (latencySamples > 0)
-            {
-                updateMinPhaseDelay(latencySamples, samples, numChannels);
-                applyMinPhaseDelay(minPhaseBuffer, samples, latencySamples);
-            }
-        }
-
-        const bool useMs = numChannels >= 2
-            && std::any_of(snapshot.msTargets.begin(), snapshot.msTargets.end(), [](int v) { return v != 0; });
-
-        if (useMs)
-        {
-            auto* left = buffer.getWritePointer(0);
-            auto* right = buffer.getWritePointer(1);
-            const int samples = buffer.getNumSamples();
-
-            for (int i = 0; i < samples; ++i)
-            {
-                const float mid = 0.5f * (left[i] + right[i]);
-                const float side = 0.5f * (left[i] - right[i]);
-                left[i] = mid;
-                right[i] = side;
+                if (minPhaseBuffer.getNumChannels() != numChannels
+                    || minPhaseBuffer.getNumSamples() < samples)
+                {
+                    minPhaseBuffer.setSize(numChannels, samples);
+                }
+                for (int ch = 0; ch < numChannels; ++ch)
+                    juce::FloatVectorOperations::copy(minPhaseBuffer.getWritePointer(ch),
+                                                      buffer.getReadPointer(ch), samples);
+                // Minimum-phase pass for transient preservation in linear modes.
+                eqDsp.process(minPhaseBuffer, detectorBuffer);
+                if (latencySamples > 0)
+                {
+                    updateMinPhaseDelay(latencySamples, samples, numChannels);
+                    applyMinPhaseDelay(minPhaseBuffer, samples, latencySamples);
+                }
             }
 
-            linearPhaseMsEq.processRange(buffer, 0, 2);
+            const bool useMs = numChannels >= 2
+                && std::any_of(snapshot.msTargets.begin(), snapshot.msTargets.end(),
+                               [](int v) { return v != 0; });
 
-            for (int i = 0; i < samples; ++i)
+            if (useMs)
             {
-                const float mid = left[i];
-                const float side = right[i];
-                left[i] = mid + side;
-                right[i] = mid - side;
-            }
+                auto* left = buffer.getWritePointer(0);
+                auto* right = buffer.getWritePointer(1);
+                const int samples = buffer.getNumSamples();
 
-            linearPhaseEq.processRange(buffer, 0, 2);
-            if (numChannels > 2)
-                linearPhaseEq.processRange(buffer, 2, numChannels - 2);
-        }
-        else
-        {
-            linearPhaseEq.process(buffer);
-        }
-
-        if (mixedPhaseAmount > 0.0f)
-        {
-            const float dryMix = 1.0f - mixedPhaseAmount;
-            for (int ch = 0; ch < numChannels; ++ch)
-            {
-                auto* wet = buffer.getWritePointer(ch);
-                const auto* minPhase = minPhaseBuffer.getReadPointer(ch);
                 for (int i = 0; i < samples; ++i)
-                    wet[i] = wet[i] * dryMix + minPhase[i] * mixedPhaseAmount;
-            }
-        }
+                {
+                    const float mid = 0.5f * (left[i] + right[i]);
+                    const float side = 0.5f * (left[i] - right[i]);
+                    left[i] = mid;
+                    right[i] = side;
+                }
 
-        // Realtime reference pass for post-mode RMS calibration.
-        eqDsp.process(calibBuffer, detectorBuffer);
+                linearPhaseMsEq.processRange(buffer, 0, 2);
+
+                for (int i = 0; i < samples; ++i)
+                {
+                    const float mid = left[i];
+                    const float side = right[i];
+                    left[i] = mid + side;
+                    right[i] = mid - side;
+                }
+
+                linearPhaseEq.processRange(buffer, 0, 2);
+                if (numChannels > 2)
+                    linearPhaseEq.processRange(buffer, 2, numChannels - 2);
+            }
+            else
+            {
+                linearPhaseEq.process(buffer);
+            }
+
+            if (mixedPhaseAmount > 0.0f)
+            {
+                const float dryMix = 1.0f - mixedPhaseAmount;
+                for (int ch = 0; ch < numChannels; ++ch)
+                {
+                    auto* wet = buffer.getWritePointer(ch);
+                    const auto* minPhase = minPhaseBuffer.getReadPointer(ch);
+                    for (int i = 0; i < samples; ++i)
+                        wet[i] = wet[i] * dryMix + minPhase[i] * mixedPhaseAmount;
+                }
+            }
+
+            // Realtime reference pass for post-mode RMS calibration.
+            eqDsp.process(calibBuffer, detectorBuffer);
+
+            // Fallback: if the linear output collapses, keep realtime EQ so audio never drops.
+            const double linRms = computeRms(buffer, numChannels);
+            const double refRms = computeRms(calibBuffer, numChannels);
+            if (linRms < 1.0e-9 && refRms > 1.0e-6)
+            {
+                for (int ch = 0; ch < numChannels; ++ch)
+                    juce::FloatVectorOperations::copy(buffer.getWritePointer(ch),
+                                                      calibBuffer.getReadPointer(ch), samples);
+            }
     }
 
     spectralDsp.setEnabled(snapshot.spectralEnabled);
@@ -359,35 +377,6 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                 const float x = data[i] * drive;
                 data[i] = std::tanh(x) / norm;
             }
-        }
-    }
-
-    float autoGainDb = 0.0f;
-    if (snapshot.autoGainEnabled)
-    {
-        float sumDb = 0.0f;
-        int count = 0;
-        for (int ch = 0; ch < numChannels; ++ch)
-        {
-            for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
-            {
-                const auto& b = snapshot.bands[ch][band];
-                if (b.bypassed)
-                    continue;
-                const auto filterType = static_cast<eqdsp::FilterType>(b.type);
-                if (filterType == eqdsp::FilterType::lowPass
-                    || filterType == eqdsp::FilterType::highPass
-                    || filterType == eqdsp::FilterType::allPass)
-                    continue;
-                sumDb += b.gainDb;
-                ++count;
-            }
-        }
-
-        if (count > 0)
-        {
-            const float avgDb = sumDb / static_cast<float>(count);
-            autoGainDb = juce::jlimit(-12.0f, 12.0f, -avgDb * (snapshot.gainScale * 0.01f));
         }
     }
 
@@ -417,8 +406,24 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     if (snapshot.phaseInvert)
         buffer.applyGain(-1.0f);
 
+    float autoGainDb = 0.0f;
+    if (snapshot.autoGainEnabled)
+    {
+        const double postRms = computeRms(buffer, numChannels);
+        if (preRms > 1.0e-9 && postRms > 1.0e-9)
+        {
+            const float preDb = juce::Decibels::gainToDecibels(static_cast<float>(preRms), -120.0f);
+            const float postDb = juce::Decibels::gainToDecibels(static_cast<float>(postRms), -120.0f);
+            const float deltaDb = preDb - postDb;
+            autoGainDb = juce::jlimit(-12.0f, 12.0f, deltaDb) * snapshot.gainScale;
+        }
+    }
+    autoGainSmoothed.setTargetValue(autoGainDb);
+    autoGainSmoothed.skip(buffer.getNumSamples());
+    const float autoGainSmoothedDb = autoGainSmoothed.getCurrentValue();
+
     outputTrimGainSmoothed.setTargetValue(
-        juce::Decibels::decibelsToGain(snapshot.outputTrimDb + autoGainDb));
+        juce::Decibels::decibelsToGain(snapshot.outputTrimDb + autoGainSmoothedDb));
     if (outputTrimGainSmoothed.isSmoothing()
         || std::abs(snapshot.outputTrimDb) > 0.001f)
     {
@@ -623,12 +628,14 @@ void EqEngine::updateLinearPhase(const ParamSnapshot& snapshot, double sampleRat
         && snapshot.linearQuality == lastLinearQuality && snapshot.linearWindow == lastWindowIndex)
         return;
 
-    const int headSize = snapshot.phaseMode == 1 ? (taps / 2) : (taps / 4);
+    // Use uniform convolution for now to avoid dropouts in lower quality modes.
+    const int headSize = 0;
 
-    linearPhaseEq.configurePartitioning(headSize);
-    linearPhaseMsEq.configurePartitioning(headSize);
-
-    rebuildLinearPhase(snapshot, taps, sampleRate);
+    rebuildLinearPhase(snapshot, taps, headSize, sampleRate);
+    juce::Logger::writeToLog("LinearPhase rebuild: mode=" + juce::String(snapshot.phaseMode)
+                             + " quality=" + juce::String(quality)
+                             + " taps=" + juce::String(taps)
+                             + " window=" + juce::String(snapshot.linearWindow));
     lastParamHash = hash;
     lastTaps = taps;
     lastPhaseMode = snapshot.phaseMode;
@@ -666,8 +673,10 @@ uint64_t EqEngine::computeParamsHash(const ParamSnapshot& snapshot) const
     return hash;
 }
 
-void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, double sampleRate)
+void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int headSize, double sampleRate)
 {
+    linearPhaseEq.beginImpulseUpdate(headSize, snapshot.numChannels);
+    linearPhaseMsEq.beginImpulseUpdate(headSize, snapshot.numChannels >= 2 ? 2 : 0);
     const int fftSize = juce::nextPowerOfTwo(taps * 2);
     const int fftOrder = static_cast<int>(std::log2(fftSize));
     if (fftSize != firFftSize || fftOrder != firFftOrder)
@@ -930,6 +939,24 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, doubl
         return impulse;
     };
 
+    auto ensureImpulseValid = [](juce::AudioBuffer<float>& impulse, const juce::String& tag)
+    {
+        const int samples = impulse.getNumSamples();
+        if (samples <= 0)
+            return;
+        const float* data = impulse.getReadPointer(0);
+        double sum = 0.0;
+        for (int i = 0; i < samples; ++i)
+            sum += static_cast<double>(data[i]) * static_cast<double>(data[i]);
+        const double rms = std::sqrt(sum / static_cast<double>(samples));
+        if (rms < 1.0e-7)
+        {
+            impulse.clear();
+            impulse.setSample(0, 0, 1.0f);
+            juce::Logger::writeToLog("LinearPhase: impulse fallback -> delta (" + tag + ")");
+        }
+    };
+
     for (int ch = 0; ch < snapshot.numChannels; ++ch)
     {
         auto impulse = buildImpulse(ch, [&](int band)
@@ -939,6 +966,7 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, doubl
             const int target = snapshot.msTargets[band];
             return target != 1 && target != 2 && target != 6;
         });
+        ensureImpulseValid(impulse, "ch=" + juce::String(ch));
         linearPhaseEq.loadImpulse(ch, std::move(impulse), sampleRate);
     }
 
@@ -956,9 +984,13 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, doubl
         };
         auto midImpulse = buildImpulse(0, includeMid);
         auto sideImpulse = buildImpulse(0, includeSide);
+        ensureImpulseValid(midImpulse, "mid");
+        ensureImpulseValid(sideImpulse, "side");
         linearPhaseMsEq.loadImpulse(0, std::move(midImpulse), sampleRate);
         linearPhaseMsEq.loadImpulse(1, std::move(sideImpulse), sampleRate);
     }
+    linearPhaseEq.endImpulseUpdate();
+    linearPhaseMsEq.endImpulseUpdate();
 
     const int latency = (taps - 1) / 2;
     linearPhaseEq.setLatencySamples(latency);

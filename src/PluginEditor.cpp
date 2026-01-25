@@ -344,6 +344,8 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         const int mode = phaseModeBox.getSelectedItemIndex();
         linearQualityBox.setEnabled(mode == 2);
         linearWindowBox.setEnabled(mode != 0);
+        if (mode != 2)
+            linearQualityBox.setSelectedItemIndex(4, juce::sendNotification);
     };
     phaseModeBox.onChange = [updateQualityEnabled]
     {

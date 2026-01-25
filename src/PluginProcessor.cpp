@@ -1564,7 +1564,9 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
     snapshot.globalBypass = globalBypassParam != nullptr && globalBypassParam->load() > 0.5f;
     snapshot.globalMix = globalMixParam != nullptr ? (globalMixParam->load() / 100.0f) : 1.0f;
     snapshot.phaseMode = phaseModeParam != nullptr ? static_cast<int>(phaseModeParam->load()) : 0;
-    snapshot.linearQuality = linearQualityParam != nullptr ? static_cast<int>(linearQualityParam->load()) : 1;
+    const int rawQuality =
+        linearQualityParam != nullptr ? static_cast<int>(linearQualityParam->load()) : 1;
+    snapshot.linearQuality = (snapshot.phaseMode == 2) ? rawQuality : 4;
     snapshot.linearWindow = linearWindowParam != nullptr ? static_cast<int>(linearWindowParam->load()) : 0;
     snapshot.oversampling = oversamplingParam != nullptr ? static_cast<int>(oversamplingParam->load()) : 0;
     snapshot.outputTrimDb = outputTrimParam != nullptr ? outputTrimParam->load() : 0.0f;

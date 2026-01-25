@@ -118,8 +118,24 @@ Usage:
 ## v3.6 Beta Updates (DSP/UI Boundary)
 - Linear/Natural convolution is now **thread-safe during impulse rebuilds**, preventing silent blocks
   when FIR partitions are updated at lower quality settings.
+- Linear/Natural partition head size now **clamps to the prepared block size** to avoid silent
+  output when higher-quality FIR taps exceed the convolution partition limits.
+- Linear/Natural now **passes dry audio until impulses are ready**, avoiding dropouts during
+  rebuilds for lower quality settings.
+- Linear/Natural convolution is **forced to uniform partitioning** to prevent silence in lower
+  quality modes (temporary stability measure).
+- Linear/Natural impulse build now **falls back to a delta response** if the FIR magnitude
+  collapses, preventing silent output even when coefficients become near-zero.
+- Linear/Natural convolution **disables IR trimming** to prevent low-quality impulses from
+  being trimmed to silence.
+- Natural mode now **ignores the linear quality selector** (quality applies only to Linear).
 - Added **Undo/Redo** and **Save/Load preset** actions to the top bar for faster workflow.
 - Added **Reset Band** (renamed from Reset) and **Reset All** actions in the band section.
+
+## v3.7 Beta Updates (DSP/UI Boundary)
+- Auto gain now uses **pre/post RMS** comparison for consistent level matching.
+- Band mix now **scales curve response only** while keeping EQ points fixed.
+- Linear/Natural convolution uses a **double-buffered IR swap** to avoid dropouts.
 
 ## Call Flow (Simplified)
 1. UI updates APVTS parameters.

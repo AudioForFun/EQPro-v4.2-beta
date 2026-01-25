@@ -378,7 +378,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         const float gain = getBandParameter(band, kParamGainSuffix);
         const bool bypassed = getBandBypassed(band);
         const float mix = getBandParameter(band, kParamMixSuffix) / 100.0f;
-        const bool isActive = ! bypassed && mix > 0.0005f;
+        const bool isActive = ! bypassed;
 
         const float x = frequencyToX(freq);
         const float y = gainToY(gain);

@@ -11,6 +11,7 @@
 #include "ui/SpectralDynamicsPanel.h"
 #include "util/Version.h"
 
+// Main plugin editor: orchestrates layout and connects UI to processor state.
 class EQProAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                         private juce::Timer
 {
@@ -29,6 +30,7 @@ private:
 
     EQProAudioProcessor& processorRef;
 
+    // Top bar controls.
     juce::ToggleButton globalBypassButton;
     juce::Label globalMixLabel;
     juce::Slider globalMixSlider;
@@ -85,6 +87,8 @@ private:
     juce::ComboBox presetBox;
     juce::TextButton savePresetButton;
     juce::TextButton loadPresetButton;
+    juce::TextButton presetPrevButton;
+    juce::TextButton presetNextButton;
     juce::TextButton copyInstanceButton;
     juce::TextButton pasteInstanceButton;
     juce::Label presetBrowserLabel;
@@ -116,10 +120,17 @@ private:
     BandControlsPanel bandControls;
     SpectralDynamicsPanel spectralPanel;
     CorrelationComponent correlation;
+    // Layout chrome.
     juce::ResizableCornerComponent resizer { this, &resizeConstrainer };
     juce::ComponentBoundsConstrainer resizeConstrainer;
     juce::OpenGLContext openGLContext;
     juce::Image backgroundNoise;
+
+    // Cached layout bounds for dividers.
+    juce::Rectangle<int> headerBounds;
+    juce::Rectangle<int> topBarBounds;
+    juce::Rectangle<int> analyzerBounds;
+    juce::Rectangle<int> bandBounds;
 
     bool debugVisible = false;
     bool pendingWindowRescue = true;

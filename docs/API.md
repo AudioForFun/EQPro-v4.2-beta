@@ -137,6 +137,14 @@ Usage:
 - Band mix now **scales curve response only** while keeping EQ points fixed.
 - Linear/Natural convolution uses a **double-buffered IR swap** to avoid dropouts.
 
+## v3.8 Beta Updates (GUI/UX + Metering)
+- Added **preset navigation bar** (prev/next + browser) to the top row.
+- Added **meter focus toggle** (RMS vs Peak fill) and **peak hold tick**.
+- Added **value readouts** for active knobs and dragged FFT points.
+- Added **band header strip** with state icons (Bypass/Solo/Link).
+- Improved **hit zones**, **hover/selection fades**, and **focus outlines**.
+- Analyzer dB labels now **auto-hide** when the grid is dense to reduce overlap.
+
 ## Call Flow (Simplified)
 1. UI updates APVTS parameters.
 2. `timerCallback` builds `ParamSnapshot` and swaps it.
@@ -195,4 +203,38 @@ For larger architecture and threading diagrams, see `docs/DIAGRAMS.md`.
 | `process()` | audio | Updates meter values. |
 | `getState()` | UI | Read-only meter values. |
 | `getCorrelation()` | UI | Read-only correlation value. |
+
+## Parameter Summary
+### Global Parameters
+- `globalBypass`: Master bypass switch for the entire EQ.
+- `globalMix`: Global dry/wet mix (percentage).
+- `phaseMode`: Processing mode (Real-time / Natural / Linear).
+- `linearQuality`: FIR quality selector (Linear mode only).
+- `linearWindow`: FIR window selection.
+- `oversampling`: Oversampling selector (non-realtime modes).
+- `outputTrim`: Output trim gain (dB).
+- `autoGainEnable`: RMS-based auto-gain enable.
+- `gainScale`: Auto-gain intensity scale (percentage).
+- `phaseInvert`: Output phase inversion.
+- `analyzerRange`: Analyzer dB range.
+- `analyzerSpeed`: Analyzer speed.
+- `analyzerView`: Analyzer view (Pre/Post/Both).
+- `analyzerFreeze`: Freeze analyzer.
+- `analyzerExternal`: External overlay toggle.
+- `qMode` / `qModeAmount`: Q behavior and weighting.
+- `characterMode`: Gentle/Warm character mode.
+- `spectralEnable` + spectral params: Spectral dynamics controls (currently disabled).
+- `midiLearn` / `midiTarget`: MIDI learn state and target.
+- `smartSolo`: Smart solo toggle.
+
+### Per‑Band Parameters (per channel/band)
+- `freq`: Band center frequency (Hz).
+- `gain`: Band gain (dB).
+- `q`: Band Q value.
+- `type`: Filter type.
+- `bypass`: Band bypass.
+- `ms`: Channel target (All/Mid/Side/etc.).
+- `slope`: Filter slope (dB/oct).
+- `solo`: Band solo.
+- `mix`: Band dry/wet mix (percentage).
 

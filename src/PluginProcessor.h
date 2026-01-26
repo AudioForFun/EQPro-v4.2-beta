@@ -6,6 +6,7 @@
 #include "dsp/AnalyzerTap.h"
 #include "dsp/MeterTap.h"
 
+// Core audio processor: owns DSP engine, parameters, meters, and analyzers.
 class EQProAudioProcessor final : public juce::AudioProcessor,
                                   private juce::Timer
 {
@@ -36,9 +37,11 @@ public:
     const juce::String getProgramName(int index) override;
     void changeProgramName(int index, const juce::String& newName) override;
 
+    // State persistence for DAW/session.
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    // Expose parameter tree to editor components.
     juce::AudioProcessorValueTreeState& getParameters();
     AudioFifo& getAnalyzerPreFifo();
     AudioFifo& getAnalyzerPostFifo();
@@ -82,8 +85,10 @@ public:
     int getSelectedChannelIndex() const;
     float getBandDetectorDb(int channelIndex, int bandIndex) const;
     float getBandDynamicGainDb(int channelIndex, int bandIndex) const;
+    // Helper for startup/diagnostic logging.
     void logStartup(const juce::String& message);
 
+    // Build full parameter layout for APVTS.
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
 private:
@@ -107,6 +112,7 @@ private:
         std::atomic<float>* dynExternal = nullptr;
     };
 
+    // Cache parameter pointers for low-overhead access.
     void initializeParamPointers();
     void timerCallback() override;
     uint64_t buildSnapshot(eqdsp::ParamSnapshot& snapshot);
@@ -150,6 +156,7 @@ private:
     bool verifyBandsDone = false;
     juce::File bandVerifyLogFile;
 
+    // DSP engine + taps for analyzer/metering.
     eqdsp::EqEngine eqEngine;
     eqdsp::AnalyzerTap analyzerPreTap;
     eqdsp::AnalyzerTap analyzerPostTap;

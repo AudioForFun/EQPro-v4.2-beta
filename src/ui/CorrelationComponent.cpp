@@ -2,10 +2,14 @@
 #include "../PluginProcessor.h"
 #include <cmath>
 
+// Goniometer rendering and scope point capture.
+
 CorrelationComponent::CorrelationComponent(EQProAudioProcessor& processor)
     : processorRef(processor)
 {
     startTimerHz(30);
+    scopeGainSmoothed.reset(30.0, 0.15);
+    scopeGainSmoothed.setCurrentAndTargetValue(1.0f);
 }
 
 void CorrelationComponent::paint(juce::Graphics& g)
@@ -43,15 +47,30 @@ void CorrelationComponent::paint(juce::Graphics& g)
 
     if (scopePointCount > 1)
     {
+        double sumSq = 0.0;
+        for (int i = 0; i < scopePointCount; ++i)
+        {
+            const auto& p = scopePoints[static_cast<size_t>(i)];
+            sumSq += static_cast<double>(p.x) * static_cast<double>(p.x);
+            sumSq += static_cast<double>(p.y) * static_cast<double>(p.y);
+        }
+        const double rms = std::sqrt(sumSq / static_cast<double>(scopePointCount * 2));
+        const float targetGain = rms > 1.0e-6
+            ? juce::jlimit(0.35f, 1.6f, static_cast<float>(0.6 / rms))
+            : 1.0f;
+        scopeGainSmoothed.setTargetValue(targetGain);
+        scopeGainSmoothed.skip(scopePointCount);
+        const float autoGain = scopeGainSmoothed.getCurrentValue();
+
         juce::Path scopePath;
-        constexpr float kBaseGain = 0.6f;
-        constexpr float kSoftClip = 2.0f;
+        constexpr float kBaseGain = 0.75f;
+        constexpr float kSoftClip = 1.6f;
         const float clipNorm = std::tanh(kSoftClip);
         for (int i = 0; i < scopePointCount; ++i)
         {
             const auto& p = scopePoints[static_cast<size_t>(i)];
-            const float sx = std::tanh(p.x * kBaseGain * kSoftClip) / clipNorm;
-            const float sy = std::tanh(p.y * kBaseGain * kSoftClip) / clipNorm;
+            const float sx = std::tanh(p.x * kBaseGain * autoGain * kSoftClip) / clipNorm;
+            const float sy = std::tanh(p.y * kBaseGain * autoGain * kSoftClip) / clipNorm;
             const float x = centre.x + sx * radius;
             const float y = centre.y - sy * radius;
             if (i == 0)
@@ -59,7 +78,9 @@ void CorrelationComponent::paint(juce::Graphics& g)
             else
                 scopePath.lineTo(x, y);
         }
-        g.setColour(theme.accent.withAlpha(0.7f));
+        g.setColour(theme.accent.withAlpha(0.35f));
+        g.strokePath(scopePath, juce::PathStrokeType(2.0f));
+        g.setColour(theme.accent.withAlpha(0.8f));
         g.strokePath(scopePath, juce::PathStrokeType(1.1f));
     }
 

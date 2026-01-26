@@ -2,6 +2,8 @@
 #include "../PluginProcessor.h"
 #include "../util/ColorUtils.h"
 
+// Per-band control panel implementation and UI state caching.
+
 namespace
 {
 const juce::StringArray kFilterTypeChoices {
@@ -65,6 +67,22 @@ bool containsName(const std::vector<juce::String>& names, const juce::String& ta
     return std::find(names.begin(), names.end(), target) != names.end();
 }
 
+constexpr int kPanelPadding = 10;
+constexpr int kRowHeight = 22;
+constexpr int kLabelHeight = 14;
+constexpr int kComboHeight = 20;
+constexpr int kGap = 8;
+constexpr int kKnobRowHeight = 124;
+
+juce::String formatFrequency(float value)
+{
+    if (value >= 10000.0f)
+        return juce::String(value / 1000.0f, 1) + "kHz";
+    if (value >= 1000.0f)
+        return juce::String(value / 1000.0f, 2) + "kHz";
+    return juce::String(value, 0) + "Hz";
+}
+
 } // namespace
 
 BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
@@ -73,6 +91,21 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
 {
     startTimerHz(30);
     channelNames = processor.getCurrentChannelNames();
+    for (auto& fade : bandHoverFade)
+    {
+        fade.reset(30.0, 0.18);
+        fade.setCurrentAndTargetValue(0.0f);
+    }
+    for (auto& fade : bandSelectFade)
+    {
+        fade.reset(30.0, 0.18);
+        fade.setCurrentAndTargetValue(0.0f);
+    }
+    for (auto& fade : bandActiveFade)
+    {
+        fade.reset(30.0, 0.18);
+        fade.setCurrentAndTargetValue(1.0f);
+    }
 
     titleLabel.setText("Band 1 / " + juce::String(ParamIDs::kBandsPerChannel), juce::dontSendNotification);
     titleLabel.setJustificationType(juce::Justification::centred);
@@ -81,23 +114,27 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
 
     eqSectionLabel.setText("EQ Parameters", juce::dontSendNotification);
     eqSectionLabel.setJustificationType(juce::Justification::centredLeft);
-    eqSectionLabel.setFont(juce::Font(11.0f, juce::Font::bold));
+    eqSectionLabel.setFont(juce::Font(12.0f, juce::Font::bold));
     eqSectionLabel.setColour(juce::Label::textColourId, theme.accent);
     addAndMakeVisible(eqSectionLabel);
 
     copyButton.setButtonText("Copy");
+    copyButton.setTooltip("Copy this band's settings");
     copyButton.onClick = [this] { copyBandState(); };
     addAndMakeVisible(copyButton);
 
     pasteButton.setButtonText("Paste");
+    pasteButton.setTooltip("Paste copied band settings");
     pasteButton.onClick = [this] { pasteBandState(); };
     addAndMakeVisible(pasteButton);
 
     defaultButton.setButtonText("Reset Band");
+    defaultButton.setTooltip("Reset current band");
     defaultButton.onClick = [this] { resetSelectedBand(); };
     addAndMakeVisible(defaultButton);
 
     resetAllButton.setButtonText("Reset All");
+    resetAllButton.setTooltip("Reset all bands");
     resetAllButton.onClick = [this] { resetAllBands(); };
     addAndMakeVisible(resetAllButton);
 
@@ -105,6 +142,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     {
         auto& button = bandSelectButtons[static_cast<size_t>(i)];
         button.setButtonText(juce::String(i + 1));
+        button.setTooltip("Select band " + juce::String(i + 1));
         button.setClickingTogglesState(true);
         button.onClick = [this, index = i]()
         {
@@ -128,6 +166,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     {
         auto& button = bandSoloButtons[static_cast<size_t>(i)];
         button.setButtonText("S");
+        button.setTooltip("Solo band " + juce::String(i + 1));
         button.setClickingTogglesState(true);
         button.setColour(juce::ToggleButton::textColourId, theme.textMuted);
         button.onClick = [this, index = i]()
@@ -163,7 +202,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         label.setText(text, juce::dontSendNotification);
         label.setJustificationType(juce::Justification::centred);
         label.setColour(juce::Label::textColourId, theme.textMuted);
-        label.setFont(11.0f);
+        label.setFont(12.0f);
         addAndMakeVisible(label);
     };
 
@@ -185,6 +224,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     freqSlider.setTextBoxIsEditable(true);
     freqSlider.setSkewFactorFromMidPoint(1000.0);
     freqSlider.setTextValueSuffix(" Hz");
+    freqSlider.setTooltip("Band frequency");
     freqSlider.onDoubleClick = [this]
     {
         if (freqParam != nullptr)
@@ -204,6 +244,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     gainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     gainSlider.setTextBoxIsEditable(true);
     gainSlider.setTextValueSuffix(" dB");
+    gainSlider.setTooltip("Band gain");
     gainSlider.onDoubleClick = [this]
     {
         if (gainParam != nullptr)
@@ -222,6 +263,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     qSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     qSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     qSlider.setTextBoxIsEditable(true);
+    qSlider.setTooltip("Band Q");
     qSlider.onDoubleClick = [this]
     {
         if (qParam != nullptr)
@@ -242,6 +284,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     typeBox.setColour(juce::ComboBox::textColourId, theme.text);
     typeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
     typeBox.setLookAndFeel(&compactComboLookAndFeel);
+    typeBox.setTooltip("Filter type");
     typeBox.onChange = [this]
     {
         ensureBandActiveFromEdit();
@@ -259,6 +302,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     msBox.setColour(juce::ComboBox::textColourId, theme.text);
     msBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
     msBox.setLookAndFeel(&compactComboLookAndFeel);
+    msBox.setTooltip("Channel target");
     addAndMakeVisible(msBox);
     msBox.onChange = [this]
     {
@@ -284,6 +328,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     slopeBox.setColour(juce::ComboBox::textColourId, theme.text);
     slopeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
     slopeBox.setLookAndFeel(&compactComboLookAndFeel);
+    slopeBox.setTooltip("Slope");
     slopeBox.onChange = [this]
     {
         const int index = slopeBox.getSelectedItemIndex();
@@ -302,6 +347,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     mixSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     mixSlider.setTextBoxIsEditable(true);
     mixSlider.setTextValueSuffix(" %");
+    mixSlider.setTooltip("Band mix");
     mixSlider.onDoubleClick = [this]
     {
         if (mixParam != nullptr)
@@ -612,10 +658,96 @@ void BandControlsPanel::setMsEnabled(bool enabled)
 
 void BandControlsPanel::paint(juce::Graphics& g)
 {
+    const auto bounds = getLocalBounds().toFloat();
     g.setColour(theme.panel);
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), 8.0f);
+    g.fillRoundedRectangle(bounds, 8.0f);
     g.setColour(theme.panelOutline);
-    g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), 8.0f, 1.0f);
+    g.drawRoundedRectangle(bounds.reduced(0.5f), 8.0f, 1.0f);
+
+    auto layout = getLocalBounds().reduced(kPanelPadding);
+    auto left = layout.removeFromLeft(static_cast<int>(layout.getWidth() * 0.62f));
+    auto headerArea = left.removeFromTop(kRowHeight);
+    const auto bandRowArea = left.removeFromTop(kRowHeight);
+    left.removeFromTop(2);
+    const auto soloRowArea = left.removeFromTop(kRowHeight);
+    left.removeFromTop(kGap);
+    const auto knobsArea = left.removeFromTop(kKnobRowHeight);
+    left.removeFromTop(kGap);
+    const auto comboRowArea = left.removeFromTop(kLabelHeight + kRowHeight);
+
+    const auto bandColour = ColorUtils::bandColour(selectedBand);
+    const float glowAlpha = juce::jlimit(0.0f, 1.0f, selectedBandGlow);
+    if (glowAlpha > 0.01f)
+    {
+        g.setColour(bandColour.withAlpha(0.12f * glowAlpha));
+        g.fillRoundedRectangle(headerArea.toFloat().expanded(2.0f, 1.0f), 6.0f);
+    }
+
+    g.setColour(theme.panel.darker(0.25f).withAlpha(0.8f));
+    g.fillRoundedRectangle(headerArea.toFloat(), 6.0f);
+    g.setColour(theme.panelOutline.withAlpha(0.7f));
+    g.drawRoundedRectangle(headerArea.toFloat(), 6.0f, 1.0f);
+
+    if (titleLabel.getBounds().getWidth() > 0)
+    {
+        auto chip = titleLabel.getBounds().toFloat().removeFromLeft(14.0f);
+        chip = chip.withSizeKeepingCentre(10.0f, 10.0f);
+        g.setColour(bandColour.withAlpha(0.95f));
+        g.fillEllipse(chip);
+        g.setColour(theme.panel.withAlpha(0.9f));
+        g.drawEllipse(chip, 1.0f);
+    }
+
+    bool bypassed = false;
+    if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "bypass")))
+        bypassed = param->getValue() > 0.5f;
+    bool soloed = false;
+    if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "solo")))
+        soloed = param->getValue() > 0.5f;
+    const int msValue = getMsParamValue();
+    const bool linked = (msValue == 0 || msValue == 3 || msValue == 6);
+
+    auto iconRow = headerArea.removeFromRight(86);
+    const float iconSize = 14.0f;
+    auto drawIcon = [&](const juce::String& text, bool enabled, juce::Colour colour)
+    {
+        auto icon = iconRow.removeFromLeft(static_cast<int>(iconSize)).toFloat();
+        icon = icon.withSizeKeepingCentre(iconSize, iconSize);
+        iconRow.removeFromLeft(6);
+        const auto bg = enabled ? colour.withAlpha(0.35f) : theme.panelOutline.withAlpha(0.25f);
+        g.setColour(bg);
+        g.fillEllipse(icon);
+        g.setColour(enabled ? colour.withAlpha(0.95f) : theme.textMuted.withAlpha(0.65f));
+        g.drawEllipse(icon, 1.0f);
+        g.setColour(enabled ? theme.text : theme.textMuted);
+        g.setFont(10.0f);
+        g.drawFittedText(text, icon.toNearestInt(), juce::Justification::centred, 1);
+    };
+    drawIcon("B", bypassed, juce::Colour(0xfff87171));
+    drawIcon("S", soloed, bandColour);
+    drawIcon("L", linked, theme.accent);
+
+    g.setColour(theme.panelOutline.withAlpha(0.35f));
+    g.drawLine(static_cast<float>(bandRowArea.getX()),
+               static_cast<float>(bandRowArea.getBottom() + 1),
+               static_cast<float>(bandRowArea.getRight()),
+               static_cast<float>(bandRowArea.getBottom() + 1), 1.0f);
+    g.drawLine(static_cast<float>(soloRowArea.getX()),
+               static_cast<float>(soloRowArea.getBottom() + 1),
+               static_cast<float>(soloRowArea.getRight()),
+               static_cast<float>(soloRowArea.getBottom() + 1), 1.0f);
+    g.drawLine(static_cast<float>(knobsArea.getX()),
+               static_cast<float>(knobsArea.getBottom() + 1),
+               static_cast<float>(knobsArea.getRight()),
+               static_cast<float>(knobsArea.getBottom() + 1), 1.0f);
+    g.drawLine(static_cast<float>(comboRowArea.getX()),
+               static_cast<float>(comboRowArea.getBottom() + 1),
+               static_cast<float>(comboRowArea.getRight()),
+               static_cast<float>(comboRowArea.getBottom() + 1), 1.0f);
+
+    const auto knobGlow = juce::Rectangle<float>(knobsArea.toFloat().reduced(6.0f));
+    g.setColour(bandColour.withAlpha(0.08f * glowAlpha + 0.04f));
+    g.fillRoundedRectangle(knobGlow, 8.0f);
 
     if (detectorMeterBounds.getWidth() > 1.0f && detectorMeterBounds.getHeight() > 1.0f)
     {
@@ -646,6 +778,54 @@ void BandControlsPanel::paint(juce::Graphics& g)
         g.drawEllipse(threshPoint.x - 3.0f, threshPoint.y - 3.0f, 6.0f, 6.0f, 1.0f);
     }
 
+    auto drawFocus = [&](const juce::Component& comp)
+    {
+        if (! comp.hasKeyboardFocus(true))
+            return;
+        auto rect = comp.getBounds().toFloat().expanded(2.0f);
+        g.setColour(theme.accent.withAlpha(0.55f));
+        g.drawRoundedRectangle(rect, 4.0f, 1.2f);
+    };
+
+    auto drawValuePill = [&](const juce::Component& comp, const juce::String& text)
+    {
+        if (text.isEmpty())
+            return;
+        g.setFont(11.0f);
+        const float padX = 6.0f;
+        const float padY = 3.0f;
+        const float textW = g.getCurrentFont().getStringWidthFloat(text);
+        const float pillW = textW + padX * 2.0f;
+        const float pillH = 16.0f;
+        auto rect = comp.getBounds().toFloat();
+        auto pill = juce::Rectangle<float>(rect.getCentreX() - pillW * 0.5f,
+                                           rect.getY() - pillH - 4.0f,
+                                           pillW, pillH);
+        pill = pill.getIntersection(getLocalBounds().toFloat().reduced(2.0f));
+        g.setColour(theme.panel.darker(0.35f).withAlpha(0.92f));
+        g.fillRoundedRectangle(pill, 4.0f);
+        g.setColour(theme.panelOutline.withAlpha(0.8f));
+        g.drawRoundedRectangle(pill, 4.0f, 1.0f);
+        g.setColour(theme.text);
+        g.drawFittedText(text, pill.toNearestInt(), juce::Justification::centred, 1);
+    };
+
+    drawFocus(freqSlider);
+    drawFocus(gainSlider);
+    drawFocus(qSlider);
+    drawFocus(mixSlider);
+    drawFocus(typeBox);
+    drawFocus(msBox);
+    drawFocus(slopeBox);
+
+    if (freqSlider.isMouseButtonDown() || freqSlider.hasKeyboardFocus(true))
+        drawValuePill(freqSlider, formatFrequency(static_cast<float>(freqSlider.getValue())));
+    if (gainSlider.isMouseButtonDown() || gainSlider.hasKeyboardFocus(true))
+        drawValuePill(gainSlider, juce::String(gainSlider.getValue(), 1) + " dB");
+    if (qSlider.isMouseButtonDown() || qSlider.hasKeyboardFocus(true))
+        drawValuePill(qSlider, "Q " + juce::String(qSlider.getValue(), 2));
+    if (mixSlider.isMouseButtonDown() || mixSlider.hasKeyboardFocus(true))
+        drawValuePill(mixSlider, juce::String(mixSlider.getValue(), 0) + " %");
 }
 
 void BandControlsPanel::timerCallback()
@@ -702,12 +882,29 @@ void BandControlsPanel::timerCallback()
         bool soloed = false;
         if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, i, "solo")))
             soloed = param->getValue() > 0.5f;
+        const bool hovered = bandSelectButtons[static_cast<size_t>(i)].isMouseOver();
+        const bool isSelected = (i == selectedBand);
+        auto& hoverFade = bandHoverFade[static_cast<size_t>(i)];
+        auto& selectFade = bandSelectFade[static_cast<size_t>(i)];
+        auto& activeFade = bandActiveFade[static_cast<size_t>(i)];
+        hoverFade.setTargetValue(hovered ? 1.0f : 0.0f);
+        selectFade.setTargetValue(isSelected ? 1.0f : 0.0f);
+        activeFade.setTargetValue(bypassed ? 0.0f : 1.0f);
+        hoverFade.skip(1);
+        selectFade.skip(1);
+        activeFade.skip(1);
+        const float hover = hoverFade.getCurrentValue();
+        const float selected = selectFade.getCurrentValue();
+        const float active = activeFade.getCurrentValue();
         auto baseColour = ColorUtils::bandColour(i);
         if (bypassed)
             baseColour = baseColour.withSaturation(0.05f).withBrightness(0.35f);
+        baseColour = baseColour.interpolatedWith(baseColour.darker(0.7f), 1.0f - active);
         auto& button = bandSelectButtons[static_cast<size_t>(i)];
-        button.setColour(juce::TextButton::buttonColourId, baseColour.withAlpha(0.2f));
-        button.setColour(juce::TextButton::buttonOnColourId, baseColour.withAlpha(0.55f));
+        const float baseAlpha = (bypassed ? 0.14f : 0.2f) + hover * 0.08f;
+        const float onAlpha = (bypassed ? 0.32f : 0.55f) + selected * 0.2f;
+        button.setColour(juce::TextButton::buttonColourId, baseColour.withAlpha(baseAlpha));
+        button.setColour(juce::TextButton::buttonOnColourId, baseColour.withAlpha(onAlpha));
         button.setColour(juce::TextButton::textColourOffId, baseColour.withAlpha(bypassed ? 0.45f : 0.9f));
         button.setColour(juce::TextButton::textColourOnId, bypassed ? theme.textMuted : juce::Colours::white);
 
@@ -717,6 +914,8 @@ void BandControlsPanel::timerCallback()
         soloButton.setColour(juce::ToggleButton::tickColourId, baseColour);
         soloButton.setColour(juce::ToggleButton::tickDisabledColourId, baseColour.withAlpha(0.4f));
     }
+    if (selectedBand >= 0 && selectedBand < ParamIDs::kBandsPerChannel)
+        selectedBandGlow = bandSelectFade[static_cast<size_t>(selectedBand)].getCurrentValue();
     repaint(detectorMeterBounds.getSmallestIntegerContainer());
 }
 
@@ -879,18 +1078,13 @@ void BandControlsPanel::mouseDoubleClick(const juce::MouseEvent& event)
 
 void BandControlsPanel::resized()
 {
-    auto bounds = getLocalBounds().reduced(10);
-    const int gap = 6;
-    const int labelHeight = 14;
-    const int rowHeight = 20;
-    const int comboHeight = 20;
-    const int knobRowHeight = 120;
-    const int knobSize = juce::jmin(86, knobRowHeight - labelHeight - 6);
+    auto bounds = getLocalBounds().reduced(kPanelPadding);
+    const int knobSize = juce::jmin(86, kKnobRowHeight - kLabelHeight - 6);
 
     auto left = bounds.removeFromLeft(static_cast<int>(bounds.getWidth() * 0.62f));
     auto right = bounds;
 
-    auto headerRow = left.removeFromTop(rowHeight);
+    auto headerRow = left.removeFromTop(kRowHeight);
     titleLabel.setBounds(headerRow.removeFromLeft(100));
     const int btnW = 58;
     const int resetW = 86;
@@ -901,73 +1095,73 @@ void BandControlsPanel::resized()
     eqSectionLabel.setBounds(headerRow);
 
     left.removeFromTop(2);
-    auto bandRow = left.removeFromTop(rowHeight);
-    const int bandBtnWidth = std::max(18, (bandRow.getWidth() - gap * 11) / 12);
+    auto bandRow = left.removeFromTop(kRowHeight);
+    const int bandBtnWidth = std::max(18, (bandRow.getWidth() - kGap * 11) / 12);
     for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
     {
         bandSelectButtons[static_cast<size_t>(i)].setBounds(
             bandRow.removeFromLeft(bandBtnWidth));
-        bandRow.removeFromLeft(gap);
+        bandRow.removeFromLeft(kGap);
     }
 
     left.removeFromTop(2);
-    auto soloRow = left.removeFromTop(rowHeight);
-    const int soloBtnWidth = std::max(18, (soloRow.getWidth() - gap * 11) / 12);
+    auto soloRow = left.removeFromTop(kRowHeight);
+    const int soloBtnWidth = std::max(18, (soloRow.getWidth() - kGap * 11) / 12);
     for (int i = 0; i < static_cast<int>(bandSoloButtons.size()); ++i)
     {
         bandSoloButtons[static_cast<size_t>(i)].setBounds(
             soloRow.removeFromLeft(soloBtnWidth));
-        soloRow.removeFromLeft(gap);
+        soloRow.removeFromLeft(kGap);
     }
-    left.removeFromTop(gap);
+    left.removeFromTop(kGap);
 
     const int eqKnobTop = left.getY();
-    auto knobsRow = left.removeFromTop(knobRowHeight);
-    const int knobWidth = (knobsRow.getWidth() - gap * 3) / 4;
+    auto knobsRow = left.removeFromTop(kKnobRowHeight);
+    const int knobWidth = (knobsRow.getWidth() - kGap * 3) / 4;
     auto squareKnob = [](juce::Rectangle<int> area)
     {
         const int size = std::min(area.getWidth(), area.getHeight());
         return juce::Rectangle<int>(size, size).withCentre(area.getCentre());
     };
     auto freqArea = knobsRow.removeFromLeft(knobWidth);
-    freqLabel.setBounds(freqArea.removeFromTop(labelHeight));
+    freqLabel.setBounds(freqArea.removeFromTop(kLabelHeight));
     freqSlider.setBounds(squareKnob(freqArea).withSizeKeepingCentre(knobSize, knobSize));
-    knobsRow.removeFromLeft(gap);
+    knobsRow.removeFromLeft(kGap);
     auto gainArea = knobsRow.removeFromLeft(knobWidth);
-    gainLabel.setBounds(gainArea.removeFromTop(labelHeight));
+    gainLabel.setBounds(gainArea.removeFromTop(kLabelHeight));
     gainSlider.setBounds(squareKnob(gainArea).withSizeKeepingCentre(knobSize, knobSize));
-    knobsRow.removeFromLeft(gap);
+    knobsRow.removeFromLeft(kGap);
     auto qArea = knobsRow.removeFromLeft(knobWidth);
-    qLabel.setBounds(qArea.removeFromTop(labelHeight));
+    qLabel.setBounds(qArea.removeFromTop(kLabelHeight));
     qSlider.setBounds(squareKnob(qArea).withSizeKeepingCentre(knobSize, knobSize));
-    knobsRow.removeFromLeft(gap);
+    knobsRow.removeFromLeft(kGap);
     auto mixArea = knobsRow.removeFromLeft(knobWidth);
-    mixLabel.setBounds(mixArea.removeFromTop(labelHeight));
+    mixLabel.setBounds(mixArea.removeFromTop(kLabelHeight));
     mixSlider.setBounds(squareKnob(mixArea).withSizeKeepingCentre(knobSize, knobSize));
 
-    left.removeFromTop(gap);
-    auto comboRow = left.removeFromTop(labelHeight + rowHeight);
-    const int comboColWidth = (comboRow.getWidth() - gap * 2) / 3;
+    left.removeFromTop(kGap);
+    auto comboRow = left.removeFromTop(kLabelHeight + kRowHeight);
+    const int comboColWidth = (comboRow.getWidth() - kGap * 2) / 3;
 
     auto channelCol = comboRow.removeFromLeft(comboColWidth);
-    msLabel.setBounds(channelCol.removeFromTop(labelHeight));
+    msLabel.setBounds(channelCol.removeFromTop(kLabelHeight));
     const int msWidth = juce::jmin(channelCol.getWidth(), comboWidthMs);
-    msBox.setBounds(channelCol.withHeight(comboHeight).withSizeKeepingCentre(msWidth, comboHeight));
+    msBox.setBounds(channelCol.withHeight(kComboHeight).withSizeKeepingCentre(msWidth, kComboHeight));
 
-    comboRow.removeFromLeft(gap);
+    comboRow.removeFromLeft(kGap);
     auto typeCol = comboRow.removeFromLeft(comboColWidth);
-    typeLabel.setBounds(typeCol.removeFromTop(labelHeight));
+    typeLabel.setBounds(typeCol.removeFromTop(kLabelHeight));
     const int typeWidth = juce::jmin(typeCol.getWidth(), comboWidthType);
-    typeBox.setBounds(typeCol.withHeight(comboHeight).withSizeKeepingCentre(typeWidth, comboHeight));
+    typeBox.setBounds(typeCol.withHeight(kComboHeight).withSizeKeepingCentre(typeWidth, kComboHeight));
 
-    comboRow.removeFromLeft(gap);
+    comboRow.removeFromLeft(kGap);
     auto slopeCol = comboRow.removeFromLeft(comboColWidth);
-    slopeLabel.setBounds(slopeCol.removeFromTop(labelHeight));
+    slopeLabel.setBounds(slopeCol.removeFromTop(kLabelHeight));
     const int slopeWidth = juce::jmin(slopeCol.getWidth(), comboWidthSlope);
-    slopeBox.setBounds(slopeCol.withHeight(comboHeight).withSizeKeepingCentre(slopeWidth, comboHeight));
+    slopeBox.setBounds(slopeCol.withHeight(kComboHeight).withSizeKeepingCentre(slopeWidth, kComboHeight));
 
     left.removeFromTop(2);
-    auto togglesRow = left.removeFromTop(rowHeight);
+    auto togglesRow = left.removeFromTop(kRowHeight);
     juce::ignoreUnused(togglesRow, eqKnobTop, right);
 
     dynEnableToggle.setBounds({0, 0, 0, 0});

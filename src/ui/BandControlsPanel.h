@@ -8,6 +8,7 @@
 
 class EQProAudioProcessor;
 
+// Main per-band control panel (knobs, type, slope, channel, reset/copy).
 class BandControlsPanel final : public juce::Component,
                                 private juce::Timer
 {
@@ -15,9 +16,13 @@ public:
     explicit BandControlsPanel(EQProAudioProcessor& processor);
     ~BandControlsPanel() override;
 
+    // Selects a band/channel and refreshes UI.
     void setSelectedBand(int channelIndex, int bandIndex);
+    // Provide channel labels from processor layout.
     void setChannelNames(const std::vector<juce::String>& names);
+    // Apply theme palette.
     void setTheme(const ThemeColors& newTheme);
+    // Enables/disables MS/channel target controls.
     void setMsEnabled(bool enabled);
     std::function<void(int)> onBandNavigate;
 
@@ -37,6 +42,12 @@ private:
             if (onDoubleClick)
                 onDoubleClick();
         }
+
+        bool hitTest(int x, int y) override
+        {
+            const auto expanded = getLocalBounds().toFloat().expanded(4.0f);
+            return expanded.contains(static_cast<float>(x), static_cast<float>(y));
+        }
     };
 
     struct BandKnob final : public juce::Slider
@@ -49,6 +60,12 @@ private:
             if (onDoubleClick)
                 onDoubleClick();
         }
+
+        bool hitTest(int x, int y) override
+        {
+            const auto expanded = getLocalBounds().toFloat().expanded(6.0f);
+            return expanded.contains(static_cast<float>(x), static_cast<float>(y));
+        }
     };
 
     struct SoloToggleButton final : public juce::ToggleButton
@@ -60,6 +77,12 @@ private:
             juce::ToggleButton::mouseDoubleClick(event);
             if (onDoubleClick)
                 onDoubleClick();
+        }
+
+        bool hitTest(int x, int y) override
+        {
+            const auto expanded = getLocalBounds().toFloat().expanded(4.0f);
+            return expanded.contains(static_cast<float>(x), static_cast<float>(y));
         }
     };
     struct CompactComboLookAndFeel final : public juce::LookAndFeel_V4
@@ -98,6 +121,7 @@ private:
 
     struct BandState
     {
+        // Cached per-band parameters for UI persistence.
         float freq = 1000.0f;
         float gain = 0.0f;
         float q = 0.707f;
@@ -186,6 +210,11 @@ private:
     bool suppressParamCallbacks = false;
     std::optional<BandState> clipboard;
     float detectorDb = -60.0f;
+    // Lightweight hover/selection fades for the band strip.
+    std::array<juce::SmoothedValue<float>, ParamIDs::kBandsPerChannel> bandHoverFade {};
+    std::array<juce::SmoothedValue<float>, ParamIDs::kBandsPerChannel> bandSelectFade {};
+    std::array<juce::SmoothedValue<float>, ParamIDs::kBandsPerChannel> bandActiveFade {};
+    float selectedBandGlow = 0.0f;
     std::vector<juce::String> channelNames;
     std::vector<int> msChoiceMap;
     std::array<std::array<BandState, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels> bandStateCache {};

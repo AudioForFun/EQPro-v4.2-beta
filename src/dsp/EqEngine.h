@@ -10,17 +10,22 @@
 
 namespace eqdsp
 {
+// Central DSP engine: routes snapshots to IIR/FIR processing, meters, and taps.
 class EqEngine
 {
 public:
+    // Prepare all internal DSP state for the given format.
     void prepare(double sampleRate, int maxBlockSize, int numChannels);
+    // Reset state to defaults.
     void reset();
+    // Process a block using the provided snapshot and taps.
     void process(juce::AudioBuffer<float>& buffer,
                  const ParamSnapshot& snapshot,
                  const juce::AudioBuffer<float>* detectorBuffer,
                  AnalyzerTap& preTap,
                  AnalyzerTap& postTap,
                  MeterTap& meterTap);
+    // Rebuild FIR paths when parameters change.
     void updateLinearPhase(const ParamSnapshot& snapshot, double sampleRate);
 
     void setOversampling(int index);
@@ -37,8 +42,11 @@ public:
     int getLastRmsQuality() const;
 
 private:
+    // Hash helper to detect snapshot changes.
     uint64_t computeParamsHash(const ParamSnapshot& snapshot) const;
+    // FIR rebuild path for linear phase processing.
     void rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int headSize, double sampleRate);
+    // Oversampling setup for non-realtime modes.
     void updateOversampling(const ParamSnapshot& snapshot, double sampleRate, int maxBlockSize, int channels);
     EQDSP eqDsp;
     EQDSP eqDspOversampled;

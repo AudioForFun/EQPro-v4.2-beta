@@ -7,17 +7,22 @@
 
 class EQProAudioProcessor;
 
+// FFT analyzer + EQ curve editor with interactive band points.
 class AnalyzerComponent final : public juce::Component,
                                 private juce::Timer
 {
 public:
     explicit AnalyzerComponent(EQProAudioProcessor& processor);
 
+    // UI selection hooks from parent editor.
     void setSelectedBand(int bandIndex);
     void setSelectedChannel(int channelIndex);
+    // Theme + scaling for different UI density.
     void setTheme(const ThemeColors& newTheme);
     void setUiScale(float scale);
+    // Enable/disable interactive editing on the graph.
     void setInteractive(bool shouldAllow);
+    // Clears cached paths to force re-render.
     void invalidateCaches();
     int getTimerHz() const noexcept { return lastTimerHz; }
 
@@ -39,6 +44,7 @@ private:
     void timerCallback() override;
     void updateFft();
     void updateCurves();
+    // Layout helpers for plot and label regions.
     juce::Rectangle<int> getPlotArea() const;
     juce::Rectangle<int> getMagnitudeArea() const;
     void drawLabels(juce::Graphics& g, const juce::Rectangle<int>& area);
@@ -135,6 +141,8 @@ private:
     uint64_t lastCurveHash = 0;
     int lastCurveBand = -1;
     int lastCurveChannel = -1;
+    float lastSelectedMix = 1.0f;
+    float lastGlobalMix = 1.0f;
     float uiScale = 1.0f;
     ThemeColors theme = makeDarkTheme();
 };

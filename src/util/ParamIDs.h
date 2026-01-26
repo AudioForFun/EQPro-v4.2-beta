@@ -4,9 +4,11 @@
 
 namespace ParamIDs
 {
+// Maximum addressable channels and bands per channel.
 constexpr int kMaxChannels = 16;
 constexpr int kBandsPerChannel = 12;
 
+// Global parameter IDs (APVTS).
 extern const juce::String globalBypass;
 extern const juce::String globalMix;
 extern const juce::String phaseMode;
@@ -35,6 +37,8 @@ extern const juce::String midiLearn;
 extern const juce::String midiTarget;
 extern const juce::String smartSolo;
 
+// Helper to create a full band parameter ID.
 juce::String bandParamId(int channelIndex, int bandIndex, juce::StringRef suffix);
+// Helper to create a readable band parameter name.
 juce::String bandParamName(int channelIndex, int bandIndex, juce::StringRef name);
 } // namespace ParamIDs

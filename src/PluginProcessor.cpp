@@ -2,6 +2,8 @@
 #include "util/ParamIDs.h"
 #include "util/ChannelLayoutUtils.h"
 #include "util/Version.h"
+
+// Audio processor implementation: parameters, DSP orchestration, and state I/O.
 #include <cmath>
 #include <complex>
 #include <cstring>
@@ -890,6 +892,7 @@ void EQProAudioProcessor::initializeParamPointers()
     }
 }
 
+// Defines every APVTS parameter (global + per-band).
 juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
@@ -992,6 +995,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
         false));
 
     const juce::NormalisableRange<float> freqRange(20.0f, 20000.0f, 0.01f, 0.5f);
+    const std::array<float, ParamIDs::kBandsPerChannel> defaultFreqs {
+        20.0f, 50.0f, 100.0f, 200.0f, 400.0f, 800.0f,
+        1600.0f, 3200.0f, 6400.0f, 10000.0f, 14000.0f, 18000.0f
+    };
     const juce::NormalisableRange<float> gainRange(-48.0f, 48.0f, 0.01f);
     const juce::NormalisableRange<float> qRange(0.1f, 18.0f, 0.01f, 0.5f);
 
@@ -1003,7 +1010,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
                 ParamIDs::bandParamId(ch, band, kParamFreqSuffix),
                 ParamIDs::bandParamName(ch, band, "Freq"),
                 freqRange,
-                1000.0f));
+                defaultFreqs[static_cast<size_t>(band)]));
 
             params.push_back(std::make_unique<juce::AudioParameterFloat>(
                 ParamIDs::bandParamId(ch, band, kParamGainSuffix),

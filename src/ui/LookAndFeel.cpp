@@ -30,6 +30,20 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
     const auto angle = rotaryStartAngle
         + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
 
+    if (slider.isMouseOverOrDragging())
+    {
+        g.setColour(theme.accent.withAlpha(0.25f));
+        g.drawEllipse(bounds.expanded(3.0f), 2.0f);
+    }
+    if (slider.hasKeyboardFocus(true))
+    {
+        g.setColour(theme.accent.withAlpha(0.55f));
+        g.drawEllipse(bounds.expanded(4.0f), 2.0f);
+    }
+
+    g.setColour(juce::Colours::black.withAlpha(0.35f));
+    g.fillEllipse(bounds.translated(0.0f, 2.0f));
+
     if (knobFilmstrip.isValid() && knobFrames > 0)
     {
         const int frame = juce::jlimit(0, knobFrames - 1,
@@ -45,6 +59,9 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
         g.setColour(theme.panel.withAlpha(0.9f));
         g.fillEllipse(bounds);
     }
+
+    g.setColour(juce::Colours::white.withAlpha(0.06f));
+    g.drawEllipse(bounds.reduced(1.5f), 1.5f);
 
     const auto tint = slider.findColour(juce::Slider::trackColourId);
     const float dotRadius = 1.8f;
@@ -67,4 +84,23 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
                                 pointerThickness, pointerLength * 0.7f, 1.0f);
     g.setColour(theme.text.withAlpha(slider.isEnabled() ? 0.9f : 0.4f));
     g.fillPath(pointer, juce::AffineTransform::rotation(angle).translated(centre.x, centre.y));
+
+    const float capRadius = 2.6f;
+    g.setColour(theme.text.withAlpha(0.8f));
+    g.fillEllipse(centre.x - capRadius, centre.y - capRadius, capRadius * 2.0f, capRadius * 2.0f);
+
+    if (slider.isDoubleClickReturnEnabled())
+    {
+        const double defaultValue = slider.getDoubleClickReturnValue();
+        const double range = slider.getRange().getLength();
+        const double epsilon = (range > 0.0) ? range * 0.001 : 0.0001;
+        if (std::abs(slider.getValue() - defaultValue) <= epsilon)
+        {
+            const float snapAngle = rotaryStartAngle;
+            const float tickX = centre.x + std::cos(snapAngle) * (radius - 8.0f);
+            const float tickY = centre.y + std::sin(snapAngle) * (radius - 8.0f);
+            g.setColour(theme.accent.withAlpha(0.85f));
+            g.fillEllipse(tickX - 1.8f, tickY - 1.8f, 3.6f, 3.6f);
+        }
+    }
 }

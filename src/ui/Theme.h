@@ -21,16 +21,16 @@ struct ThemeColors
 inline ThemeColors makeDarkTheme()
 {
     return {
-        juce::Colour(0xff000000),
-        juce::Colour(0xff000000),
-        juce::Colour(0xff0c0c0c),
+        juce::Colour(0xff0b0f14),
+        juce::Colour(0xff111827),
+        juce::Colour(0xff1f2937),
         juce::Colour(0xffe6edf3),
-        juce::Colour(0xffb6c2cf),
+        juce::Colour(0xff94a3b8),
         juce::Colour(0xff22d3ee),
         juce::Colour(0xffa78bfa),
-        juce::Colour(0xff000000),
-        juce::Colour(0xff000000),
-        juce::Colour(0xff000000),
+        juce::Colour(0xff1f2937),
+        juce::Colour(0xff0b0f14),
+        juce::Colour(0xff0b0f14),
         juce::Colour(0xff22c55e),
         juce::Colour(0xfff97316),
     };
@@ -39,15 +39,15 @@ inline ThemeColors makeDarkTheme()
 inline ThemeColors makeLightTheme()
 {
     return {
-        juce::Colour(0xfff7f8fa),
-        juce::Colour(0xfff0f2f5),
-        juce::Colour(0xffcbd5e1),
-        juce::Colour(0xff111827),
-        juce::Colour(0xff475569),
-        juce::Colour(0xff1d4ed8),
-        juce::Colour(0xffea580c),
-        juce::Colour(0xffd7dce3),
+        juce::Colour(0xfff5f7fb),
         juce::Colour(0xffeef2f7),
+        juce::Colour(0xffcbd5e1),
+        juce::Colour(0xff0f172a),
+        juce::Colour(0xff64748b),
+        juce::Colour(0xff0891b2),
+        juce::Colour(0xff8b5cf6),
+        juce::Colour(0xffd7dde6),
+        juce::Colour(0xfff1f5f9),
         juce::Colour(0xffe2e8f0),
         juce::Colour(0xff16a34a),
         juce::Colour(0xffdc2626),

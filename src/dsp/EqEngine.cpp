@@ -148,6 +148,12 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
         }
     }
 
+    const bool bypassed = snapshot.globalBypass;
+    if (bypassed)
+        autoGainSmoothed.setTargetValue(0.0f);
+
+    if (! bypassed)
+    {
     globalMixSmoothed.setTargetValue(snapshot.globalMix);
     const bool applyGlobalMix = globalMixSmoothed.isSmoothing()
         || std::abs(snapshot.globalMix - 1.0f) > 0.0001f;
@@ -484,6 +490,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
         const double linRms = computeRms(buffer, numChannels);
         if (refRms > 1.0e-9 && linRms > 1.0e-9)
             buffer.applyGain(static_cast<float>(refRms / linRms));
+    }
     }
 
     if (++meterSkipCounter >= meterSkipFactor)

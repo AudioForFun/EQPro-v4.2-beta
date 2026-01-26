@@ -1,6 +1,8 @@
 #include "MetersComponent.h"
 #include "../PluginProcessor.h"
 
+// Output meter drawing and sampling.
+
 namespace
 {
 constexpr float kMinDb = -60.0f;
@@ -42,6 +44,17 @@ MetersComponent::MetersComponent(EQProAudioProcessor& processor)
     : processorRef(processor)
 {
     startTimerHz(30);
+    meterModeButton.setButtonText("RMS");
+    meterModeButton.setClickingTogglesState(true);
+    meterModeButton.setToggleState(false, juce::dontSendNotification);
+    meterModeButton.setTooltip("Toggle meter focus (RMS/Peak)");
+    meterModeButton.onClick = [this]
+    {
+        showPeakAsFill = meterModeButton.getToggleState();
+        meterModeButton.setButtonText(showPeakAsFill ? "PEAK" : "RMS");
+        repaint();
+    };
+    addAndMakeVisible(meterModeButton);
 }
 
 void MetersComponent::setSelectedChannel(int channelIndex)
@@ -57,6 +70,10 @@ void MetersComponent::setChannelLabels(const juce::StringArray& labels)
 void MetersComponent::setTheme(const ThemeColors& newTheme)
 {
     theme = newTheme;
+    meterModeButton.setColour(juce::TextButton::buttonColourId, theme.panel);
+    meterModeButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
+    meterModeButton.setColour(juce::TextButton::buttonOnColourId, theme.panel.brighter(0.2f));
+    meterModeButton.setColour(juce::TextButton::textColourOnId, theme.text);
     repaint();
 }
 
@@ -119,22 +136,33 @@ void MetersComponent::paint(juce::Graphics& g)
             const float y = mapDbToY(tick);
             g.drawLine(meterBounds.getX() + 2.0f, y, meterBounds.getRight() - 2.0f, y, 1.0f);
         }
+        const float mainDb = showPeakAsFill ? peakDbValue : rmsDbValue;
         const float rmsY = mapDbToY(rmsDbValue);
         const float peakY = mapDbToY(peakDbValue);
-        const auto fill = juce::Rectangle<float>(meterBounds.getX(), rmsY,
+        const float mainY = mapDbToY(mainDb);
+        const auto fill = juce::Rectangle<float>(meterBounds.getX(), mainY,
                                                  meterBounds.getWidth(),
-                                                 meterBounds.getBottom() - rmsY);
+                                                 meterBounds.getBottom() - mainY);
         juce::ColourGradient fillGrad(theme.meterFill.brighter(0.2f), fill.getTopLeft(),
                                       theme.meterFill.darker(0.25f), fill.getBottomLeft(), false);
         g.setGradientFill(fillGrad);
         g.fillRoundedRectangle(fill, 3.0f);
 
         g.setColour(theme.meterPeak);
-        g.drawLine(meterBounds.getX(), peakY, meterBounds.getRight(), peakY, 1.5f);
+        g.drawLine(meterBounds.getX(), peakY, meterBounds.getRight(), peakY, 1.4f);
 
         const float holdY = mapDbToY(holdDbValue);
         g.setColour(theme.meterPeak.withAlpha(0.75f));
         g.drawLine(meterBounds.getX(), holdY, meterBounds.getRight(), holdY, 1.0f);
+        g.setColour(theme.meterPeak.withAlpha(0.4f));
+        g.drawLine(meterBounds.getRight() - 2.0f, holdY, meterBounds.getRight() - 2.0f,
+                   holdY + 8.0f, 1.0f);
+
+        if (showPeakAsFill)
+        {
+            g.setColour(theme.textMuted.withAlpha(0.7f));
+            g.drawLine(meterBounds.getX(), rmsY, meterBounds.getRight(), rmsY, 1.0f);
+        }
 
         juce::String labelText = formatDolbyLabel(label);
         const float labelScale = labelText.length() <= 2 ? 0.9f : 0.75f;
@@ -181,6 +209,12 @@ void MetersComponent::paint(juce::Graphics& g)
 
 void MetersComponent::resized()
 {
+    auto area = getLocalBounds();
+    const int buttonW = 44;
+    const int buttonH = 16;
+    meterModeButton.setBounds(area.removeFromTop(buttonH + 4)
+                                  .removeFromRight(buttonW)
+                                  .withSizeKeepingCentre(buttonW, buttonH));
 }
 
 void MetersComponent::timerCallback()

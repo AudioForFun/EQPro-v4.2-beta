@@ -1,7 +1,7 @@
 # EQ Pro GUI Guide
 
 ## Layout
-- Top: global bypass + global mix.
+- Top: global bypass + global mix + Undo/Redo + Save/Load + preset browser.
 - Center/top: analyzer with pre/post/external spectra and EQ curves.
 - Middle: band controls panel.
 - Right: multi-channel meters + correlation + phase.
@@ -14,6 +14,7 @@
 - Pre/Post/External spectra can be shown; view selection controls render.
 - Per-band curves are overlaid with a highlighted selected band.
 - The plot shows a small legend for Pre/Post/Ext.
+- Dragging a band point shows a value pill (freq + gain).
 
 ## Band Controls
 - Per-band: Frequency, Gain, Q, Mix, Filter Type (dropdown), Slope (dropdown).
@@ -25,9 +26,9 @@
 - Bypass is toggled by double-clicking band buttons; active = bypass off.
 - Solo is a per-band toggle under the 1–12 band row (exclusive per channel; double-click clears).
 - Any band edit automatically un-bypasses that band.
-- Dynamic EQ: Enable, Up/Down trigger, Threshold, Attack, Release, Auto Scale + diagonal threshold display.
-- Dynamic section greys out when disabled; threshold meter is a square with a diagonal ratio line.
-- Copy/Paste band state and Reset (no Delete).
+- Dynamic EQ controls are currently hidden (reserved for a future release).
+- Copy/Paste band state and Reset actions.
+- Band header strip shows state icons and active band color.
 
 ## Processing / Global
 - Phase mode: Real-time / Natural / Linear.
@@ -38,6 +39,7 @@
 
 ## Presets / Snapshots
 - Snapshot buttons and menu (Recall/Store).
+- Preset browser with prev/next navigation in the top bar.
 
 ## Analyzer Options
 - Range: 3/6/12/30 dB.

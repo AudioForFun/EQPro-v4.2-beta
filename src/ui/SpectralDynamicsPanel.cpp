@@ -10,7 +10,7 @@ SpectralDynamicsPanel::SpectralDynamicsPanel(juce::AudioProcessorValueTreeState&
 {
     titleLabel.setText("Spectral Dynamics", juce::dontSendNotification);
     titleLabel.setJustificationType(juce::Justification::centredLeft);
-    titleLabel.setFont(juce::Font(13.0f, juce::Font::bold));
+    titleLabel.setFont(juce::Font(12.0f, juce::Font::bold));
     titleLabel.setColour(juce::Label::textColourId, theme.text);
     addAndMakeVisible(titleLabel);
 

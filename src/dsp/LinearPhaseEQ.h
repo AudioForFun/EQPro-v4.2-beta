@@ -6,23 +6,31 @@
 
 namespace eqdsp
 {
+// Linear phase FIR engine with double-buffered convolution sets.
 class LinearPhaseEQ
 {
 public:
+    // Prepares convolution sets for the given format.
     void prepare(double sampleRate, int maxBlockSize, int numChannels);
+    // Clears convolution state.
     void reset();
 
+    // Begin an impulse update for a staged set.
     void beginImpulseUpdate(int headSize, int expectedLoads);
+    // Load impulse response for a given channel.
     void loadImpulse(int channelIndex, juce::AudioBuffer<float>&& impulse, double sampleRate);
+    // Commit staged set once all impulses are loaded.
     void endImpulseUpdate();
     void process(juce::AudioBuffer<float>& buffer);
     void processRange(juce::AudioBuffer<float>& buffer, int startChannel, int count);
+    // Update partitioning for new head size.
     void configurePartitioning(int headSize);
 
     int getLatencySamples() const;
     void setLatencySamples(int samples);
 
 private:
+    // DSP format + state tracking.
     double sampleRateHz = 48000.0;
     int numChannels = 0;
     int latencySamples = 0;

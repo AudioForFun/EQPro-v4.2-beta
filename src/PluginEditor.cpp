@@ -1,6 +1,8 @@
 #include "PluginEditor.h"
 #include "util/ParamIDs.h"
 
+// Editor implementation: creates and lays out all UI components.
+
 juce::AudioProcessorEditor* EQProAudioProcessor::createEditor()
 {
     logStartup("createEditor");
@@ -86,6 +88,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     globalBypassButton.setButtonText("Global Bypass");
     globalBypassButton.setColour(juce::ToggleButton::textColourId,
                                  juce::Colour(0xffcbd5e1));
+    globalBypassButton.setTooltip("Toggle global bypass");
     addAndMakeVisible(globalBypassButton);
     globalBypassAttachment =
         std::make_unique<ButtonAttachment>(processorRef.getParameters(), ParamIDs::globalBypass,
@@ -104,6 +107,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     globalMixSlider.setColour(juce::Slider::trackColourId, juce::Colour(0xff38bdf8));
     globalMixSlider.setColour(juce::Slider::textBoxTextColourId, juce::Colour(0xffe2e8f0));
     globalMixSlider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colour(0xff1f2937));
+    globalMixSlider.setTooltip("Global dry/wet mix");
     addAndMakeVisible(globalMixSlider);
     globalMixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.getParameters(), ParamIDs::globalMix, globalMixSlider);
@@ -358,7 +362,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     {
         label.setText(text, juce::dontSendNotification);
         label.setJustificationType(juce::Justification::centredLeft);
-        label.setFont(juce::Font(11.0f, juce::Font::bold));
+        label.setFont(juce::Font(12.0f, juce::Font::bold));
         label.setColour(juce::Label::textColourId, theme.accent);
         addAndMakeVisible(label);
     };
@@ -416,6 +420,12 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         msViewToggle.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
         savePresetButton.setColour(juce::TextButton::textColourOffId, newTheme.textMuted);
         loadPresetButton.setColour(juce::TextButton::textColourOffId, newTheme.textMuted);
+        presetPrevButton.setColour(juce::TextButton::textColourOffId, newTheme.textMuted);
+        presetNextButton.setColour(juce::TextButton::textColourOffId, newTheme.textMuted);
+        presetPrevButton.setColour(juce::TextButton::buttonColourId, newTheme.panel);
+        presetPrevButton.setColour(juce::TextButton::buttonOnColourId, newTheme.panel.brighter(0.2f));
+        presetNextButton.setColour(juce::TextButton::buttonColourId, newTheme.panel);
+        presetNextButton.setColour(juce::TextButton::buttonOnColourId, newTheme.panel.brighter(0.2f));
         copyInstanceButton.setColour(juce::TextButton::textColourOffId, newTheme.textMuted);
         pasteInstanceButton.setColour(juce::TextButton::textColourOffId, newTheme.textMuted);
         favoriteToggle.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
@@ -492,6 +502,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
 
     presetDeltaToggle.setButtonText("Delta");
     presetDeltaToggle.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffcbd5e1));
+    presetDeltaToggle.setTooltip("Apply presets as delta (non-destructive)");
     addAndMakeVisible(presetDeltaToggle);
 
     presetLabel.setText("Preset", juce::dontSendNotification);
@@ -606,6 +617,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
 
     savePresetButton.setButtonText("Save");
+    savePresetButton.setTooltip("Save preset to file");
     savePresetButton.onClick = [this]
     {
         saveChooser = std::make_unique<juce::FileChooser>(
@@ -628,6 +640,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(savePresetButton);
 
     loadPresetButton.setButtonText("Load");
+    loadPresetButton.setTooltip("Load preset from file");
     loadPresetButton.onClick = [this]
     {
         loadChooser = std::make_unique<juce::FileChooser>(
@@ -649,6 +662,36 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     addAndMakeVisible(loadPresetButton);
 
+    presetPrevButton.setButtonText("<");
+    presetPrevButton.setTooltip("Previous preset");
+    presetPrevButton.onClick = [this]
+    {
+        const int total = presetBrowserBox.getNumItems();
+        if (total <= 0)
+            return;
+        int index = presetBrowserBox.getSelectedItemIndex();
+        if (index < 0)
+            index = 0;
+        index = (index - 1 + total) % total;
+        presetBrowserBox.setSelectedItemIndex(index, juce::sendNotification);
+    };
+    addAndMakeVisible(presetPrevButton);
+
+    presetNextButton.setButtonText(">");
+    presetNextButton.setTooltip("Next preset");
+    presetNextButton.onClick = [this]
+    {
+        const int total = presetBrowserBox.getNumItems();
+        if (total <= 0)
+            return;
+        int index = presetBrowserBox.getSelectedItemIndex();
+        if (index < 0)
+            index = 0;
+        index = (index + 1) % total;
+        presetBrowserBox.setSelectedItemIndex(index, juce::sendNotification);
+    };
+    addAndMakeVisible(presetNextButton);
+
     copyInstanceButton.setButtonText("Copy");
     copyInstanceButton.onClick = [this]
     {
@@ -663,11 +706,12 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     addAndMakeVisible(pasteInstanceButton);
 
-    presetBrowserLabel.setText("Presets", juce::dontSendNotification);
+    presetBrowserLabel.setText("Preset", juce::dontSendNotification);
     presetBrowserLabel.setJustificationType(juce::Justification::centredLeft);
     presetBrowserLabel.setFont(kLabelFontSize);
     addAndMakeVisible(presetBrowserLabel);
 
+    presetBrowserBox.setTooltip("Preset list");
     addAndMakeVisible(presetBrowserBox);
     favoriteToggle.setButtonText("Fav");
     addAndMakeVisible(favoriteToggle);
@@ -750,6 +794,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     refreshPresetBrowser(false);
 
     undoButton.setButtonText("Undo");
+    undoButton.setTooltip("Undo last change");
     undoButton.onClick = [this]
     {
         if (auto* undo = processorRef.getUndoManager())
@@ -758,6 +803,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(undoButton);
 
     redoButton.setButtonText("Redo");
+    redoButton.setTooltip("Redo last change");
     redoButton.onClick = [this]
     {
         if (auto* undo = processorRef.getUndoManager())
@@ -944,8 +990,10 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     loadPresetButton.setVisible(true);
     copyInstanceButton.setVisible(false);
     pasteInstanceButton.setVisible(false);
-    presetBrowserLabel.setVisible(false);
-    presetBrowserBox.setVisible(false);
+    presetBrowserLabel.setVisible(true);
+    presetBrowserBox.setVisible(true);
+    presetPrevButton.setVisible(true);
+    presetNextButton.setVisible(true);
     favoriteToggle.setVisible(false);
     refreshPresetsButton.setVisible(false);
     applyLabel.setVisible(false);
@@ -1137,9 +1185,29 @@ void EQProAudioProcessorEditor::paint(juce::Graphics& g)
                                frameBounds.getBottomLeft(),
                                false);
     g.setGradientFill(sheen);
-    g.fillRoundedRectangle(frameBounds, 8.0f);
+    g.fillRoundedRectangle(frameBounds, 10.0f);
     g.setColour(theme.panelOutline);
-    g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(6.0f), 6.0f, 1.0f);
+    g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(6.0f), 10.0f, 1.0f);
+
+    if (backgroundNoise.isValid())
+    {
+        g.setOpacity(0.04f);
+        g.drawImageWithin(backgroundNoise, 0, 0, getWidth(), getHeight(),
+                          juce::RectanglePlacement::fillDestination);
+        g.setOpacity(1.0f);
+    }
+
+    g.setColour(theme.panelOutline.withAlpha(0.35f));
+    if (topBarBounds.getHeight() > 0)
+        g.drawLine(static_cast<float>(topBarBounds.getX()),
+                   static_cast<float>(topBarBounds.getBottom()),
+                   static_cast<float>(topBarBounds.getRight()),
+                   static_cast<float>(topBarBounds.getBottom()), 1.0f);
+    if (analyzerBounds.getHeight() > 0)
+        g.drawLine(static_cast<float>(analyzerBounds.getX()),
+                   static_cast<float>(analyzerBounds.getBottom()),
+                   static_cast<float>(analyzerBounds.getRight()),
+                   static_cast<float>(analyzerBounds.getBottom()), 1.0f);
 
     if (debugVisible)
     {
@@ -1189,12 +1257,14 @@ void EQProAudioProcessorEditor::resized()
 
     const int headerHeight = static_cast<int>(26 * uiScale);
     auto headerRow = bounds.removeFromTop(headerHeight);
+    headerBounds = headerRow;
     const int headerWidth = static_cast<int>(220 * uiScale);
     headerLabel.setBounds(headerRow.removeFromLeft(headerWidth));
     versionLabel.setBounds(headerRow.removeFromRight(static_cast<int>(220 * uiScale)));
 
     const int topBarHeight = static_cast<int>(32 * uiScale);
     auto topBar = bounds.removeFromTop(topBarHeight);
+    topBarBounds = topBar;
     const int globalBypassWidth = static_cast<int>(120 * uiScale);
     const int globalBypassHeight = static_cast<int>(24 * uiScale);
     globalBypassButton.setBounds(topBar.removeFromLeft(globalBypassWidth)
@@ -1218,6 +1288,19 @@ void EQProAudioProcessorEditor::resized()
     loadPresetButton.setBounds(topBar.removeFromLeft(actionBtnW)
                                    .withSizeKeepingCentre(actionBtnW, globalBypassHeight));
     topBar.removeFromLeft(static_cast<int>(8 * uiScale));
+    const int presetLabelWidth = static_cast<int>(
+        presetBrowserLabel.getFont().getStringWidthFloat(presetBrowserLabel.getText()) + 8 * uiScale);
+    presetBrowserLabel.setBounds(topBar.removeFromLeft(presetLabelWidth)
+                                     .withSizeKeepingCentre(presetLabelWidth, globalBypassHeight));
+    const int navW = static_cast<int>(20 * uiScale);
+    presetPrevButton.setBounds(topBar.removeFromLeft(navW)
+                                   .withSizeKeepingCentre(navW, globalBypassHeight));
+    const int presetBoxW = static_cast<int>(180 * uiScale);
+    presetBrowserBox.setBounds(topBar.removeFromLeft(presetBoxW)
+                                   .withSizeKeepingCentre(presetBoxW, globalBypassHeight + 6));
+    presetNextButton.setBounds(topBar.removeFromLeft(navW)
+                                   .withSizeKeepingCentre(navW, globalBypassHeight));
+    topBar.removeFromLeft(static_cast<int>(6 * uiScale));
     const int deltaWidth = static_cast<int>(70 * uiScale);
     presetDeltaToggle.setBounds(topBar.removeFromLeft(deltaWidth)
                                     .withSizeKeepingCentre(deltaWidth, globalBypassHeight));
@@ -1228,6 +1311,7 @@ void EQProAudioProcessorEditor::resized()
     auto leftContent = content;
     const int analyzerHeight = static_cast<int>(leftContent.getHeight() * 0.52f);
     auto analyzerArea = leftContent.removeFromTop(analyzerHeight);
+    analyzerBounds = analyzerArea;
     analyzer.setBounds(analyzerArea);
 
     auto controlsArea = leftContent;
@@ -1250,6 +1334,7 @@ void EQProAudioProcessorEditor::resized()
     qualityLabel.setBounds(processingRow.removeFromLeft(static_cast<int>(70 * uiScale)));
     linearQualityBox.setBounds(processingRow.removeFromLeft(static_cast<int>(120 * uiScale)));
     const auto bandArea = controlsArea.reduced(static_cast<int>(6 * uiScale), 0);
+    bandBounds = bandArea;
     bandControls.setBounds(bandArea);
     auto gonioArea = bandArea;
     gonioArea = gonioArea.removeFromRight(static_cast<int>(bandArea.getWidth() * 0.38f));
@@ -1279,7 +1364,6 @@ void EQProAudioProcessorEditor::resized()
     analyzerExternalToggle.setBounds({0, 0, 0, 0});
     smartSoloToggle.setBounds({0, 0, 0, 0});
     showSpectralToggle.setBounds({0, 0, 0, 0});
-    presetDeltaToggle.setBounds({0, 0, 0, 0});
 
     layoutLabel.setBounds({0, 0, 0, 0});
     layoutValueLabel.setBounds({0, 0, 0, 0});

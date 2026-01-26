@@ -145,6 +145,12 @@ Usage:
 - Improved **hit zones**, **hover/selection fades**, and **focus outlines**.
 - Analyzer dB labels now **auto-hide** when the grid is dense to reduce overlap.
 
+## v3.9 Beta Updates (Navigation + Metering)
+- Added **RMS/Peak toggles** in the top bar for meter fill mode.
+- Added **correlation meter bar** under the goniometer.
+- Added **band navigation arrows** next to Reset All.
+- Analyzer dB grid aligns with **exact 0 dB** reference line.
+
 ## Call Flow (Simplified)
 1. UI updates APVTS parameters.
 2. `timerCallback` builds `ParamSnapshot` and swaps it.

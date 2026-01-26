@@ -117,26 +117,51 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     eqSectionLabel.setFont(juce::Font(12.0f, juce::Font::bold));
     eqSectionLabel.setColour(juce::Label::textColourId, theme.accent);
     addAndMakeVisible(eqSectionLabel);
+    eqSectionLabel.setVisible(false);
 
     copyButton.setButtonText("Copy");
     copyButton.setTooltip("Copy this band's settings");
     copyButton.onClick = [this] { copyBandState(); };
     addAndMakeVisible(copyButton);
+    copyButton.setVisible(true);
 
     pasteButton.setButtonText("Paste");
     pasteButton.setTooltip("Paste copied band settings");
     pasteButton.onClick = [this] { pasteBandState(); };
     addAndMakeVisible(pasteButton);
+    pasteButton.setVisible(true);
 
     defaultButton.setButtonText("Reset Band");
     defaultButton.setTooltip("Reset current band");
     defaultButton.onClick = [this] { resetSelectedBand(); };
     addAndMakeVisible(defaultButton);
+    defaultButton.setVisible(true);
 
     resetAllButton.setButtonText("Reset All");
     resetAllButton.setTooltip("Reset all bands");
     resetAllButton.onClick = [this] { resetAllBands(); };
     addAndMakeVisible(resetAllButton);
+
+    // Band navigation arrows (previous/next).
+    prevBandButton.setButtonText("<");
+    prevBandButton.setTooltip("Previous band");
+    prevBandButton.onClick = [this]
+    {
+        const int target = findNextExisting(selectedBand, -1);
+        if (onBandNavigate)
+            onBandNavigate(target);
+    };
+    addAndMakeVisible(prevBandButton);
+
+    nextBandButton.setButtonText(">");
+    nextBandButton.setTooltip("Next band");
+    nextBandButton.onClick = [this]
+    {
+        const int target = findNextExisting(selectedBand, +1);
+        if (onBandNavigate)
+            onBandNavigate(target);
+    };
+    addAndMakeVisible(nextBandButton);
 
     for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
     {
@@ -610,6 +635,8 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     pasteButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     defaultButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     resetAllButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
+    prevBandButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
+    nextBandButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
     for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
     {
         auto& button = bandSelectButtons[static_cast<size_t>(i)];
@@ -698,35 +725,6 @@ void BandControlsPanel::paint(juce::Graphics& g)
         g.drawEllipse(chip, 1.0f);
     }
 
-    bool bypassed = false;
-    if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "bypass")))
-        bypassed = param->getValue() > 0.5f;
-    bool soloed = false;
-    if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "solo")))
-        soloed = param->getValue() > 0.5f;
-    const int msValue = getMsParamValue();
-    const bool linked = (msValue == 0 || msValue == 3 || msValue == 6);
-
-    auto iconRow = headerArea.removeFromRight(86);
-    const float iconSize = 14.0f;
-    auto drawIcon = [&](const juce::String& text, bool enabled, juce::Colour colour)
-    {
-        auto icon = iconRow.removeFromLeft(static_cast<int>(iconSize)).toFloat();
-        icon = icon.withSizeKeepingCentre(iconSize, iconSize);
-        iconRow.removeFromLeft(6);
-        const auto bg = enabled ? colour.withAlpha(0.35f) : theme.panelOutline.withAlpha(0.25f);
-        g.setColour(bg);
-        g.fillEllipse(icon);
-        g.setColour(enabled ? colour.withAlpha(0.95f) : theme.textMuted.withAlpha(0.65f));
-        g.drawEllipse(icon, 1.0f);
-        g.setColour(enabled ? theme.text : theme.textMuted);
-        g.setFont(10.0f);
-        g.drawFittedText(text, icon.toNearestInt(), juce::Justification::centred, 1);
-    };
-    drawIcon("B", bypassed, juce::Colour(0xfff87171));
-    drawIcon("S", soloed, bandColour);
-    drawIcon("L", linked, theme.accent);
-
     g.setColour(theme.panelOutline.withAlpha(0.35f));
     g.drawLine(static_cast<float>(bandRowArea.getX()),
                static_cast<float>(bandRowArea.getBottom() + 1),
@@ -746,7 +744,7 @@ void BandControlsPanel::paint(juce::Graphics& g)
                static_cast<float>(comboRowArea.getBottom() + 1), 1.0f);
 
     const auto knobGlow = juce::Rectangle<float>(knobsArea.toFloat().reduced(6.0f));
-    g.setColour(bandColour.withAlpha(0.08f * glowAlpha + 0.04f));
+    g.setColour(bandColour.withAlpha(0.16f));
     g.fillRoundedRectangle(knobGlow, 8.0f);
 
     if (detectorMeterBounds.getWidth() > 1.0f && detectorMeterBounds.getHeight() > 1.0f)
@@ -1092,7 +1090,10 @@ void BandControlsPanel::resized()
     pasteButton.setBounds(headerRow.removeFromLeft(btnW));
     defaultButton.setBounds(headerRow.removeFromLeft(resetW));
     resetAllButton.setBounds(headerRow.removeFromLeft(resetW));
-    eqSectionLabel.setBounds(headerRow);
+    const int navW = 24;
+    prevBandButton.setBounds(headerRow.removeFromLeft(navW));
+    nextBandButton.setBounds(headerRow.removeFromLeft(navW));
+    eqSectionLabel.setBounds({0, 0, 0, 0});
 
     left.removeFromTop(2);
     auto bandRow = left.removeFromTop(kRowHeight);

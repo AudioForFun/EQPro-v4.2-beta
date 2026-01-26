@@ -14,23 +14,33 @@ public:
     EQProAudioProcessor();
     ~EQProAudioProcessor() override;
 
+    // Allocate DSP buffers and prepare processing pipeline.
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
+    // Release audio resources when playback stops.
     void releaseResources() override;
 
+    // Validate host bus layout support.
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 
+    // Main audio processing callback.
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
+    // Create the editor instance.
     juce::AudioProcessorEditor* createEditor() override;
+    // Whether this processor provides an editor.
     bool hasEditor() const override;
 
+    // Display name for the plugin.
     const juce::String getName() const override;
 
+    // MIDI capabilities.
     bool acceptsMidi() const override;
     bool producesMidi() const override;
     bool isMidiEffect() const override;
+    // Report tail time (seconds).
     double getTailLengthSeconds() const override;
 
+    // Program/preset bank support.
     int getNumPrograms() override;
     int getCurrentProgram() override;
     void setCurrentProgram(int index) override;
@@ -43,12 +53,16 @@ public:
 
     // Expose parameter tree to editor components.
     juce::AudioProcessorValueTreeState& getParameters();
+    // Analyzer tap accessors (UI thread).
     AudioFifo& getAnalyzerPreFifo();
     AudioFifo& getAnalyzerPostFifo();
     AudioFifo& getAnalyzerExternalFifo();
+    // Current channel layout label helpers.
     std::vector<juce::String> getCurrentChannelNames() const;
     juce::String getCurrentLayoutDescription() const;
+    // Meter state access.
     eqdsp::ChannelMeterState getMeterState(int channelIndex) const;
+    // Correlation/goniometer helpers.
     float getCorrelation() const;
     int getGoniometerPoints(juce::Point<float>* dest, int maxPoints, int& writePos) const;
     juce::StringArray getCorrelationPairNames();
@@ -56,11 +70,14 @@ public:
     int getCorrelationPairIndex() const;
     void setShowPhasePreference(bool enabled);
     bool getShowPhasePreference() const;
+    // Undo/redo manager for UI actions.
     juce::UndoManager* getUndoManager();
+    // Preset browser helpers.
     void setPresetSelection(int index);
     int getPresetSelection() const;
     void setPresetApplyTarget(int index);
     int getPresetApplyTarget() const;
+    // Snapshot A/B/C/D helpers.
     void storeSnapshotA();
     void storeSnapshotB();
     void recallSnapshotA();
@@ -69,20 +86,27 @@ public:
     void storeSnapshotD();
     void recallSnapshotC();
     void recallSnapshotD();
+    // Theme management.
     void setDarkTheme(bool enabled);
     bool getDarkTheme() const;
     void setThemeMode(int mode);
     int getThemeMode() const;
+    // Favorite presets list.
     void setFavoritePresets(const juce::String& names);
     juce::String getFavoritePresets() const;
+    // Instance clipboard helpers.
     void copyStateToClipboard();
     void pasteStateFromClipboard();
+    // Safe state replacement for preset loading.
     bool replaceStateSafely(const juce::ValueTree& newState);
+    // Debug tone generator for calibration.
     void setDebugToneEnabled(bool enabled);
+    // Selected band/channel (for UI).
     void setSelectedBandIndex(int index);
     void setSelectedChannelIndex(int index);
     int getSelectedBandIndex() const;
     int getSelectedChannelIndex() const;
+    // Metering hooks per band.
     float getBandDetectorDb(int channelIndex, int bandIndex) const;
     float getBandDynamicGainDb(int channelIndex, int bandIndex) const;
     // Helper for startup/diagnostic logging.

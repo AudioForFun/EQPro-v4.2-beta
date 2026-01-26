@@ -305,10 +305,12 @@ bool EQProAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) con
 void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                        juce::MidiBuffer& midiMessages)
 {
+    // Critical path: process audio on the realtime thread.
     juce::ScopedNoDenormals noDenormals;
 
     const auto numChannels = juce::jmin(buffer.getNumChannels(), ParamIDs::kMaxChannels);
 
+    // Optional MIDI learn / mapping.
     const bool midiLearnEnabled = midiLearnParam != nullptr && midiLearnParam->load() > 0.5f;
     if (midiLearnEnabled || learnedMidiCC.load() >= 0)
     {
@@ -335,6 +337,7 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         }
     }
 
+    // Optional detector sidechain for dynamics.
     const bool sidechainEnabled = getBusCount(true) > 1 && getBus(true, 1) != nullptr
         && getBus(true, 1)->isEnabled();
     const juce::AudioBuffer<float>* detectorBuffer = nullptr;
@@ -354,6 +357,7 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         meterTap.setCorrelationPair(pair.first, pair.second);
     }
 
+    // Pull the active snapshot and run DSP.
     const int snapshotIndex = activeSnapshot.load();
     const auto& snapshot = snapshots[snapshotIndex];
     eqEngine.process(buffer, snapshot, detectorBuffer, analyzerPreTap, analyzerPostTap, meterTap);
@@ -1110,6 +1114,7 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 
 void EQProAudioProcessor::timerCallback()
 {
+    // Critical path: build next snapshot and schedule FIR rebuilds.
     if (verifyBands && ! verifyBandsDone)
     {
         verifyBandsDone = true;
@@ -1566,6 +1571,7 @@ void EQProAudioProcessor::updateOversampling()
 
 uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
 {
+    // Critical path: copy current APVTS values into an atomic-safe snapshot.
     const int numChannels = juce::jmin(getTotalNumInputChannels(), ParamIDs::kMaxChannels);
     snapshot.numChannels = numChannels;
     snapshot.globalBypass = globalBypassParam != nullptr && globalBypassParam->load() > 0.5f;

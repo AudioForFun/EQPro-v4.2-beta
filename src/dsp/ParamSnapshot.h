@@ -6,6 +6,7 @@
 
 namespace eqdsp
 {
+// Snapshot of one band's parameters (thread-safe copy).
 struct BandSnapshot
 {
     float frequencyHz = 1000.0f;
@@ -26,6 +27,7 @@ struct BandSnapshot
     bool dynExternal = false;
 };
 
+// Full parameter snapshot used by the audio thread.
 struct ParamSnapshot
 {
     int numChannels = 0;

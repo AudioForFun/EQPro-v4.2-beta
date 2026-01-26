@@ -2,6 +2,7 @@
 
 namespace eqdsp
 {
+// Filter types supported by the EQ.
 enum class FilterType
 {
     bell = 0,
@@ -16,6 +17,7 @@ enum class FilterType
     flatTilt
 };
 
+// Parameter bundle for one EQ band.
 struct BandParams
 {
     float frequencyHz = 1000.0f;

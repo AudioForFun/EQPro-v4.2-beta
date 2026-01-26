@@ -4,13 +4,17 @@
 #include "../util/ParamIDs.h"
 #include "Theme.h"
 
+// UI panel for spectral dynamics parameters (currently hidden).
 class SpectralDynamicsPanel final : public juce::Component
 {
 public:
     explicit SpectralDynamicsPanel(juce::AudioProcessorValueTreeState& state);
+    // Apply theme palette.
     void setTheme(const ThemeColors& newTheme);
 
+    // Paint panel background.
     void paint(juce::Graphics& g) override;
+    // Layout controls.
     void resized() override;
 
 private:

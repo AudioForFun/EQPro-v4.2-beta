@@ -44,17 +44,6 @@ MetersComponent::MetersComponent(EQProAudioProcessor& processor)
     : processorRef(processor)
 {
     startTimerHz(30);
-    meterModeButton.setButtonText("RMS");
-    meterModeButton.setClickingTogglesState(true);
-    meterModeButton.setToggleState(false, juce::dontSendNotification);
-    meterModeButton.setTooltip("Toggle meter focus (RMS/Peak)");
-    meterModeButton.onClick = [this]
-    {
-        showPeakAsFill = meterModeButton.getToggleState();
-        meterModeButton.setButtonText(showPeakAsFill ? "PEAK" : "RMS");
-        repaint();
-    };
-    addAndMakeVisible(meterModeButton);
 }
 
 void MetersComponent::setSelectedChannel(int channelIndex)
@@ -70,10 +59,13 @@ void MetersComponent::setChannelLabels(const juce::StringArray& labels)
 void MetersComponent::setTheme(const ThemeColors& newTheme)
 {
     theme = newTheme;
-    meterModeButton.setColour(juce::TextButton::buttonColourId, theme.panel);
-    meterModeButton.setColour(juce::TextButton::textColourOffId, theme.textMuted);
-    meterModeButton.setColour(juce::TextButton::buttonOnColourId, theme.panel.brighter(0.2f));
-    meterModeButton.setColour(juce::TextButton::textColourOnId, theme.text);
+    repaint();
+}
+
+void MetersComponent::setMeterMode(bool usePeak)
+{
+    // Controls whether RMS or Peak drives the filled bar.
+    showPeakAsFill = usePeak;
     repaint();
 }
 
@@ -209,12 +201,6 @@ void MetersComponent::paint(juce::Graphics& g)
 
 void MetersComponent::resized()
 {
-    auto area = getLocalBounds();
-    const int buttonW = 44;
-    const int buttonH = 16;
-    meterModeButton.setBounds(area.removeFromTop(buttonH + 4)
-                                  .removeFromRight(buttonW)
-                                  .withSizeKeepingCentre(buttonW, buttonH));
 }
 
 void MetersComponent::timerCallback()

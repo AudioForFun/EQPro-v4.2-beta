@@ -18,6 +18,8 @@ public:
     void setChannelLabels(const juce::StringArray& labels);
     // Apply theme palette.
     void setTheme(const ThemeColors& newTheme);
+    // Select which level drives the filled bar.
+    void setMeterMode(bool usePeak);
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -28,8 +30,6 @@ private:
     float dbToY(float db) const;
 
     EQProAudioProcessor& processorRef;
-    // Small toggle in the meter header (RMS/Peak focus).
-    juce::TextButton meterModeButton;
     // When true, the filled bar follows peak instead of RMS.
     bool showPeakAsFill = false;
     int selectedChannel = 0;

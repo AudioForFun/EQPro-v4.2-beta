@@ -1,10 +1,10 @@
 # EQ Pro GUI Guide
 
 ## Layout
-- Top: global bypass + global mix + Undo/Redo + Save/Load + preset browser.
+- Top: global bypass + global mix + RMS/Peak toggles + Undo/Redo + Save/Load + preset browser.
 - Center/top: analyzer with pre/post/external spectra and EQ curves.
 - Middle: band controls panel.
-- Right: multi-channel meters + correlation + phase.
+- Right: multi-channel meters + goniometer + correlation meter.
 - Bottom: processing row (phase mode + quality) and output trim/auto gain.
 
 ## Analyzer
@@ -28,7 +28,7 @@
 - Any band edit automatically un-bypasses that band.
 - Dynamic EQ controls are currently hidden (reserved for a future release).
 - Copy/Paste band state and Reset actions.
-- Band header strip shows state icons and active band color.
+- Band header strip shows active band color and navigation arrows.
 
 ## Processing / Global
 - Phase mode: Real-time / Natural / Linear.

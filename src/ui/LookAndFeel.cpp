@@ -63,8 +63,9 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
     g.setColour(juce::Colours::white.withAlpha(0.06f));
     g.drawEllipse(bounds.reduced(1.5f), 1.5f);
 
+    // Draw per-band colored LED dots over the filmstrip.
     const auto tint = slider.findColour(juce::Slider::trackColourId);
-    const float dotRadius = 1.8f;
+    const float dotRadius = 2.4f;
     const int dotCount = 24;
     for (int i = 0; i < dotCount; ++i)
     {
@@ -72,7 +73,7 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
         const float dotAngle = rotaryStartAngle + t * (rotaryEndAngle - rotaryStartAngle);
         const float dotX = centre.x + std::cos(dotAngle) * (radius - 6.0f);
         const float dotY = centre.y + std::sin(dotAngle) * (radius - 6.0f);
-        const float alpha = (t <= sliderPosProportional + 0.001f) ? 0.9f : 0.25f;
+        const float alpha = (t <= sliderPosProportional + 0.001f) ? 0.95f : 0.45f;
         g.setColour(tint.withAlpha(slider.isEnabled() ? alpha : 0.15f));
         g.fillEllipse(dotX - dotRadius, dotY - dotRadius, dotRadius * 2.0f, dotRadius * 2.0f);
     }

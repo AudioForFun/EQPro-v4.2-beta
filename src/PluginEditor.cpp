@@ -109,6 +109,33 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     globalMixSlider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colour(0xff1f2937));
     globalMixSlider.setTooltip("Global dry/wet mix");
     addAndMakeVisible(globalMixSlider);
+    // Meter mode toggles (RMS vs Peak) in the top bar.
+    rmsToggle.setButtonText("RMS");
+    rmsToggle.setClickingTogglesState(true);
+    rmsToggle.setToggleState(true, juce::dontSendNotification);
+    rmsToggle.setTooltip("Meter fill follows RMS");
+    addAndMakeVisible(rmsToggle);
+
+    peakToggle.setButtonText("Peak");
+    peakToggle.setClickingTogglesState(true);
+    peakToggle.setToggleState(false, juce::dontSendNotification);
+    peakToggle.setTooltip("Meter fill follows Peak");
+    addAndMakeVisible(peakToggle);
+
+    rmsToggle.onClick = [this]
+    {
+        if (! rmsToggle.getToggleState())
+            rmsToggle.setToggleState(true, juce::dontSendNotification);
+        peakToggle.setToggleState(false, juce::dontSendNotification);
+        meters.setMeterMode(false);
+    };
+    peakToggle.onClick = [this]
+    {
+        if (! peakToggle.getToggleState())
+            peakToggle.setToggleState(true, juce::dontSendNotification);
+        rmsToggle.setToggleState(false, juce::dontSendNotification);
+        meters.setMeterMode(true);
+    };
     globalMixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.getParameters(), ParamIDs::globalMix, globalMixSlider);
 
@@ -444,6 +471,8 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         globalMixSlider.setColour(juce::Slider::trackColourId, newTheme.accent);
         globalMixSlider.setColour(juce::Slider::textBoxTextColourId, newTheme.text);
         globalMixSlider.setColour(juce::Slider::textBoxOutlineColourId, newTheme.panelOutline);
+        rmsToggle.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
+        peakToggle.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
         qModeLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         qAmountLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         qAmountSlider.setColour(juce::Slider::trackColourId, newTheme.accent);
@@ -504,6 +533,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     presetDeltaToggle.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffcbd5e1));
     presetDeltaToggle.setTooltip("Apply presets as delta (non-destructive)");
     addAndMakeVisible(presetDeltaToggle);
+    presetDeltaToggle.setVisible(false);
 
     presetLabel.setText("Preset", juce::dontSendNotification);
     presetLabel.setJustificationType(juce::Justification::centredLeft);
@@ -998,7 +1028,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     refreshPresetsButton.setVisible(false);
     applyLabel.setVisible(false);
     applyTargetBox.setVisible(false);
-    presetDeltaToggle.setVisible(true);
+    presetDeltaToggle.setVisible(false);
     snapshotSectionLabel.setVisible(true);
     undoButton.setVisible(true);
     redoButton.setVisible(true);
@@ -1278,6 +1308,13 @@ void EQProAudioProcessorEditor::resized()
     globalMixSlider.setBounds(topBar.removeFromLeft(mixSliderWidth)
                                   .withSizeKeepingCentre(mixSliderWidth, globalBypassHeight + 8));
     topBar.removeFromLeft(static_cast<int>(10 * uiScale));
+    // Place RMS/Peak toggles beside the global mix.
+    const int meterToggleW = static_cast<int>(44 * uiScale);
+    rmsToggle.setBounds(topBar.removeFromLeft(meterToggleW)
+                            .withSizeKeepingCentre(meterToggleW, globalBypassHeight));
+    peakToggle.setBounds(topBar.removeFromLeft(meterToggleW)
+                             .withSizeKeepingCentre(meterToggleW, globalBypassHeight));
+    topBar.removeFromLeft(static_cast<int>(10 * uiScale));
     const int actionBtnW = static_cast<int>(60 * uiScale);
     undoButton.setBounds(topBar.removeFromLeft(actionBtnW)
                              .withSizeKeepingCentre(actionBtnW, globalBypassHeight));
@@ -1300,10 +1337,7 @@ void EQProAudioProcessorEditor::resized()
                                    .withSizeKeepingCentre(presetBoxW, globalBypassHeight + 6));
     presetNextButton.setBounds(topBar.removeFromLeft(navW)
                                    .withSizeKeepingCentre(navW, globalBypassHeight));
-    topBar.removeFromLeft(static_cast<int>(6 * uiScale));
-    const int deltaWidth = static_cast<int>(70 * uiScale);
-    presetDeltaToggle.setBounds(topBar.removeFromLeft(deltaWidth)
-                                    .withSizeKeepingCentre(deltaWidth, globalBypassHeight));
+    presetDeltaToggle.setBounds({0, 0, 0, 0});
 
     auto content = bounds;
     const int metersWidth = static_cast<int>(kRightPanelWidth * uiScale);
@@ -1329,9 +1363,13 @@ void EQProAudioProcessorEditor::resized()
     meters.setBounds(metersArea);
     const int processingRowHeight = static_cast<int>(28 * uiScale);
     auto processingRow = controlsArea.removeFromBottom(processingRowHeight);
-    phaseLabel.setBounds(processingRow.removeFromLeft(static_cast<int>(70 * uiScale)));
+    const int phaseLabelWidth = static_cast<int>(
+        phaseLabel.getFont().getStringWidthFloat(phaseLabel.getText()) + 10 * uiScale);
+    phaseLabel.setBounds(processingRow.removeFromLeft(phaseLabelWidth));
     phaseModeBox.setBounds(processingRow.removeFromLeft(static_cast<int>(140 * uiScale)));
-    qualityLabel.setBounds(processingRow.removeFromLeft(static_cast<int>(70 * uiScale)));
+    const int qualityLabelWidth = static_cast<int>(
+        qualityLabel.getFont().getStringWidthFloat(qualityLabel.getText()) + 10 * uiScale);
+    qualityLabel.setBounds(processingRow.removeFromLeft(qualityLabelWidth));
     linearQualityBox.setBounds(processingRow.removeFromLeft(static_cast<int>(120 * uiScale)));
     const auto bandArea = controlsArea.reduced(static_cast<int>(6 * uiScale), 0);
     bandBounds = bandArea;

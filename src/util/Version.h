@@ -4,6 +4,7 @@
 
 namespace Version
 {
+// Version string baked into the build.
 inline juce::String versionString()
 {
 #if defined(EQPRO_VERSION)
@@ -13,6 +14,7 @@ inline juce::String versionString()
 #endif
 }
 
+// Human-readable iteration label.
 inline juce::String iterationString()
 {
 #if defined(EQPRO_ITERATION)
@@ -22,6 +24,7 @@ inline juce::String iterationString()
 #endif
 }
 
+// Display string shown in the UI.
 inline juce::String displayString()
 {
     return "v" + versionString() + " - " + iterationString();

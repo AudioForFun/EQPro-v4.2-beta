@@ -31,6 +31,7 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
+    // Mouse interaction for point editing.
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseUp(const juce::MouseEvent& event) override;
@@ -41,6 +42,7 @@ public:
     void mouseExit(const juce::MouseEvent& event) override;
 
 private:
+    // Timer refresh (FFT + curves).
     void timerCallback() override;
     void updateFft();
     void updateCurves();

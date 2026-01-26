@@ -1409,17 +1409,15 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
     const int bottomGutter = static_cast<int>(18 * scale);
     const auto labelArea = area.withTrimmedLeft(leftGutter).withTrimmedRight(rightGutter)
         .withTrimmedBottom(bottomGutter);
-
     const float spectrumMinDb = kAnalyzerMinDb;
     const float spectrumMaxDb = kAnalyzerMaxDb;
     const float spectrumStep = 6.0f;
     const float majorSpacing = labelArea.getHeight() * (12.0f / (spectrumMaxDb - spectrumMinDb));
     const bool showDbLabels = majorSpacing >= 14.0f * scale;
+    // Use gainToY() so the grid lines align exactly with the 0 dB line.
     for (float db = spectrumMinDb; db <= spectrumMaxDb + 0.01f; db += spectrumStep)
     {
-        const float y = juce::jmap(db, spectrumMinDb, spectrumMaxDb,
-                                   static_cast<float>(labelArea.getBottom()),
-                                   static_cast<float>(labelArea.getY()));
+        const float y = gainToY(db);
         const bool major = (static_cast<int>(db) % 12 == 0);
         g.setColour(gridColour.withAlpha(major ? 0.65f : 0.25f));
         g.drawLine(static_cast<float>(area.getX()), y,

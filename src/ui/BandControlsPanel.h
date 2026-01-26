@@ -28,6 +28,7 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    // Periodic UI sync + solo validation.
     void timerCallback() override;
     void mouseDoubleClick(const juce::MouseEvent& event) override;
 
@@ -149,6 +150,8 @@ private:
     juce::Label eqSectionLabel;
     juce::TextButton defaultButton;
     juce::TextButton resetAllButton;
+    juce::TextButton prevBandButton;
+    juce::TextButton nextBandButton;
     std::array<BandSelectButton, ParamIDs::kBandsPerChannel> bandSelectButtons;
     std::array<SoloToggleButton, ParamIDs::kBandsPerChannel> bandSoloButtons;
     juce::Label freqLabel;

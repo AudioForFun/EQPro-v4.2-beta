@@ -5,13 +5,19 @@
 
 namespace eqdsp
 {
+// Spectral dynamics processor (currently disabled in UI).
 class SpectralDynamicsDSP
 {
 public:
+    // Prepare FFT buffers and state.
     void prepare(double sampleRate, int maxBlockSize, int channels);
+    // Reset state.
     void reset();
+    // Enable/disable processing.
     void setEnabled(bool enabled);
+    // Set detector and mix parameters.
     void setParams(float thresholdDb, float ratio, float attackMs, float releaseMs, float mix);
+    // Process buffer in-place.
     void process(juce::AudioBuffer<float>& buffer);
 
 private:

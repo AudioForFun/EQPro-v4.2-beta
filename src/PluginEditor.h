@@ -19,13 +19,19 @@ public:
     explicit EQProAudioProcessorEditor(EQProAudioProcessor&);
     ~EQProAudioProcessorEditor() override;
 
+    // Main editor background and chrome.
     void paint(juce::Graphics&) override;
+    // Layout all child controls.
     void resized() override;
+    // Keyboard shortcuts (debug tone, etc.).
     bool keyPressed(const juce::KeyPress& key) override;
 
 private:
+    // Keep plugin editor in sync with host window bounds.
     bool syncToHostBounds();
+    // Periodic refresh for layout/params.
     void timerCallback() override;
+    // Refresh channel layout and labels.
     void refreshChannelLayout();
 
     EQProAudioProcessor& processorRef;
@@ -34,6 +40,8 @@ private:
     juce::ToggleButton globalBypassButton;
     juce::Label globalMixLabel;
     juce::Slider globalMixSlider;
+    juce::ToggleButton rmsToggle;
+    juce::ToggleButton peakToggle;
     juce::Label headerLabel;
     juce::Label versionLabel;
     juce::ComboBox channelSelector;

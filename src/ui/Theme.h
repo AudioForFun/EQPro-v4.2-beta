@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 
+// Collection of colors used across the UI.
 struct ThemeColors
 {
     juce::Colour background;
@@ -18,6 +19,7 @@ struct ThemeColors
     juce::Colour meterPeak;
 };
 
+// Default dark theme palette.
 inline ThemeColors makeDarkTheme()
 {
     return {
@@ -36,6 +38,7 @@ inline ThemeColors makeDarkTheme()
     };
 }
 
+// Default light theme palette.
 inline ThemeColors makeLightTheme()
 {
     return {

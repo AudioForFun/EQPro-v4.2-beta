@@ -27,11 +27,13 @@ void CorrelationComponent::paint(juce::Graphics& g)
     // Correlation bar lives under the goniometer.
     const float corrLabelHeight = 14.0f;
     const float corrBarHeight = 10.0f;
+    const float corrTickHeight = 12.0f;
     const float corrPad = 6.0f;
-    auto corrArea = bounds.removeFromBottom(corrLabelHeight + corrBarHeight + corrPad);
+    auto corrArea = bounds.removeFromBottom(corrLabelHeight + corrBarHeight + corrTickHeight + corrPad);
     const auto corrLabelArea = corrArea.removeFromTop(corrLabelHeight);
     corrArea.removeFromTop(2.0f);
-    const auto corrBarArea = corrArea.withHeight(corrBarHeight);
+    const auto corrBarArea = corrArea.removeFromTop(corrBarHeight);
+    const auto corrTickArea = corrArea.removeFromBottom(corrTickHeight);
 
     auto scopeArea = bounds.reduced(6.0f, 6.0f);
     const float size = juce::jmin(scopeArea.getWidth(), scopeArea.getHeight());
@@ -103,16 +105,29 @@ void CorrelationComponent::paint(juce::Graphics& g)
     g.setColour(theme.textMuted);
     g.setFont(11.0f);
     g.drawFittedText("Correlation", corrLabelArea.toNearestInt(),
-                     juce::Justification::centredLeft, 1);
+                     juce::Justification::centred, 1);
 
     g.setColour(theme.panel.darker(0.2f));
     g.fillRoundedRectangle(corrBarArea, 3.0f);
-    g.setColour(theme.panelOutline.withAlpha(0.7f));
-    g.drawRoundedRectangle(corrBarArea, 3.0f, 1.0f);
+    g.setColour(theme.panelOutline.withAlpha(0.9f));
+    g.drawRoundedRectangle(corrBarArea, 3.0f, 1.2f);
 
     const float midX = corrBarArea.getCentreX();
     g.setColour(theme.grid.withAlpha(0.5f));
     g.drawLine(midX, corrBarArea.getY(), midX, corrBarArea.getBottom(), 1.0f);
+    g.drawLine(corrBarArea.getX(), corrBarArea.getCentreY(),
+               corrBarArea.getRight(), corrBarArea.getCentreY(), 0.8f);
+
+    g.setColour(theme.textMuted.withAlpha(0.85f));
+    g.setFont(10.5f);
+    g.drawFittedText("-1", corrTickArea.withTrimmedRight(static_cast<int>(corrTickArea.getWidth() * 0.66f))
+                              .toNearestInt(),
+                     juce::Justification::centredLeft, 1);
+    g.drawFittedText("0", corrTickArea.toNearestInt(),
+                     juce::Justification::centred, 1);
+    g.drawFittedText("+1", corrTickArea.withTrimmedLeft(static_cast<int>(corrTickArea.getWidth() * 0.66f))
+                               .toNearestInt(),
+                     juce::Justification::centredRight, 1);
 
     const float fillWidth = (corrBarArea.getWidth() * 0.5f) * std::abs(correlation);
     juce::Rectangle<float> fillRect;

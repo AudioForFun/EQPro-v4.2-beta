@@ -151,6 +151,325 @@ Usage:
 - Added **band navigation arrows** next to Reset All.
 - Analyzer dB grid aligns with **exact 0 dB** reference line.
 
+## v3.9 Beta Updates (Channel Routing)
+- Channel routing dropdown now **adapts to the active host layout**, showing only
+  the relevant targets for each format.
+- Added **format-specific targets** for stereo pairs (Front/Rear/Lateral/Wide/Top),
+  per-channel selections, and Mid/Side variants for each pair.
+- Processor routing now maps **pair selections to the correct channel masks**
+  and mirrors band parameters to all channels in the selected target.
+
+## Channel Routing Formats
+The `ms` parameter choices are dynamically filtered by layout, but the canonical
+format lists are:
+
+### Mono
+- M
+
+### Stereo
+- ALL (STEREO)
+- L
+- R
+- MID
+- SIDE
+
+### 2.1
+- ALL (2.1)
+- STEREO
+- L
+- R
+- LFE
+- MID
+- SIDE
+
+### 3.0
+- ALL (3.0)
+- STEREO
+- L
+- R
+- C
+- MID
+- SIDE
+
+### 3.1
+- ALL (3.1)
+- STEREO
+- L
+- R
+- C
+- LFE
+- MID
+- SIDE
+
+### 4.0
+- ALL (4.0)
+- STEREO FRONT
+- L
+- R
+- STEREO REAR
+- Ls
+- Rs
+- MID FRONT
+- MID REAR
+- SIDE FRONT
+- SIDE REAR
+
+### 4.1
+- ALL (4.1)
+- STEREO FRONT
+- L
+- R
+- LFE
+- STEREO REAR
+- Ls
+- Rs
+- MID FRONT
+- MID REAR
+- SIDE FRONT
+- SIDE REAR
+
+### 5.0 – Film (ITU)
+- ALL (5.0)
+- STEREO FRONT
+- L
+- R
+- C
+- STEREO REAR
+- Ls
+- Rs
+- MID FRONT
+- MID REAR
+
+### 5.0 – Music (SMPTE)
+- ALL (5.0)
+- STEREO FRONT
+- L
+- R
+- STEREO REAR
+- Ls
+- Rs
+- C
+- MID FRONT
+- MID REAR
+- SIDE FRONT
+- SIDE REAR
+
+### 5.1 – Film
+- ALL (5.1)
+- STEREO FRONT
+- L
+- R
+- C
+- LFE
+- STEREO REAR
+- Ls
+- Rs
+- MID FRONT
+- MID REAR
+- SIDE FRONT
+- SIDE REAR
+
+### 5.1 – Music
+- ALL (5.1)
+- STEREO FRONT
+- L
+- R
+- STEREO REAR
+- Ls
+- Rs
+- C
+- LFE
+- MID FRONT
+- MID REAR
+- SIDE FRONT
+- SIDE REAR
+
+### 6.0 – Film
+- ALL (6.0)
+- STEREO FRONT
+- L
+- R
+- C
+- STEREO REAR
+- Ls
+- Rs
+- Cs
+- MID FRONT
+- MID REAR
+- SIDE FRONT
+- SIDE REAR
+
+### 6.1 – Film
+- ALL (6.1)
+- STEREO FRONT
+- L
+- R
+- C
+- LFE
+- STEREO REAR
+- Ls
+- Rs
+- Cs
+- MID FRONT
+- MID REAR
+- SIDE FRONT
+- SIDE REAR
+
+### 7.0 – Film
+- ALL (7.0)
+- STEREO FRONT
+- L
+- R
+- C
+- STEREO REAR
+- Ls
+- Rs
+- STEREO LATERAL
+- Lrs
+- Rrs
+- MID FRONT
+- MID REAR
+- MID LATERAL
+- SIDE FRONT
+- SIDE REAR
+- SIDE LATERAL
+
+### 7.1 – Film
+- ALL (7.1)
+- STEREO FRONT
+- L
+- R
+- C
+- LFE
+- STEREO REAR
+- Ls
+- Rs
+- STEREO LATERAL
+- Lrs
+- Rrs
+- MID FRONT
+- MID REAR
+- MID LATERAL
+
+### 7.1 – Music
+- ALL (7.1)
+- STEREO FRONT
+- L
+- R
+- STEREO REAR
+- Ls
+- Rs
+- C
+- LFE
+- STEREO LATERAL
+- Lrs
+- Rrs
+- MID FRONT
+- MID REAR
+- MID LATERAL
+- SIDE FRONT
+- SIDE REAR
+- SIDE LATERAL
+
+### Dolby Atmos 7.1.2
+- ALL (7.1.2)
+- STEREO FRONT
+- L
+- R
+- C
+- LFE
+- STEREO REAR
+- Ls
+- Rs
+- STEREO LATERAL
+- Lrs
+- Rrs
+- STEREO TOP FRONT
+- Top Front Left (TFL)
+- Top Front Right (TFR)
+- MID FRONT
+- MID REAR
+- MID LATERAL
+- MID TOP FRONT
+- SIDE FRONT
+- SIDE REAR
+- SIDE LATERAL
+- SIDE TOP FRONT
+
+### Dolby Atmos 7.1.4
+- ALL (7.1.4)
+- STEREO FRONT
+- L
+- R
+- C
+- LFE
+- STEREO REAR
+- Ls
+- Rs
+- STEREO LATERAL
+- Lrs
+- Rrs
+- STEREO TOP FRONT
+- Top Front Left (TFL)
+- Top Front Right (TFR)
+- STEREO TOP REAR
+- Top Rear Left (TRL)
+- Top Rear Right (TRR)
+- MID FRONT
+- MID REAR
+- MID LATERAL
+- MID TOP FRONT
+- SIDE FRONT
+- SIDE REAR
+- SIDE LATERAL
+- SIDE TOP FRONT
+
+### Dolby Atmos 9.1.6
+- ALL (9.1.6)
+- STEREO FRONT
+- L
+- R
+- C
+- LFE
+- STEREO REAR
+- Ls
+- Rs
+- STEREO LATERAL
+- Lrs
+- Rrs
+- STEREO FRONT WIDE
+- Front Wide Left (Lw)
+- Front Wide Right (Rw)
+- STEREO TOP FRONT
+- Top Front Left
+- Top Front Right
+- STEREO TOP MIDDLE
+- Top Middle Left
+- Top Middle Right
+- STEREO TOP REAR
+- Top Rear Left
+- Top Rear Right
+- MID FRONT
+- MID REAR
+- MID LATERAL
+- MID FRONT WIDE
+- MID TOP FRONT
+- MID TOP REAR
+- MID TOP MIDDLE
+- SIDE FRONT
+- SIDE REAR
+- SIDE LATERAL
+- SIDE FRONT WIDE
+- SIDE TOP FRONT
+- SIDE TOP REAR
+- SIDE TOP MIDDLE
+
+## v4.1 Beta Updates (UI + Routing)
+- RMS/Peak toggles moved to the **right panel above meters**.
+- Correlation meter now shows **-1 / 0 / +1 graduations** with a clearer bar frame.
+- EQ band section frame and divider lines now **follow the active band color**.
+- Rotary knobs render **band-colored inner LED ring** to match the main LED row.
+
 ## Call Flow (Simplified)
 1. UI updates APVTS parameters.
 2. `timerCallback` builds `ParamSnapshot` and swaps it.

@@ -1169,9 +1169,9 @@ void EQProAudioProcessorEditor::refreshChannelLayout()
         addPair("Ls", "Rs", "Ls/Rs");
         addPair("Lrs", "Rrs", "Lrs/Rrs");
         addPair("Lc", "Rc", "Lc/Rc");
-        addPair("Ltf", "Rtf", "Ltf/Rtf");
-        addPair("Ltr", "Rtr", "Ltr/Rtr");
-        addPair("Lts", "Rts", "Lts/Rts");
+        addPair("TFL", "TFR", "TFL/TFR");
+        addPair("TRL", "TRR", "TRL/TRR");
+        addPair("TML", "TMR", "TML/TMR");
         addPair("Lw", "Rw", "Lw/Rw");
         addPair("Bfl", "Bfr", "Bfl/Bfr");
         return labels;
@@ -1308,13 +1308,7 @@ void EQProAudioProcessorEditor::resized()
     globalMixSlider.setBounds(topBar.removeFromLeft(mixSliderWidth)
                                   .withSizeKeepingCentre(mixSliderWidth, globalBypassHeight + 8));
     topBar.removeFromLeft(static_cast<int>(10 * uiScale));
-    // Place RMS/Peak toggles beside the global mix.
-    const int meterToggleW = static_cast<int>(44 * uiScale);
-    rmsToggle.setBounds(topBar.removeFromLeft(meterToggleW)
-                            .withSizeKeepingCentre(meterToggleW, globalBypassHeight));
-    peakToggle.setBounds(topBar.removeFromLeft(meterToggleW)
-                             .withSizeKeepingCentre(meterToggleW, globalBypassHeight));
-    topBar.removeFromLeft(static_cast<int>(10 * uiScale));
+    // RMS/Peak toggles are positioned above the meters on the right panel.
     const int actionBtnW = static_cast<int>(60 * uiScale);
     undoButton.setBounds(topBar.removeFromLeft(actionBtnW)
                              .withSizeKeepingCentre(actionBtnW, globalBypassHeight));
@@ -1350,6 +1344,16 @@ void EQProAudioProcessorEditor::resized()
 
     auto controlsArea = leftContent;
     auto metersArea = rightPanel;
+    const int meterToggleH = static_cast<int>(24 * uiScale);
+    auto meterToggleArea = metersArea.removeFromTop(meterToggleH);
+    const int meterToggleW = static_cast<int>(48 * uiScale);
+    const int meterToggleGap = static_cast<int>(6 * uiScale);
+    auto toggleRow = meterToggleArea.removeFromRight(meterToggleW * 2 + meterToggleGap);
+    rmsToggle.setBounds(toggleRow.removeFromLeft(meterToggleW)
+                            .withSizeKeepingCentre(meterToggleW, meterToggleH));
+    toggleRow.removeFromLeft(meterToggleGap);
+    peakToggle.setBounds(toggleRow.removeFromLeft(meterToggleW)
+                             .withSizeKeepingCentre(meterToggleW, meterToggleH));
     const int trimSize = static_cast<int>(72 * uiScale);
     const int trimLabelHeight = static_cast<int>(14 * uiScale);
     auto trimArea = metersArea.removeFromBottom(trimSize + trimLabelHeight + static_cast<int>(10 * uiScale));

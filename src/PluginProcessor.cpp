@@ -42,45 +42,87 @@ const juce::StringArray kFilterTypeChoices {
 
 const juce::StringArray kMsChoices {
     "All",
-    "Mid",
-    "Side",
-    "Stereo",
-    "Left",
-    "Right",
-    "Mono",
+    "Stereo Front",
     "L",
     "R",
+    "Mid Front",
+    "Side Front",
     "C",
     "LFE",
+    "Stereo Rear",
     "Ls",
     "Rs",
+    "Mid Rear",
+    "Side Rear",
+    "Stereo Lateral",
     "Lrs",
     "Rrs",
-    "Lc",
-    "Rc",
-    "Ltf",
-    "Rtf",
-    "Tfc",
-    "Tm",
-    "Ltr",
-    "Rtr",
-    "Trc",
-    "Lts",
-    "Rts",
+    "Mid Lateral",
+    "Side Lateral",
+    "Cs",
+    "Stereo Front Wide",
     "Lw",
     "Rw",
-    "LFE2",
-    "Bfl",
-    "Bfr",
-    "Bfc",
-    "Ls/Rs",
-    "Lrs/Rrs",
-    "Lc/Rc",
-    "Ltf/Rtf",
-    "Ltr/Rtr",
-    "Lts/Rts",
-    "Lw/Rw",
-    "Bfl/Bfr"
+    "Mid Front Wide",
+    "Side Front Wide",
+    "Stereo Top Front",
+    "TFL",
+    "TFR",
+    "Mid Top Front",
+    "Side Top Front",
+    "Stereo Top Rear",
+    "TRL",
+    "TRR",
+    "Mid Top Rear",
+    "Side Top Rear",
+    "Stereo Top Middle",
+    "TML",
+    "TMR",
+    "Mid Top Middle",
+    "Side Top Middle"
+};
+
+enum MsChoiceIndex
+{
+    kMsAll = 0,
+    kMsStereoFront,
+    kMsLeft,
+    kMsRight,
+    kMsMidFront,
+    kMsSideFront,
+    kMsCentre,
+    kMsLfe,
+    kMsStereoRear,
+    kMsLs,
+    kMsRs,
+    kMsMidRear,
+    kMsSideRear,
+    kMsStereoLateral,
+    kMsLrs,
+    kMsRrs,
+    kMsMidLateral,
+    kMsSideLateral,
+    kMsCs,
+    kMsStereoFrontWide,
+    kMsLw,
+    kMsRw,
+    kMsMidFrontWide,
+    kMsSideFrontWide,
+    kMsStereoTopFront,
+    kMsTfl,
+    kMsTfr,
+    kMsMidTopFront,
+    kMsSideTopFront,
+    kMsStereoTopRear,
+    kMsTrl,
+    kMsTrr,
+    kMsMidTopRear,
+    kMsSideTopRear,
+    kMsStereoTopMiddle,
+    kMsTml,
+    kMsTmr,
+    kMsMidTopMiddle,
+    kMsSideTopMiddle
 };
 
 
@@ -1243,48 +1285,45 @@ void EQProAudioProcessor::rebuildLinearPhase(int taps, double sampleRate, int ch
         uint32_t mask = maskAll;
         switch (target)
         {
-            case 0: mask = maskAll; break;
-            case 1: mask = maskForPair("L", "R"); break;
-            case 2: mask = maskForPair("L", "R"); break;
-            case 3: mask = maskFor("L"); break;
-            case 4: mask = maskFor("R"); break;
-            case 5: mask = maskForPair("L", "R"); break;
-            case 6: mask = maskForPair("L", "R"); break;
-            case 7: mask = maskFor("C"); break;
-            case 8: mask = maskFor("LFE"); break;
-            case 9: mask = maskFor("Ls"); break;
-            case 10: mask = maskFor("Rs"); break;
-            case 11: mask = maskFor("Lrs"); break;
-            case 12: mask = maskFor("Rrs"); break;
-            case 13: mask = maskFor("Lc"); break;
-            case 14: mask = maskFor("Rc"); break;
-            case 15: mask = maskFor("Ltf"); break;
-            case 16: mask = maskFor("Rtf"); break;
-            case 17: mask = maskFor("Tfc"); break;
-            case 18: mask = maskFor("Tm"); break;
-            case 19: mask = maskFor("Ltr"); break;
-            case 20: mask = maskFor("Rtr"); break;
-            case 21: mask = maskFor("Trc"); break;
-            case 22: mask = maskFor("Lts"); break;
-            case 23: mask = maskFor("Rts"); break;
-            case 24: mask = maskFor("Lw"); break;
-            case 25: mask = maskFor("Rw"); break;
-            case 26: mask = maskFor("LFE2"); break;
-            case 27: mask = maskFor("Bfl"); break;
-            case 28: mask = maskFor("Bfr"); break;
-            case 29: mask = maskFor("Bfc"); break;
-            case 30: mask = maskFor("W"); break;
-            case 31: mask = maskFor("X"); break;
-            case 32: mask = maskFor("Y"); break;
-            case 33: mask = maskFor("Z"); break;
-            case 34: mask = maskForPair("Ls", "Rs"); break;
-            case 35: mask = maskForPair("Lrs", "Rrs"); break;
-            case 36: mask = maskForPair("Lc", "Rc"); break;
-            case 37: mask = maskForPair("Ltf", "Rtf"); break;
-            case 38: mask = maskForPair("Ltr", "Rtr"); break;
-            case 39: mask = maskForPair("Lts", "Rts"); break;
-            case 40: mask = maskForPair("Lw", "Rw"); break;
-            case 41: mask = maskForPair("Bfl", "Bfr"); break;
+            case kMsAll: mask = maskAll; break;
+            case kMsStereoFront: mask = maskForPair("L", "R"); break;
+            case kMsLeft: mask = maskFor("L"); break;
+            case kMsRight: mask = maskFor("R"); break;
+            case kMsMidFront: mask = maskForPair("L", "R"); break;
+            case kMsSideFront: mask = maskForPair("L", "R"); break;
+            case kMsCentre: mask = maskFor("C"); break;
+            case kMsLfe: mask = maskFor("LFE"); break;
+            case kMsStereoRear: mask = maskForPair("Ls", "Rs"); break;
+            case kMsLs: mask = maskFor("Ls"); break;
+            case kMsRs: mask = maskFor("Rs"); break;
+            case kMsMidRear: mask = maskForPair("Ls", "Rs"); break;
+            case kMsSideRear: mask = maskForPair("Ls", "Rs"); break;
+            case kMsStereoLateral: mask = maskForPair("Lrs", "Rrs"); break;
+            case kMsLrs: mask = maskFor("Lrs"); break;
+            case kMsRrs: mask = maskFor("Rrs"); break;
+            case kMsMidLateral: mask = maskForPair("Lrs", "Rrs"); break;
+            case kMsSideLateral: mask = maskForPair("Lrs", "Rrs"); break;
+            case kMsCs: mask = maskFor("Cs"); break;
+            case kMsStereoFrontWide: mask = maskForPair("Lw", "Rw"); break;
+            case kMsLw: mask = maskFor("Lw"); break;
+            case kMsRw: mask = maskFor("Rw"); break;
+            case kMsMidFrontWide: mask = maskForPair("Lw", "Rw"); break;
+            case kMsSideFrontWide: mask = maskForPair("Lw", "Rw"); break;
+            case kMsStereoTopFront: mask = maskForPair("TFL", "TFR"); break;
+            case kMsTfl: mask = maskFor("TFL"); break;
+            case kMsTfr: mask = maskFor("TFR"); break;
+            case kMsMidTopFront: mask = maskForPair("TFL", "TFR"); break;
+            case kMsSideTopFront: mask = maskForPair("TFL", "TFR"); break;
+            case kMsStereoTopRear: mask = maskForPair("TRL", "TRR"); break;
+            case kMsTrl: mask = maskFor("TRL"); break;
+            case kMsTrr: mask = maskFor("TRR"); break;
+            case kMsMidTopRear: mask = maskForPair("TRL", "TRR"); break;
+            case kMsSideTopRear: mask = maskForPair("TRL", "TRR"); break;
+            case kMsStereoTopMiddle: mask = maskForPair("TML", "TMR"); break;
+            case kMsTml: mask = maskFor("TML"); break;
+            case kMsTmr: mask = maskFor("TMR"); break;
+            case kMsMidTopMiddle: mask = maskForPair("TML", "TMR"); break;
+            case kMsSideTopMiddle: mask = maskForPair("TML", "TMR"); break;
             default: mask = maskAll; break;
         }
         bandChannelMasks[band] = mask;
@@ -1666,58 +1705,72 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
         int msTarget = 0;
         uint32_t mask = maskAll;
 
+        // Map UI selection to a channel mask and optional M/S target.
         switch (target)
         {
-            case 0: mask = maskAll; break;
-            case 1: msTarget = 1; mask = maskStereo; break;
-            case 2: msTarget = 2; mask = maskStereo; break;
-            case 3: mask = maskStereo; break;
-            case 4: mask = maskL; break;
-            case 5: mask = maskR; break;
-            case 6: msTarget = 1; mask = maskStereo; break;
-            case 7: mask = maskL; break;
-            case 8: mask = maskR; break;
-            case 9: mask = maskFor("C"); break;
-            case 10: mask = maskFor("LFE"); break;
-            case 11: mask = maskFor("Ls"); break;
-            case 12: mask = maskFor("Rs"); break;
-            case 13: mask = maskFor("Lrs"); break;
-            case 14: mask = maskFor("Rrs"); break;
-            case 15: mask = maskFor("Lc"); break;
-            case 16: mask = maskFor("Rc"); break;
-            case 17: mask = maskFor("Ltf"); break;
-            case 18: mask = maskFor("Rtf"); break;
-            case 19: mask = maskFor("Tfc"); break;
-            case 20: mask = maskFor("Tm"); break;
-            case 21: mask = maskFor("Ltr"); break;
-            case 22: mask = maskFor("Rtr"); break;
-            case 23: mask = maskFor("Trc"); break;
-            case 24: mask = maskFor("Lts"); break;
-            case 25: mask = maskFor("Rts"); break;
-            case 26: mask = maskFor("Lw"); break;
-            case 27: mask = maskFor("Rw"); break;
-            case 28: mask = maskFor("LFE2"); break;
-            case 29: mask = maskFor("Bfl"); break;
-            case 30: mask = maskFor("Bfr"); break;
-            case 31: mask = maskFor("Bfc"); break;
-            case 32: mask = maskForPair("Ls", "Rs"); break;
-            case 33: mask = maskForPair("Lrs", "Rrs"); break;
-            case 34: mask = maskForPair("Lc", "Rc"); break;
-            case 35: mask = maskForPair("Ltf", "Rtf"); break;
-            case 36: mask = maskForPair("Ltr", "Rtr"); break;
-            case 37: mask = maskForPair("Lts", "Rts"); break;
-            case 38: mask = maskForPair("Lw", "Rw"); break;
-            case 39: mask = maskForPair("Bfl", "Bfr"); break;
+            case kMsAll: mask = maskAll; break;
+            case kMsStereoFront: mask = maskStereo; break;
+            case kMsLeft: mask = maskL; break;
+            case kMsRight: mask = maskR; break;
+            case kMsMidFront: msTarget = 1; mask = maskStereo; break;
+            case kMsSideFront: msTarget = 2; mask = maskStereo; break;
+            case kMsCentre: mask = maskFor("C"); break;
+            case kMsLfe: mask = maskFor("LFE"); break;
+            case kMsStereoRear: mask = maskForPair("Ls", "Rs"); break;
+            case kMsLs: mask = maskFor("Ls"); break;
+            case kMsRs: mask = maskFor("Rs"); break;
+            case kMsMidRear: msTarget = 1; mask = maskForPair("Ls", "Rs"); break;
+            case kMsSideRear: msTarget = 2; mask = maskForPair("Ls", "Rs"); break;
+            case kMsStereoLateral: mask = maskForPair("Lrs", "Rrs"); break;
+            case kMsLrs: mask = maskFor("Lrs"); break;
+            case kMsRrs: mask = maskFor("Rrs"); break;
+            case kMsMidLateral: msTarget = 1; mask = maskForPair("Lrs", "Rrs"); break;
+            case kMsSideLateral: msTarget = 2; mask = maskForPair("Lrs", "Rrs"); break;
+            case kMsCs: mask = maskFor("Cs"); break;
+            case kMsStereoFrontWide: mask = maskForPair("Lw", "Rw"); break;
+            case kMsLw: mask = maskFor("Lw"); break;
+            case kMsRw: mask = maskFor("Rw"); break;
+            case kMsMidFrontWide: msTarget = 1; mask = maskForPair("Lw", "Rw"); break;
+            case kMsSideFrontWide: msTarget = 2; mask = maskForPair("Lw", "Rw"); break;
+            case kMsStereoTopFront: mask = maskForPair("TFL", "TFR"); break;
+            case kMsTfl: mask = maskFor("TFL"); break;
+            case kMsTfr: mask = maskFor("TFR"); break;
+            case kMsMidTopFront: msTarget = 1; mask = maskForPair("TFL", "TFR"); break;
+            case kMsSideTopFront: msTarget = 2; mask = maskForPair("TFL", "TFR"); break;
+            case kMsStereoTopRear: mask = maskForPair("TRL", "TRR"); break;
+            case kMsTrl: mask = maskFor("TRL"); break;
+            case kMsTrr: mask = maskFor("TRR"); break;
+            case kMsMidTopRear: msTarget = 1; mask = maskForPair("TRL", "TRR"); break;
+            case kMsSideTopRear: msTarget = 2; mask = maskForPair("TRL", "TRR"); break;
+            case kMsStereoTopMiddle: mask = maskForPair("TML", "TMR"); break;
+            case kMsTml: mask = maskFor("TML"); break;
+            case kMsTmr: mask = maskFor("TMR"); break;
+            case kMsMidTopMiddle: msTarget = 1; mask = maskForPair("TML", "TMR"); break;
+            case kMsSideTopMiddle: msTarget = 2; mask = maskForPair("TML", "TMR"); break;
             default: mask = maskAll; break;
         }
 
         snapshot.msTargets[band] = msTarget;
         snapshot.bandChannelMasks[band] = mask;
 
-        if (target == 0 || target == 3)
+        const auto maskBitCount = [](uint32_t value)
         {
-            for (int ch = 1; ch < numChannels; ++ch)
-                snapshot.bands[ch][band] = snapshot.bands[sourceChannel][band];
+            int count = 0;
+            while (value != 0)
+            {
+                value &= (value - 1u);
+                ++count;
+            }
+            return count;
+        };
+        // For multi-channel selections, mirror the band parameters to the covered channels.
+        if (maskBitCount(mask) > 1)
+        {
+            for (int ch = 0; ch < numChannels; ++ch)
+            {
+                if ((mask & (1u << static_cast<uint32_t>(ch))) != 0)
+                    snapshot.bands[ch][band] = snapshot.bands[sourceChannel][band];
+            }
         }
     }
 

@@ -65,7 +65,7 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
 
     // Draw per-band colored LED dots over the filmstrip.
     const auto tint = slider.findColour(juce::Slider::trackColourId);
-    const float dotRadius = 2.4f;
+    const float dotRadius = 1.6f;
     const int dotCount = 24;
     for (int i = 0; i < dotCount; ++i)
     {
@@ -76,6 +76,22 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
         const float alpha = (t <= sliderPosProportional + 0.001f) ? 0.95f : 0.45f;
         g.setColour(tint.withAlpha(slider.isEnabled() ? alpha : 0.15f));
         g.fillEllipse(dotX - dotRadius, dotY - dotRadius, dotRadius * 2.0f, dotRadius * 2.0f);
+    }
+
+    // Smaller inner LED ring to cover the filmstrip's inner dots.
+    const float innerRadius = radius - 16.0f;
+    const float innerDotRadius = 1.1f;
+    const int innerDotCount = 16;
+    for (int i = 0; i < innerDotCount; ++i)
+    {
+        const float t = static_cast<float>(i) / static_cast<float>(innerDotCount - 1);
+        const float dotAngle = rotaryStartAngle + t * (rotaryEndAngle - rotaryStartAngle);
+        const float dotX = centre.x + std::cos(dotAngle) * innerRadius;
+        const float dotY = centre.y + std::sin(dotAngle) * innerRadius;
+        const float alpha = (t <= sliderPosProportional + 0.001f) ? 0.85f : 0.35f;
+        g.setColour(tint.withAlpha(slider.isEnabled() ? alpha : 0.15f));
+        g.fillEllipse(dotX - innerDotRadius, dotY - innerDotRadius,
+                      innerDotRadius * 2.0f, innerDotRadius * 2.0f);
     }
 
     juce::Path pointer;

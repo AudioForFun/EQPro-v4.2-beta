@@ -22,15 +22,21 @@ juce::String formatDolbyLabel(const juce::String& label)
     if (key == "RRS") return "Rrs";
     if (key == "LC") return "Lc";
     if (key == "RC") return "Rc";
-    if (key == "LTF") return "Ltf";
-    if (key == "RTF") return "Rtf";
-    if (key == "TFC") return "Tfc";
-    if (key == "TM") return "Tm";
-    if (key == "LTR") return "Ltr";
-    if (key == "RTR") return "Rtr";
-    if (key == "TRC") return "Trc";
-    if (key == "LTS") return "Lts";
-    if (key == "RTS") return "Rts";
+    if (key == "LTF") return "TFL";
+    if (key == "RTF") return "TFR";
+    if (key == "TFL") return "TFL";
+    if (key == "TFR") return "TFR";
+    if (key == "TFC") return "TFC";
+    if (key == "TM") return "TM";
+    if (key == "TML") return "TML";
+    if (key == "TMR") return "TMR";
+    if (key == "LTR") return "TRL";
+    if (key == "RTR") return "TRR";
+    if (key == "TRL") return "TRL";
+    if (key == "TRR") return "TRR";
+    if (key == "TRC") return "TRC";
+    if (key == "LTS") return "TML";
+    if (key == "RTS") return "TMR";
     if (key == "LW") return "Lw";
     if (key == "RW") return "Rw";
     if (key == "BFL") return "Bfl";
@@ -90,36 +96,29 @@ void MetersComponent::paint(juce::Graphics& g)
             return values[static_cast<size_t>(index)];
         return fallback;
     };
-    const float gap = channels > 10 ? 2.0f : 4.0f;
+    const float gap = channels > 12 ? 2.0f : 4.0f;
+    const float minWidth = channels > 12 ? 4.0f : 6.0f;
+    const float maxWidth = channels > 12 ? 10.0f : 16.0f;
     const float meterWidthRaw = (meterArea.getWidth() - gap * static_cast<float>(channels - 1))
         / static_cast<float>(channels);
-    float meterWidth = meterWidthRaw;
-    const float maxWidth = channels > 10 ? 12.0f : 16.0f;
-    if (meterWidth > maxWidth)
-        meterWidth = maxWidth;
-    float totalWidth = meterWidth * static_cast<float>(channels)
+    const float meterWidth = juce::jlimit(minWidth, maxWidth, meterWidthRaw);
+    const float totalWidth = meterWidth * static_cast<float>(channels)
         + gap * static_cast<float>(channels - 1);
-    if (totalWidth > meterArea.getWidth())
-    {
-        meterWidth = meterWidthRaw;
-        totalWidth = meterArea.getWidth();
-    }
     const float startX = meterArea.getX() + (meterArea.getWidth() - totalWidth) * 0.5f;
 
-    auto drawMeter = [&](float x, float rmsDbValue, float peakDbValue, float holdDbValue,
-                         const juce::String& label)
+    auto drawMeter = [&](const juce::Rectangle<float>& meterBounds, float rmsDbValue,
+                         float peakDbValue, float holdDbValue, const juce::String& label)
     {
-        const auto meterBounds = juce::Rectangle<float>(x, meterArea.getY(), meterWidth,
-                                                        meterArea.getHeight());
         g.setColour(theme.panel);
         g.fillRoundedRectangle(meterBounds, 4.0f);
         g.setColour(theme.panelOutline.withAlpha(0.6f));
         g.drawRoundedRectangle(meterBounds.reduced(0.6f), 3.5f, 1.0f);
 
-        const auto mapDbToY = [&meterArea](float db)
+        const auto mapDbToY = [&meterBounds](float db)
         {
             const float clamped = juce::jlimit(kMinDb, kMaxDb, db);
-            return juce::jmap(clamped, kMinDb, kMaxDb, meterArea.getBottom(), meterArea.getY());
+            return juce::jmap(clamped, kMinDb, kMaxDb,
+                              meterBounds.getBottom(), meterBounds.getY());
         };
         const float tickDb[] { -60.0f, -48.0f, -36.0f, -24.0f, -12.0f, -6.0f, 0.0f, 6.0f };
         g.setColour(theme.grid.withAlpha(0.35f));
@@ -158,7 +157,7 @@ void MetersComponent::paint(juce::Graphics& g)
 
         juce::String labelText = formatDolbyLabel(label);
         const float labelScale = labelText.length() <= 2 ? 0.9f : 0.75f;
-        const float labelFont = juce::jlimit(6.0f, 11.0f, meterWidth * labelScale);
+        const float labelFont = juce::jlimit(6.0f, 11.0f, meterBounds.getWidth() * labelScale);
         g.setColour(theme.textMuted);
         g.setFont(labelFont);
         g.drawFittedText(labelText, meterBounds.toNearestInt().withHeight(14),
@@ -172,14 +171,12 @@ void MetersComponent::paint(juce::Graphics& g)
                 ? channelLabels[ch]
                 : ("Ch " + juce::String(ch + 1));
         const float x = startX + ch * (meterWidth + gap);
+        const auto meterBounds = juce::Rectangle<float>(x, meterArea.getY(),
+                                                        meterWidth, meterArea.getHeight());
         const float rmsValue = getSafeValue(rmsDb, ch, kMinDb);
         const float peakValue = getSafeValue(peakDb, ch, kMinDb);
         const float holdValue = getSafeValue(peakHoldDb, ch, peakValue);
-        drawMeter(x,
-                  rmsValue,
-                  peakValue,
-                  holdValue,
-                  label);
+        drawMeter(meterBounds, rmsValue, peakValue, holdValue, label);
     }
 
     float peakDbValue = kMinDb;

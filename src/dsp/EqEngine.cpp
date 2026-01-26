@@ -297,9 +297,21 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                 }
             }
 
-            const bool useMs = numChannels >= 2
-                && std::any_of(snapshot.msTargets.begin(), snapshot.msTargets.end(),
-                               [](int v) { return v != 0; });
+            // Linear-phase M/S is only applied to the front L/R pair.
+            bool useMs = false;
+            if (numChannels >= 2)
+            {
+                for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+                {
+                    const int target = snapshot.msTargets[band];
+                    if ((target == 1 || target == 2)
+                        && (snapshot.bandChannelMasks[band] & 0x3u) == 0x3u)
+                    {
+                        useMs = true;
+                        break;
+                    }
+                }
+            }
 
             if (useMs)
             {
@@ -971,7 +983,9 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int h
             if ((snapshot.bandChannelMasks[band] & (1u << static_cast<uint32_t>(ch))) == 0)
                 return false;
             const int target = snapshot.msTargets[band];
-            return target != 1 && target != 2 && target != 6;
+            const bool isMs = target == 1 || target == 2;
+            const bool isFrontPair = (snapshot.bandChannelMasks[band] & 0x3u) == 0x3u;
+            return ! isMs || ! isFrontPair;
         });
         ensureImpulseValid(impulse, "ch=" + juce::String(ch));
         linearPhaseEq.loadImpulse(ch, std::move(impulse), sampleRate);
@@ -981,13 +995,15 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int h
     {
         auto includeMid = [&](int band)
         {
-            const int target = snapshot.msTargets[band];
-            return target == 1 || target == 6;
+        const int target = snapshot.msTargets[band];
+        const bool isFrontPair = (snapshot.bandChannelMasks[band] & 0x3u) == 0x3u;
+        return isFrontPair && target == 1;
         };
         auto includeSide = [&](int band)
         {
-            const int target = snapshot.msTargets[band];
-            return target == 2;
+        const int target = snapshot.msTargets[band];
+        const bool isFrontPair = (snapshot.bandChannelMasks[band] & 0x3u) == 0x3u;
+        return isFrontPair && target == 2;
         };
         auto midImpulse = buildImpulse(0, includeMid);
         auto sideImpulse = buildImpulse(0, includeSide);

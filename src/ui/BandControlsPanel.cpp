@@ -21,45 +21,87 @@ const juce::StringArray kFilterTypeChoices {
 
 const juce::StringArray kMsChoices {
     "All",
-    "Mid",
-    "Side",
-    "Stereo",
-    "Left",
-    "Right",
-    "Mono",
+    "Stereo Front",
     "L",
     "R",
+    "Mid Front",
+    "Side Front",
     "C",
     "LFE",
+    "Stereo Rear",
     "Ls",
     "Rs",
+    "Mid Rear",
+    "Side Rear",
+    "Stereo Lateral",
     "Lrs",
     "Rrs",
-    "Lc",
-    "Rc",
-    "Ltf",
-    "Rtf",
-    "Tfc",
-    "Tm",
-    "Ltr",
-    "Rtr",
-    "Trc",
-    "Lts",
-    "Rts",
+    "Mid Lateral",
+    "Side Lateral",
+    "Cs",
+    "Stereo Front Wide",
     "Lw",
     "Rw",
-    "LFE2",
-    "Bfl",
-    "Bfr",
-    "Bfc",
-    "Ls/Rs",
-    "Lrs/Rrs",
-    "Lc/Rc",
-    "Ltf/Rtf",
-    "Ltr/Rtr",
-    "Lts/Rts",
-    "Lw/Rw",
-    "Bfl/Bfr"
+    "Mid Front Wide",
+    "Side Front Wide",
+    "Stereo Top Front",
+    "TFL",
+    "TFR",
+    "Mid Top Front",
+    "Side Top Front",
+    "Stereo Top Rear",
+    "TRL",
+    "TRR",
+    "Mid Top Rear",
+    "Side Top Rear",
+    "Stereo Top Middle",
+    "TML",
+    "TMR",
+    "Mid Top Middle",
+    "Side Top Middle"
+};
+
+enum MsChoiceIndex
+{
+    kMsAll = 0,
+    kMsStereoFront,
+    kMsLeft,
+    kMsRight,
+    kMsMidFront,
+    kMsSideFront,
+    kMsCentre,
+    kMsLfe,
+    kMsStereoRear,
+    kMsLs,
+    kMsRs,
+    kMsMidRear,
+    kMsSideRear,
+    kMsStereoLateral,
+    kMsLrs,
+    kMsRrs,
+    kMsMidLateral,
+    kMsSideLateral,
+    kMsCs,
+    kMsStereoFrontWide,
+    kMsLw,
+    kMsRw,
+    kMsMidFrontWide,
+    kMsSideFrontWide,
+    kMsStereoTopFront,
+    kMsTfl,
+    kMsTfr,
+    kMsMidTopFront,
+    kMsSideTopFront,
+    kMsStereoTopRear,
+    kMsTrl,
+    kMsTrr,
+    kMsMidTopRear,
+    kMsSideTopRear,
+    kMsStereoTopMiddle,
+    kMsTml,
+    kMsTmr,
+    kMsMidTopMiddle,
+    kMsSideTopMiddle
 };
 
 bool containsName(const std::vector<juce::String>& names, const juce::String& target)
@@ -688,8 +730,10 @@ void BandControlsPanel::paint(juce::Graphics& g)
     const auto bounds = getLocalBounds().toFloat();
     g.setColour(theme.panel);
     g.fillRoundedRectangle(bounds, 8.0f);
-    g.setColour(theme.panelOutline);
-    g.drawRoundedRectangle(bounds.reduced(0.5f), 8.0f, 1.0f);
+    const auto bandColour = ColorUtils::bandColour(selectedBand);
+    // Band frame follows the active band color.
+    g.setColour(bandColour.withAlpha(0.75f));
+    g.drawRoundedRectangle(bounds.reduced(0.5f), 8.0f, 1.2f);
 
     auto layout = getLocalBounds().reduced(kPanelPadding);
     auto left = layout.removeFromLeft(static_cast<int>(layout.getWidth() * 0.62f));
@@ -702,7 +746,6 @@ void BandControlsPanel::paint(juce::Graphics& g)
     left.removeFromTop(kGap);
     const auto comboRowArea = left.removeFromTop(kLabelHeight + kRowHeight);
 
-    const auto bandColour = ColorUtils::bandColour(selectedBand);
     const float glowAlpha = juce::jlimit(0.0f, 1.0f, selectedBandGlow);
     if (glowAlpha > 0.01f)
     {
@@ -712,7 +755,7 @@ void BandControlsPanel::paint(juce::Graphics& g)
 
     g.setColour(theme.panel.darker(0.25f).withAlpha(0.8f));
     g.fillRoundedRectangle(headerArea.toFloat(), 6.0f);
-    g.setColour(theme.panelOutline.withAlpha(0.7f));
+    g.setColour(bandColour.withAlpha(0.6f));
     g.drawRoundedRectangle(headerArea.toFloat(), 6.0f, 1.0f);
 
     if (titleLabel.getBounds().getWidth() > 0)
@@ -725,7 +768,7 @@ void BandControlsPanel::paint(juce::Graphics& g)
         g.drawEllipse(chip, 1.0f);
     }
 
-    g.setColour(theme.panelOutline.withAlpha(0.35f));
+    g.setColour(bandColour.withAlpha(0.35f));
     g.drawLine(static_cast<float>(bandRowArea.getX()),
                static_cast<float>(bandRowArea.getBottom() + 1),
                static_cast<float>(bandRowArea.getRight()),
@@ -1419,72 +1462,443 @@ void BandControlsPanel::updateMsChoices()
     msChoiceMap.clear();
     juce::StringArray labels;
 
-    const bool hasL = containsName(channelNames, "L");
-    const bool hasR = containsName(channelNames, "R");
-
-    auto addChoice = [&](int index)
+    auto addChoice = [&](int index, const juce::String& labelOverride = {})
     {
         msChoiceMap.push_back(index);
-        labels.add(kMsChoices[index]);
+        labels.add(labelOverride.isNotEmpty() ? labelOverride : kMsChoices[index]);
     };
 
-    addChoice(0); // All
-    if (hasL && hasR)
+    // The available routing choices depend on the exact channel order of the current layout.
+    auto matchesOrder = [&](std::initializer_list<juce::String> order)
     {
-        addChoice(1); // Mid
-        addChoice(2); // Side
-        addChoice(3); // L/R
-        addChoice(4); // Left
-        addChoice(5); // Right
-        addChoice(6); // Mono
-        addChoice(7); // L
-        addChoice(8); // R
+        if (channelNames.size() != order.size())
+            return false;
+        int index = 0;
+        for (const auto& name : order)
+        {
+            if (channelNames[static_cast<size_t>(index++)] != name)
+                return false;
+        }
+        return true;
+    };
+
+    enum class ChannelFormat
+    {
+        Mono,
+        Stereo,
+        TwoOne,
+        ThreeZero,
+        ThreeOne,
+        FourZero,
+        FourOne,
+        FiveZeroFilm,
+        FiveZeroMusic,
+        FiveOneFilm,
+        FiveOneMusic,
+        SixZeroFilm,
+        SixOneFilm,
+        SevenZeroFilm,
+        SevenOneFilm,
+        SevenOneMusic,
+        SevenOneTwo,
+        SevenOneFour,
+        NineOneSix,
+        Unknown
+    };
+
+    ChannelFormat format = ChannelFormat::Unknown;
+    if (matchesOrder({ "M" }) || matchesOrder({ "L" }) || matchesOrder({ "R" }))
+        format = ChannelFormat::Mono;
+    else if (matchesOrder({ "L", "R" }))
+        format = ChannelFormat::Stereo;
+    else if (matchesOrder({ "L", "R", "LFE" }))
+        format = ChannelFormat::TwoOne;
+    else if (matchesOrder({ "L", "R", "C" }))
+        format = ChannelFormat::ThreeZero;
+    else if (matchesOrder({ "L", "R", "C", "LFE" }))
+        format = ChannelFormat::ThreeOne;
+    else if (matchesOrder({ "L", "R", "Ls", "Rs" }))
+        format = ChannelFormat::FourZero;
+    else if (matchesOrder({ "L", "R", "LFE", "Ls", "Rs" }))
+        format = ChannelFormat::FourOne;
+    else if (matchesOrder({ "L", "R", "C", "Ls", "Rs" }))
+        format = ChannelFormat::FiveZeroFilm;
+    else if (matchesOrder({ "L", "R", "Ls", "Rs", "C" }))
+        format = ChannelFormat::FiveZeroMusic;
+    else if (matchesOrder({ "L", "R", "C", "LFE", "Ls", "Rs" }))
+        format = ChannelFormat::FiveOneFilm;
+    else if (matchesOrder({ "L", "R", "Ls", "Rs", "C", "LFE" }))
+        format = ChannelFormat::FiveOneMusic;
+    else if (matchesOrder({ "L", "R", "C", "Ls", "Rs", "Cs" }))
+        format = ChannelFormat::SixZeroFilm;
+    else if (matchesOrder({ "L", "R", "C", "LFE", "Ls", "Rs", "Cs" }))
+        format = ChannelFormat::SixOneFilm;
+    else if (matchesOrder({ "L", "R", "C", "Ls", "Rs", "Lrs", "Rrs" }))
+        format = ChannelFormat::SevenZeroFilm;
+    else if (matchesOrder({ "L", "R", "C", "LFE", "Ls", "Rs", "Lrs", "Rrs" }))
+        format = ChannelFormat::SevenOneFilm;
+    else if (matchesOrder({ "L", "R", "Ls", "Rs", "C", "LFE", "Lrs", "Rrs" }))
+        format = ChannelFormat::SevenOneMusic;
+    else if (matchesOrder({ "L", "R", "C", "LFE", "Ls", "Rs", "Lrs", "Rrs", "TFL", "TFR" }))
+        format = ChannelFormat::SevenOneTwo;
+    else if (matchesOrder({ "L", "R", "C", "LFE", "Ls", "Rs", "Lrs", "Rrs", "TFL", "TFR",
+                            "TRL", "TRR" }))
+        format = ChannelFormat::SevenOneFour;
+    else if (matchesOrder({ "L", "R", "C", "LFE", "Ls", "Rs", "Lrs", "Rrs", "Lw", "Rw",
+                            "TFL", "TFR", "TML", "TMR", "TRL", "TRR" }))
+        format = ChannelFormat::NineOneSix;
+
+    switch (format)
+    {
+        case ChannelFormat::Mono:
+            // Mono exposes only a single "M" target.
+            addChoice(kMsAll, "M");
+            break;
+        case ChannelFormat::Stereo:
+            // Stereo exposes M/S pair and individual channels.
+            addChoice(kMsAll, "ALL (STEREO)");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsMidFront, "MID");
+            addChoice(kMsSideFront, "SIDE");
+            break;
+        case ChannelFormat::TwoOne:
+            addChoice(kMsAll, "ALL (2.1)");
+            addChoice(kMsStereoFront, "STEREO");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsLfe, "LFE");
+            addChoice(kMsMidFront, "MID");
+            addChoice(kMsSideFront, "SIDE");
+            break;
+        case ChannelFormat::ThreeZero:
+            addChoice(kMsAll, "ALL (3.0)");
+            addChoice(kMsStereoFront, "STEREO");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsMidFront, "MID");
+            addChoice(kMsSideFront, "SIDE");
+            break;
+        case ChannelFormat::ThreeOne:
+            addChoice(kMsAll, "ALL (3.1)");
+            addChoice(kMsStereoFront, "STEREO");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsLfe, "LFE");
+            addChoice(kMsMidFront, "MID");
+            addChoice(kMsSideFront, "SIDE");
+            break;
+        case ChannelFormat::FourZero:
+            addChoice(kMsAll, "ALL (4.0)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            addChoice(kMsSideFront, "SIDE FRONT");
+            addChoice(kMsSideRear, "SIDE REAR");
+            break;
+        case ChannelFormat::FourOne:
+            addChoice(kMsAll, "ALL (4.1)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsLfe, "LFE");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            addChoice(kMsSideFront, "SIDE FRONT");
+            addChoice(kMsSideRear, "SIDE REAR");
+            break;
+        case ChannelFormat::FiveZeroFilm:
+            addChoice(kMsAll, "ALL (5.0)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            break;
+        case ChannelFormat::FiveZeroMusic:
+            addChoice(kMsAll, "ALL (5.0)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            addChoice(kMsSideFront, "SIDE FRONT");
+            addChoice(kMsSideRear, "SIDE REAR");
+            break;
+        case ChannelFormat::FiveOneFilm:
+            addChoice(kMsAll, "ALL (5.1)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsLfe, "LFE");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            addChoice(kMsSideFront, "SIDE FRONT");
+            addChoice(kMsSideRear, "SIDE REAR");
+            break;
+        case ChannelFormat::FiveOneMusic:
+            addChoice(kMsAll, "ALL (5.1)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsLfe, "LFE");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            addChoice(kMsSideFront, "SIDE FRONT");
+            addChoice(kMsSideRear, "SIDE REAR");
+            break;
+        case ChannelFormat::SixZeroFilm:
+            addChoice(kMsAll, "ALL (6.0)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsCs, "Cs");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            addChoice(kMsSideFront, "SIDE FRONT");
+            addChoice(kMsSideRear, "SIDE REAR");
+            break;
+        case ChannelFormat::SixOneFilm:
+            addChoice(kMsAll, "ALL (6.1)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsLfe, "LFE");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsCs, "Cs");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            addChoice(kMsSideFront, "SIDE FRONT");
+            addChoice(kMsSideRear, "SIDE REAR");
+            break;
+        case ChannelFormat::SevenZeroFilm:
+            addChoice(kMsAll, "ALL (7.0)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsStereoLateral, "STEREO LATERAL");
+            addChoice(kMsLrs, "Lrs");
+            addChoice(kMsRrs, "Rrs");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            addChoice(kMsMidLateral, "MID LATERAL");
+            addChoice(kMsSideFront, "SIDE FRONT");
+            addChoice(kMsSideRear, "SIDE REAR");
+            addChoice(kMsSideLateral, "SIDE LATERAL");
+            break;
+        case ChannelFormat::SevenOneFilm:
+            addChoice(kMsAll, "ALL (7.1)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsLfe, "LFE");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsStereoLateral, "STEREO LATERAL");
+            addChoice(kMsLrs, "Lrs");
+            addChoice(kMsRrs, "Rrs");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            addChoice(kMsMidLateral, "MID LATERAL");
+            break;
+        case ChannelFormat::SevenOneMusic:
+            addChoice(kMsAll, "ALL (7.1)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsLfe, "LFE");
+            addChoice(kMsStereoLateral, "STEREO LATERAL");
+            addChoice(kMsLrs, "Lrs");
+            addChoice(kMsRrs, "Rrs");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            addChoice(kMsMidLateral, "MID LATERAL");
+            addChoice(kMsSideFront, "SIDE FRONT");
+            addChoice(kMsSideRear, "SIDE REAR");
+            addChoice(kMsSideLateral, "SIDE LATERAL");
+            break;
+        case ChannelFormat::SevenOneTwo:
+            addChoice(kMsAll, "ALL (7.1.2)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsLfe, "LFE");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsStereoLateral, "STEREO LATERAL");
+            addChoice(kMsLrs, "Lrs");
+            addChoice(kMsRrs, "Rrs");
+            addChoice(kMsStereoTopFront, "STEREO TOP FRONT");
+            addChoice(kMsTfl, "Top Front Left (TFL)");
+            addChoice(kMsTfr, "Top Front Right (TFR)");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            addChoice(kMsMidLateral, "MID LATERAL");
+            addChoice(kMsMidTopFront, "MID TOP FRONT");
+            addChoice(kMsSideFront, "SIDE FRONT");
+            addChoice(kMsSideRear, "SIDE REAR");
+            addChoice(kMsSideLateral, "SIDE LATERAL");
+            addChoice(kMsSideTopFront, "SIDE TOP FRONT");
+            break;
+        case ChannelFormat::SevenOneFour:
+            addChoice(kMsAll, "ALL (7.1.4)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsLfe, "LFE");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsStereoLateral, "STEREO LATERAL");
+            addChoice(kMsLrs, "Lrs");
+            addChoice(kMsRrs, "Rrs");
+            addChoice(kMsStereoTopFront, "STEREO TOP FRONT");
+            addChoice(kMsTfl, "Top Front Left (TFL)");
+            addChoice(kMsTfr, "Top Front Right (TFR)");
+            addChoice(kMsStereoTopRear, "STEREO TOP REAR");
+            addChoice(kMsTrl, "Top Rear Left (TRL)");
+            addChoice(kMsTrr, "Top Rear Right (TRR)");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            addChoice(kMsMidLateral, "MID LATERAL");
+            addChoice(kMsMidTopFront, "MID TOP FRONT");
+            addChoice(kMsSideFront, "SIDE FRONT");
+            addChoice(kMsSideRear, "SIDE REAR");
+            addChoice(kMsSideLateral, "SIDE LATERAL");
+            addChoice(kMsSideTopFront, "SIDE TOP FRONT");
+            break;
+        case ChannelFormat::NineOneSix:
+            // Atmos 9.1.6 exposes front/rear/lateral/wide and top pairs.
+            addChoice(kMsAll, "ALL (9.1.6)");
+            addChoice(kMsStereoFront, "STEREO FRONT");
+            addChoice(kMsLeft, "L");
+            addChoice(kMsRight, "R");
+            addChoice(kMsCentre, "C");
+            addChoice(kMsLfe, "LFE");
+            addChoice(kMsStereoRear, "STEREO REAR");
+            addChoice(kMsLs, "Ls");
+            addChoice(kMsRs, "Rs");
+            addChoice(kMsStereoLateral, "STEREO LATERAL");
+            addChoice(kMsLrs, "Lrs");
+            addChoice(kMsRrs, "Rrs");
+            addChoice(kMsStereoFrontWide, "STEREO FRONT WIDE");
+            addChoice(kMsLw, "Front Wide Left (Lw)");
+            addChoice(kMsRw, "Front Wide Right (Rw)");
+            addChoice(kMsStereoTopFront, "STEREO TOP FRONT");
+            addChoice(kMsTfl, "Top Front Left");
+            addChoice(kMsTfr, "Top Front Right");
+            addChoice(kMsStereoTopMiddle, "STEREO TOP MIDDLE");
+            addChoice(kMsTml, "Top Middle Left");
+            addChoice(kMsTmr, "Top Middle Right");
+            addChoice(kMsStereoTopRear, "STEREO TOP REAR");
+            addChoice(kMsTrl, "Top Rear Left");
+            addChoice(kMsTrr, "Top Rear Right");
+            addChoice(kMsMidFront, "MID FRONT");
+            addChoice(kMsMidRear, "MID REAR");
+            addChoice(kMsMidLateral, "MID LATERAL");
+            addChoice(kMsMidFrontWide, "MID FRONT WIDE");
+            addChoice(kMsMidTopFront, "MID TOP FRONT");
+            addChoice(kMsMidTopRear, "MID TOP REAR");
+            addChoice(kMsMidTopMiddle, "MID TOP MIDDLE");
+            addChoice(kMsSideFront, "SIDE FRONT");
+            addChoice(kMsSideRear, "SIDE REAR");
+            addChoice(kMsSideLateral, "SIDE LATERAL");
+            addChoice(kMsSideFrontWide, "SIDE FRONT WIDE");
+            addChoice(kMsSideTopFront, "SIDE TOP FRONT");
+            addChoice(kMsSideTopRear, "SIDE TOP REAR");
+            addChoice(kMsSideTopMiddle, "SIDE TOP MIDDLE");
+            break;
+        case ChannelFormat::Unknown:
+        default:
+        {
+            addChoice(kMsAll);
+
+            auto addIfPresent = [&](int index, const juce::String& name)
+            {
+                if (containsName(channelNames, name))
+                    addChoice(index);
+            };
+
+            auto addPairIfPresent = [&](int index, const juce::String& left, const juce::String& right,
+                                        const juce::String& label)
+            {
+                if (containsName(channelNames, left) && containsName(channelNames, right))
+                    addChoice(index, label);
+            };
+
+            addPairIfPresent(kMsStereoFront, "L", "R", "STEREO");
+            addIfPresent(kMsLeft, "L");
+            addIfPresent(kMsRight, "R");
+            addIfPresent(kMsCentre, "C");
+            addIfPresent(kMsLfe, "LFE");
+            addIfPresent(kMsLs, "Ls");
+            addIfPresent(kMsRs, "Rs");
+            addIfPresent(kMsLrs, "Lrs");
+            addIfPresent(kMsRrs, "Rrs");
+            addIfPresent(kMsCs, "Cs");
+            addIfPresent(kMsLw, "Lw");
+            addIfPresent(kMsRw, "Rw");
+            addIfPresent(kMsTfl, "TFL");
+            addIfPresent(kMsTfr, "TFR");
+            addIfPresent(kMsTrl, "TRL");
+            addIfPresent(kMsTrr, "TRR");
+            addIfPresent(kMsTml, "TML");
+            addIfPresent(kMsTmr, "TMR");
+            addPairIfPresent(kMsStereoRear, "Ls", "Rs", "STEREO REAR");
+            addPairIfPresent(kMsStereoLateral, "Lrs", "Rrs", "STEREO LATERAL");
+            addPairIfPresent(kMsStereoFrontWide, "Lw", "Rw", "STEREO FRONT WIDE");
+            addPairIfPresent(kMsStereoTopFront, "TFL", "TFR", "STEREO TOP FRONT");
+            addPairIfPresent(kMsStereoTopRear, "TRL", "TRR", "STEREO TOP REAR");
+            addPairIfPresent(kMsStereoTopMiddle, "TML", "TMR", "STEREO TOP MIDDLE");
+            break;
+        }
     }
-
-    auto addIfPresent = [&](int index, const juce::String& name)
-    {
-        if (containsName(channelNames, name))
-            addChoice(index);
-    };
-
-    addIfPresent(9, "C");
-    addIfPresent(10, "LFE");
-    addIfPresent(11, "Ls");
-    addIfPresent(12, "Rs");
-    addIfPresent(13, "Lrs");
-    addIfPresent(14, "Rrs");
-    addIfPresent(15, "Lc");
-    addIfPresent(16, "Rc");
-    addIfPresent(17, "Ltf");
-    addIfPresent(18, "Rtf");
-    addIfPresent(19, "Tfc");
-    addIfPresent(20, "Tm");
-    addIfPresent(21, "Ltr");
-    addIfPresent(22, "Rtr");
-    addIfPresent(23, "Trc");
-    addIfPresent(24, "Lts");
-    addIfPresent(25, "Rts");
-    addIfPresent(26, "Lw");
-    addIfPresent(27, "Rw");
-    addIfPresent(28, "LFE2");
-    addIfPresent(29, "Bfl");
-    addIfPresent(30, "Bfr");
-    addIfPresent(31, "Bfc");
-
-    auto addPairIfPresent = [&](int index, const juce::String& left, const juce::String& right)
-    {
-        if (containsName(channelNames, left) && containsName(channelNames, right))
-            addChoice(index);
-    };
-
-    addPairIfPresent(32, "Ls", "Rs");
-    addPairIfPresent(33, "Lrs", "Rrs");
-    addPairIfPresent(34, "Lc", "Rc");
-    addPairIfPresent(35, "Ltf", "Rtf");
-    addPairIfPresent(36, "Ltr", "Rtr");
-    addPairIfPresent(37, "Lts", "Rts");
-    addPairIfPresent(38, "Lw", "Rw");
-    addPairIfPresent(39, "Bfl", "Bfr");
 
     msBox.clear(juce::dontSendNotification);
     msBox.addItemList(labels, 1);

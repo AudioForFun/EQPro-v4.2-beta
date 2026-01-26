@@ -306,8 +306,7 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
             const auto* in = scratchBuffer.getReadPointer(ch);
             for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
             {
-                const int target = (ch < 2) ? msTargets[band] : 0;
-                const int paramSource = (target == 0 || target == 3) ? 0 : ch;
+                const int paramSource = ch;
                 if (! cachedParams[paramSource][band].solo)
                     continue;
                 if ((bandChannelMasks[band] & (1u << static_cast<uint32_t>(ch))) == 0)
@@ -405,307 +404,278 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
 
     if (useMs)
     {
-        bool anyExternalMs = false;
-        if (externalAvailable)
+        // Build M/S processing groups for each stereo pair selection in the layout.
+        struct MsPairGroup
         {
-            for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+            int left = -1;
+            int right = -1;
+            bool useExternal = false;
+            std::vector<int> bands;
+        };
+
+        std::vector<MsPairGroup> pairGroups;
+        pairGroups.reserve(4);
+
+        auto findPairFromMask = [&](uint32_t mask) -> std::pair<int, int>
+        {
+            int first = -1;
+            int second = -1;
+            for (int ch = 0; ch < numChannels; ++ch)
             {
-                if (cachedParams[0][band].useExternalDetector)
+                if ((mask & (1u << static_cast<uint32_t>(ch))) == 0)
+                    continue;
+                if (first < 0)
+                    first = ch;
+                else
                 {
-                    anyExternalMs = true;
+                    second = ch;
                     break;
                 }
             }
-        }
+            if (first >= 0 && second >= 0 && first > second)
+                std::swap(first, second);
+            return { first, second };
+        };
 
-        auto* mid = msBuffer.getWritePointer(0);
-        auto* side = msBuffer.getWritePointer(1);
-        auto* left = buffer.getWritePointer(0);
-        auto* right = buffer.getWritePointer(1);
-
-        juce::FloatVectorOperations::copy(mid, left, samples);
-        juce::FloatVectorOperations::add(mid, right, samples);
-        juce::FloatVectorOperations::multiply(mid, 0.5f, samples);
-        juce::FloatVectorOperations::copy(side, left, samples);
-        juce::FloatVectorOperations::subtract(side, right, samples);
-        juce::FloatVectorOperations::multiply(side, 0.5f, samples);
-
-        juce::FloatVectorOperations::copy(msDryBuffer.getWritePointer(0), mid, samples);
-        juce::FloatVectorOperations::copy(msDryBuffer.getWritePointer(1), side, samples);
-
-        if (anyExternalMs)
+        auto addPairGroup = [&](int left, int right, int band, bool useExternal)
         {
-            auto* detMid = detectorMsBuffer.getWritePointer(0);
-            auto* detSide = detectorMsBuffer.getWritePointer(1);
-            const auto* detLeft = detectorBuffer->getReadPointer(0);
-            const auto* detRight = detectorBuffer->getReadPointer(
-                juce::jmin(1, detectorBuffer->getNumChannels() - 1));
-            juce::FloatVectorOperations::copy(detMid, detLeft, samples);
-            juce::FloatVectorOperations::add(detMid, detRight, samples);
-            juce::FloatVectorOperations::multiply(detMid, 0.5f, samples);
-            juce::FloatVectorOperations::copy(detSide, detLeft, samples);
-            juce::FloatVectorOperations::subtract(detSide, detRight, samples);
-            juce::FloatVectorOperations::multiply(detSide, 0.5f, samples);
-        }
+            for (auto& group : pairGroups)
+            {
+                if (group.left == left && group.right == right)
+                {
+                    group.bands.push_back(band);
+                    group.useExternal = group.useExternal || useExternal;
+                    return;
+                }
+            }
+            MsPairGroup group;
+            group.left = left;
+            group.right = right;
+            group.useExternal = useExternal;
+            group.bands.push_back(band);
+            pairGroups.push_back(std::move(group));
+        };
 
         for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
         {
-            if (cachedParams[0][band].bypassed)
-                continue;
-            if ((bandChannelMasks[band] & 0x3u) == 0)
-                continue;
-
             const int target = msTargets[band];
-            if (target == 3 || target == 4)
+            if (target != 1 && target != 2)
                 continue;
-            auto params = cachedParams[0][band];
-            const bool bandUseExternal = externalAvailable && params.useExternalDetector;
-            const bool isHpLp = params.type == FilterType::lowPass || params.type == FilterType::highPass;
-            const bool isTilt = params.type == FilterType::tilt || params.type == FilterType::flatTilt;
-            const float tiltQ = (params.type == FilterType::flatTilt) ? 0.5f : -1.0f;
-            const auto slopeConfig = slopeFromDb(params.slopeDb);
-            smoothFreq[0][band].skip(samples);
-            smoothGain[0][band].skip(samples);
-            smoothQ[0][band].skip(samples);
-            smoothMix[0][band].skip(samples);
-            smoothDynThresh[0][band].skip(samples);
-            params.frequencyHz = smoothFreq[0][band].getCurrentValue();
-            params.gainDb = smoothGain[0][band].getCurrentValue();
-            params.q = smoothQ[0][band].getCurrentValue();
-            params.mix = smoothMix[0][band].getCurrentValue();
-            params.thresholdDb = smoothDynThresh[0][band].getCurrentValue();
-            params.q = applyQMode(params);
-            params.dynamicEnabled = false;
-            const float mix = juce::jlimit(0.0f, 1.0f, params.mix);
-            const float staticGainDb = params.gainDb;
-
-            const float scale = params.autoScale
-                ? juce::jlimit(0.25f, 4.0f, params.frequencyHz / 1000.0f)
-                : 1.0f;
-            const float attackMs = juce::jmax(0.1f, params.attackMs * scale);
-            const float releaseMs = juce::jmax(0.1f, params.releaseMs * scale);
-            const float attackCoeff = std::exp(-1.0f / (attackMs * 0.001f * static_cast<float>(sampleRateHz)));
-            const float releaseCoeff = std::exp(-1.0f / (releaseMs * 0.001f * static_cast<float>(sampleRateHz)));
-
-            BandParams detectorParams = params;
-            detectorParams.type = FilterType::bandPass;
-            detectorParams.gainDb = 0.0f;
-            detectorFilters[0][band].update(detectorParams);
-            detectorFilters[1][band].update(detectorParams);
-
-            const int stages = isTilt ? 2 : (isHpLp ? slopeConfig.stages : 1);
-            const bool isSixDb = isHpLp && slopeConfig.stages == 0 && slopeConfig.useOnePole;
-            const float resonanceMix = isSixDb
-                ? juce::jlimit(0.0f, 0.8f, (params.q - 0.707f) / 6.0f)
-                : 0.0f;
-
-            if (isTilt)
-            {
-                const auto lowParams = makeTiltParams(params, false, tiltQ);
-                const auto highParams = makeTiltParams(params, true, tiltQ);
-                msFilters[0][band][0].update(lowParams);
-                msFilters[0][band][1].update(highParams);
-                msFilters[1][band][0].update(lowParams);
-                msFilters[1][band][1].update(highParams);
-            }
-            else
-            {
-                for (int stage = 0; stage < stages; ++stage)
-                {
-                    msFilters[0][band][stage].update(params);
-                    msFilters[1][band][stage].update(params);
-                }
-            }
-            if (resonanceMix > 0.0f)
-            {
-                BandParams resParams = params;
-                resParams.type = FilterType::bandPass;
-                resParams.gainDb = 0.0f;
-                msFilters[0][band][0].update(resParams);
-                msFilters[1][band][0].update(resParams);
-            }
-
-            if (target == 0)
-            {
-                dynamicGainDb[0][band].store(0.0f);
-                if (isHpLp && slopeConfig.useOnePole)
-                {
-                    msOnePoles[0][band].setLowPass(params.frequencyHz);
-                    msOnePoles[1][band].setLowPass(params.frequencyHz);
-                    if (params.type == FilterType::highPass)
-                    {
-                        msOnePoles[0][band].setHighPass(params.frequencyHz);
-                        msOnePoles[1][band].setHighPass(params.frequencyHz);
-                    }
-                }
-
-                const auto* dryMid = msDryBuffer.getReadPointer(0);
-                const auto* drySide = msDryBuffer.getReadPointer(1);
-                for (int i = 0; i < samples; ++i)
-                {
-                    const float dryM = dryMid[i];
-                    const float dryS = drySide[i];
-                    float m = dryM;
-                    float s = dryS;
-                    float resM = 0.0f;
-                    float resS = 0.0f;
-                    if (resonanceMix > 0.0f)
-                    {
-                        resM = msFilters[0][band][0].processSample(dryM);
-                        resS = msFilters[1][band][0].processSample(dryS);
-                    }
-
-                    const float detM = bandUseExternal
-                        ? detectorMsBuffer.getReadPointer(0)[i]
-                        : dryM;
-                    const float detS = bandUseExternal
-                        ? detectorMsBuffer.getReadPointer(1)[i]
-                        : dryS;
-                    const float detInput = (target == 2) ? detS : detM;
-                    const float detSample = (target == 2)
-                        ? detectorFilters[1][band].processSample(detInput)
-                        : detectorFilters[0][band].processSample(detInput);
-                    const float detDb = updateDetector(0, band, detSample,
-                                                       attackCoeff, releaseCoeff,
-                                                       params.frequencyHz);
-
-                    if (isHpLp && slopeConfig.useOnePole)
-                    {
-                        m = msOnePoles[0][band].processSample(m);
-                        s = msOnePoles[1][band].processSample(s);
-                    }
-
-                    for (int stage = 0; stage < stages; ++stage)
-                    {
-                        m = msFilters[0][band][stage].processSample(m);
-                        s = msFilters[1][band][stage].processSample(s);
-                    }
-                    if (resonanceMix > 0.0f)
-                    {
-                        m += resM * resonanceMix;
-                        s += resS * resonanceMix;
-                    }
-
-                    if (params.dynamicEnabled)
-                    {
-                        const float dynamicGainDb = computeDynamicGain(params, detDb);
-                        const float deltaDb = dynamicGainDb - staticGainDb;
-                        const float deltaGain = juce::Decibels::decibelsToGain(deltaDb);
-                        m = dryM + (m - dryM) * deltaGain;
-                        s = dryS + (s - dryS) * deltaGain;
-                        this->dynamicGainDb[0][band].store(deltaDb);
-                    }
-
-                    const float mDelta = (m - dryM) * mix;
-                    const float sDelta = (s - dryS) * mix;
-                    mid[i] += mDelta;
-                    side[i] += sDelta;
-                }
-            }
-            else if (target == 1)
-            {
-                dynamicGainDb[0][band].store(0.0f);
-                if (isHpLp && slopeConfig.useOnePole)
-                {
-                    if (params.type == FilterType::lowPass)
-                        msOnePoles[0][band].setLowPass(params.frequencyHz);
-                    else
-                        msOnePoles[0][band].setHighPass(params.frequencyHz);
-                }
-
-                const auto* dryMid = msDryBuffer.getReadPointer(0);
-                for (int i = 0; i < samples; ++i)
-                {
-                    const float dryM = dryMid[i];
-                    float m = dryM;
-                    float resM = 0.0f;
-                    if (resonanceMix > 0.0f)
-                        resM = msFilters[0][band][0].processSample(dryM);
-                    const float detInput = bandUseExternal
-                        ? detectorMsBuffer.getReadPointer(0)[i]
-                        : dryM;
-                    const float detSample = detectorFilters[0][band].processSample(detInput);
-                    const float detDb = updateDetector(0, band, detSample,
-                                                       attackCoeff, releaseCoeff,
-                                                       params.frequencyHz);
-                    if (isHpLp && slopeConfig.useOnePole)
-                        m = msOnePoles[0][band].processSample(m);
-
-                    for (int stage = 0; stage < stages; ++stage)
-                    {
-                        m = msFilters[0][band][stage].processSample(m);
-                    }
-                    if (resonanceMix > 0.0f)
-                        m += resM * resonanceMix;
-
-                    if (params.dynamicEnabled)
-                    {
-                        const float dynamicGainDb = computeDynamicGain(params, detDb);
-                        const float deltaDb = dynamicGainDb - staticGainDb;
-                        const float deltaGain = juce::Decibels::decibelsToGain(deltaDb);
-                        m = dryM + (m - dryM) * deltaGain;
-                        this->dynamicGainDb[0][band].store(deltaDb);
-                    }
-
-                    const float mDelta = (m - dryM) * mix;
-                    mid[i] += mDelta;
-                }
-            }
-            else if (target == 2)
-            {
-                dynamicGainDb[1][band].store(0.0f);
-                if (isHpLp && slopeConfig.useOnePole)
-                {
-                    if (params.type == FilterType::lowPass)
-                        msOnePoles[1][band].setLowPass(params.frequencyHz);
-                    else
-                        msOnePoles[1][band].setHighPass(params.frequencyHz);
-                }
-
-                const auto* drySide = msDryBuffer.getReadPointer(1);
-                for (int i = 0; i < samples; ++i)
-                {
-                    const float dryS = drySide[i];
-                    float s = dryS;
-                    float resS = 0.0f;
-                    if (resonanceMix > 0.0f)
-                        resS = msFilters[1][band][0].processSample(dryS);
-                    const float detInput = bandUseExternal
-                        ? detectorMsBuffer.getReadPointer(1)[i]
-                        : dryS;
-                    const float detSample = detectorFilters[1][band].processSample(detInput);
-                    const float detDb = updateDetector(1, band, detSample,
-                                                       attackCoeff, releaseCoeff,
-                                                       params.frequencyHz);
-                    if (isHpLp && slopeConfig.useOnePole)
-                        s = msOnePoles[1][band].processSample(s);
-
-                    for (int stage = 0; stage < stages; ++stage)
-                    {
-                        s = msFilters[1][band][stage].processSample(s);
-                    }
-                    if (resonanceMix > 0.0f)
-                        s += resS * resonanceMix;
-
-                    if (params.dynamicEnabled)
-                    {
-                        const float dynamicGainDb = computeDynamicGain(params, detDb);
-                        const float deltaDb = dynamicGainDb - staticGainDb;
-                        const float deltaGain = juce::Decibels::decibelsToGain(deltaDb);
-                        s = dryS + (s - dryS) * deltaGain;
-                        this->dynamicGainDb[1][band].store(deltaDb);
-                    }
-
-                    const float sDelta = (s - dryS) * mix;
-                    side[i] += sDelta;
-                }
-            }
+            const auto pair = findPairFromMask(bandChannelMasks[band]);
+            if (pair.first < 0 || pair.second < 0)
+                continue;
+            const bool bandUseExternal = externalAvailable && cachedParams[pair.first][band].useExternalDetector;
+            addPairGroup(pair.first, pair.second, band, bandUseExternal);
         }
 
-        juce::FloatVectorOperations::copy(left, mid, samples);
-        juce::FloatVectorOperations::add(left, side, samples);
-        juce::FloatVectorOperations::copy(right, mid, samples);
-        juce::FloatVectorOperations::subtract(right, side, samples);
+        for (const auto& group : pairGroups)
+        {
+            // Process each selected stereo pair independently in M/S.
+            auto* mid = msBuffer.getWritePointer(0);
+            auto* side = msBuffer.getWritePointer(1);
+            auto* left = buffer.getWritePointer(group.left);
+            auto* right = buffer.getWritePointer(group.right);
+
+            juce::FloatVectorOperations::copy(mid, left, samples);
+            juce::FloatVectorOperations::add(mid, right, samples);
+            juce::FloatVectorOperations::multiply(mid, 0.5f, samples);
+            juce::FloatVectorOperations::copy(side, left, samples);
+            juce::FloatVectorOperations::subtract(side, right, samples);
+            juce::FloatVectorOperations::multiply(side, 0.5f, samples);
+
+            juce::FloatVectorOperations::copy(msDryBuffer.getWritePointer(0), mid, samples);
+            juce::FloatVectorOperations::copy(msDryBuffer.getWritePointer(1), side, samples);
+
+            if (group.useExternal)
+            {
+                auto* detMid = detectorMsBuffer.getWritePointer(0);
+                auto* detSide = detectorMsBuffer.getWritePointer(1);
+                const auto* detLeft = detectorBuffer->getReadPointer(group.left);
+                const auto* detRight = detectorBuffer->getReadPointer(group.right);
+                juce::FloatVectorOperations::copy(detMid, detLeft, samples);
+                juce::FloatVectorOperations::add(detMid, detRight, samples);
+                juce::FloatVectorOperations::multiply(detMid, 0.5f, samples);
+                juce::FloatVectorOperations::copy(detSide, detLeft, samples);
+                juce::FloatVectorOperations::subtract(detSide, detRight, samples);
+                juce::FloatVectorOperations::multiply(detSide, 0.5f, samples);
+            }
+
+            for (int band : group.bands)
+            {
+                const int target = msTargets[band];
+                if (target != 1 && target != 2)
+                    continue;
+                auto params = cachedParams[group.left][band];
+                if (params.bypassed)
+                    continue;
+
+                const bool bandUseExternal = externalAvailable && params.useExternalDetector;
+                const bool isHpLp = params.type == FilterType::lowPass || params.type == FilterType::highPass;
+                const bool isTilt = params.type == FilterType::tilt || params.type == FilterType::flatTilt;
+                const float tiltQ = (params.type == FilterType::flatTilt) ? 0.5f : -1.0f;
+                const auto slopeConfig = slopeFromDb(params.slopeDb);
+                smoothFreq[group.left][band].skip(samples);
+                smoothGain[group.left][band].skip(samples);
+                smoothQ[group.left][band].skip(samples);
+                smoothMix[group.left][band].skip(samples);
+                smoothDynThresh[group.left][band].skip(samples);
+                params.frequencyHz = smoothFreq[group.left][band].getCurrentValue();
+                params.gainDb = smoothGain[group.left][band].getCurrentValue();
+                params.q = smoothQ[group.left][band].getCurrentValue();
+                params.mix = smoothMix[group.left][band].getCurrentValue();
+                params.thresholdDb = smoothDynThresh[group.left][band].getCurrentValue();
+                params.q = applyQMode(params);
+                params.dynamicEnabled = false;
+                const float mix = juce::jlimit(0.0f, 1.0f, params.mix);
+                const float staticGainDb = params.gainDb;
+
+                const float scale = params.autoScale
+                    ? juce::jlimit(0.25f, 4.0f, params.frequencyHz / 1000.0f)
+                    : 1.0f;
+                const float attackMs = juce::jmax(0.1f, params.attackMs * scale);
+                const float releaseMs = juce::jmax(0.1f, params.releaseMs * scale);
+                const float attackCoeff = std::exp(-1.0f / (attackMs * 0.001f * static_cast<float>(sampleRateHz)));
+                const float releaseCoeff = std::exp(-1.0f / (releaseMs * 0.001f * static_cast<float>(sampleRateHz)));
+
+                BandParams detectorParams = params;
+                detectorParams.type = FilterType::bandPass;
+                detectorParams.gainDb = 0.0f;
+                detectorFilters[0][band].update(detectorParams);
+                detectorFilters[1][band].update(detectorParams);
+
+                const int stages = isTilt ? 2 : (isHpLp ? slopeConfig.stages : 1);
+                const bool isSixDb = isHpLp && slopeConfig.stages == 0 && slopeConfig.useOnePole;
+                const float resonanceMix = isSixDb
+                    ? juce::jlimit(0.0f, 0.8f, (params.q - 0.707f) / 6.0f)
+                    : 0.0f;
+
+                if (isTilt)
+                {
+                    const auto lowParams = makeTiltParams(params, false, tiltQ);
+                    const auto highParams = makeTiltParams(params, true, tiltQ);
+                    msFilters[0][band][0].update(lowParams);
+                    msFilters[0][band][1].update(highParams);
+                    msFilters[1][band][0].update(lowParams);
+                    msFilters[1][band][1].update(highParams);
+                }
+                else
+                {
+                    for (int stage = 0; stage < stages; ++stage)
+                    {
+                        msFilters[0][band][stage].update(params);
+                        msFilters[1][band][stage].update(params);
+                    }
+                }
+                if (resonanceMix > 0.0f)
+                {
+                    BandParams resParams = params;
+                    resParams.type = FilterType::bandPass;
+                    resParams.gainDb = 0.0f;
+                    msFilters[0][band][0].update(resParams);
+                    msFilters[1][band][0].update(resParams);
+                }
+
+                if (target == 1)
+                {
+                    dynamicGainDb[0][band].store(0.0f);
+                    if (isHpLp && slopeConfig.useOnePole)
+                    {
+                        if (params.type == FilterType::lowPass)
+                            msOnePoles[0][band].setLowPass(params.frequencyHz);
+                        else
+                            msOnePoles[0][band].setHighPass(params.frequencyHz);
+                    }
+
+                    const auto* dryMid = msDryBuffer.getReadPointer(0);
+                    for (int i = 0; i < samples; ++i)
+                    {
+                        const float dryM = dryMid[i];
+                        float m = dryM;
+                        float resM = 0.0f;
+                        if (resonanceMix > 0.0f)
+                            resM = msFilters[0][band][0].processSample(dryM);
+                        const float detInput = bandUseExternal
+                            ? detectorMsBuffer.getReadPointer(0)[i]
+                            : dryM;
+                        const float detSample = detectorFilters[0][band].processSample(detInput);
+                        const float detDb = updateDetector(0, band, detSample,
+                                                           attackCoeff, releaseCoeff,
+                                                           params.frequencyHz);
+                        if (isHpLp && slopeConfig.useOnePole)
+                            m = msOnePoles[0][band].processSample(m);
+
+                        for (int stage = 0; stage < stages; ++stage)
+                            m = msFilters[0][band][stage].processSample(m);
+                        if (resonanceMix > 0.0f)
+                            m += resM * resonanceMix;
+
+                        if (params.dynamicEnabled)
+                        {
+                            const float dynamicGainDb = computeDynamicGain(params, detDb);
+                            const float deltaDb = dynamicGainDb - staticGainDb;
+                            const float deltaGain = juce::Decibels::decibelsToGain(deltaDb);
+                            m = dryM + (m - dryM) * deltaGain;
+                            this->dynamicGainDb[0][band].store(deltaDb);
+                        }
+
+                        const float mDelta = (m - dryM) * mix;
+                        mid[i] += mDelta;
+                    }
+                }
+                else if (target == 2)
+                {
+                    dynamicGainDb[1][band].store(0.0f);
+                    if (isHpLp && slopeConfig.useOnePole)
+                    {
+                        if (params.type == FilterType::lowPass)
+                            msOnePoles[1][band].setLowPass(params.frequencyHz);
+                        else
+                            msOnePoles[1][band].setHighPass(params.frequencyHz);
+                    }
+
+                    const auto* drySide = msDryBuffer.getReadPointer(1);
+                    for (int i = 0; i < samples; ++i)
+                    {
+                        const float dryS = drySide[i];
+                        float s = dryS;
+                        float resS = 0.0f;
+                        if (resonanceMix > 0.0f)
+                            resS = msFilters[1][band][0].processSample(dryS);
+                        const float detInput = bandUseExternal
+                            ? detectorMsBuffer.getReadPointer(1)[i]
+                            : dryS;
+                        const float detSample = detectorFilters[1][band].processSample(detInput);
+                        const float detDb = updateDetector(1, band, detSample,
+                                                           attackCoeff, releaseCoeff,
+                                                           params.frequencyHz);
+                        if (isHpLp && slopeConfig.useOnePole)
+                            s = msOnePoles[1][band].processSample(s);
+
+                        for (int stage = 0; stage < stages; ++stage)
+                            s = msFilters[1][band][stage].processSample(s);
+                        if (resonanceMix > 0.0f)
+                            s += resS * resonanceMix;
+
+                        if (params.dynamicEnabled)
+                        {
+                            const float dynamicGainDb = computeDynamicGain(params, detDb);
+                            const float deltaDb = dynamicGainDb - staticGainDb;
+                            const float deltaGain = juce::Decibels::decibelsToGain(deltaDb);
+                            s = dryS + (s - dryS) * deltaGain;
+                            this->dynamicGainDb[1][band].store(deltaDb);
+                        }
+
+                        const float sDelta = (s - dryS) * mix;
+                        side[i] += sDelta;
+                    }
+                }
+            }
+
+            juce::FloatVectorOperations::copy(left, mid, samples);
+            juce::FloatVectorOperations::add(left, side, samples);
+            juce::FloatVectorOperations::copy(right, mid, samples);
+            juce::FloatVectorOperations::subtract(right, side, samples);
+        }
     }
 
     for (int ch = 0; ch < numChannels; ++ch)
@@ -721,17 +691,15 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
         auto* rightData = (numChannels >= 2) ? buffer.getWritePointer(1) : nullptr;
         for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
         {
-            const int target = (ch < 2) ? msTargets[band] : 0;
-            if (useMs && ch < 2 && (target == 0 || target == 1 || target == 2))
+            const int target = msTargets[band];
+            if ((target == 1 || target == 2)
+                && (bandChannelMasks[band] & (1u << static_cast<uint32_t>(ch))) != 0)
+            {
                 continue;
-            if (ch == 1 && target == 4)
-                continue;
-            if (ch == 0 && target == 5)
-                continue;
+            }
             if ((bandChannelMasks[band] & (1u << static_cast<uint32_t>(ch))) == 0)
                 continue;
-
-            const int paramSource = (target == 0 || target == 3) ? 0 : ch;
+            const int paramSource = ch;
             if (cachedParams[paramSource][band].bypassed)
                 continue;
 

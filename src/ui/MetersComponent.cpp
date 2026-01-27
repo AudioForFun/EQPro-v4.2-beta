@@ -89,6 +89,10 @@ void MetersComponent::paint(juce::Graphics& g)
 
     auto meterArea = bounds.reduced(8.0f, 12.0f);
     const auto peakArea = meterArea.removeFromBottom(18.0f);
+    
+    // v4.4 beta: Add dB value labels on the left side of the meter scale
+    const float labelWidth = 28.0f;
+    const auto labelArea = meterArea.removeFromLeft(labelWidth);
     const int channels = juce::jmax(1, static_cast<int>(rmsDb.size()));
     auto getSafeValue = [](const std::vector<float>& values, int index, float fallback)
     {
@@ -164,6 +168,32 @@ void MetersComponent::paint(juce::Graphics& g)
                          juce::Justification::centred, 1);
     };
 
+    // v4.4 beta: Draw dB value labels on the left side of the meter scale
+    const float tickDb[] { -60.0f, -48.0f, -36.0f, -24.0f, -12.0f, -6.0f, 0.0f, 6.0f };
+    const auto mapDbToY = [&meterArea](float db)
+    {
+        const float clamped = juce::jlimit(kMinDb, kMaxDb, db);
+        return juce::jmap(clamped, kMinDb, kMaxDb,
+                          meterArea.getBottom(), meterArea.getY());
+    };
+    
+    g.setColour(theme.textMuted.withAlpha(0.8f));
+    g.setFont(juce::Font(9.0f, juce::Font::plain));
+    for (float tick : tickDb)
+    {
+        const float y = mapDbToY(tick);
+        // Format label: whole numbers without decimals, negative sign included
+        const juce::String labelText = juce::String(static_cast<int>(tick));
+        const auto labelRect = juce::Rectangle<float>(
+            labelArea.getX(),
+            y - 6.0f,
+            labelArea.getWidth() - 4.0f,
+            12.0f
+        );
+        g.drawFittedText(labelText, labelRect.toNearestInt(),
+                         juce::Justification::centredRight, 1);
+    }
+    
     for (int ch = 0; ch < channels; ++ch)
     {
         const juce::String label =

@@ -131,7 +131,9 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     : processor(processorIn),
       parameters(processorIn.getParameters())
 {
-    startTimerHz(30);
+    // v4.4 beta: Defer timer start to avoid expensive repaints before components are laid out.
+    // Timer will start after first resize to ensure proper initialization.
+    hasBeenResized = false;
     channelNames = processor.getCurrentChannelNames();
     for (auto& fade : bandHoverFade)
     {
@@ -730,7 +732,10 @@ void BandControlsPanel::setMsEnabled(bool enabled)
 
 void BandControlsPanel::paint(juce::Graphics& g)
 {
+    // v4.4 beta: Skip expensive painting if component isn't properly initialized or visible
     const auto bounds = getLocalBounds().toFloat();
+    if (bounds.getWidth() <= 0 || bounds.getHeight() <= 0 || !isVisible())
+        return;
     // Main panel background (fixed color, not band-dependent).
     g.setColour(theme.panel);
     g.fillRoundedRectangle(bounds, 8.0f);
@@ -1144,6 +1149,17 @@ void BandControlsPanel::mouseDoubleClick(const juce::MouseEvent& event)
 
 void BandControlsPanel::resized()
 {
+    // v4.4 beta: Start timer only after first resize to ensure components are properly laid out.
+    // This prevents expensive repaints before initialization is complete.
+    if (!hasBeenResized)
+    {
+        hasBeenResized = true;
+        // Force initial repaint to ensure all components render properly
+        repaint();
+        // Start timer at normal rate after components are laid out
+        startTimerHz(30);
+    }
+    
     auto bounds = getLocalBounds().reduced(kPanelPadding);
     const int knobSize = juce::jmin(86, kKnobRowHeight - kLabelHeight - 6);
 

@@ -117,19 +117,27 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     auto magnitudeArea = getMagnitudeArea();
     const float scale = uiScale;
     const float cornerRadius = 8.0f * scale;
-    g.setColour(theme.analyzerBg);
+    
+    // Modern background with subtle gradient for depth.
+    juce::ColourGradient bgGradient(theme.analyzerBg.brighter(0.02f), plotArea.toFloat().getTopLeft(),
+                                    theme.analyzerBg.darker(0.03f), plotArea.toFloat().getBottomLeft(), false);
+    g.setGradientFill(bgGradient);
     g.fillRoundedRectangle(plotArea.toFloat(), cornerRadius);
+    
+    // Subtle inner glow for modern look.
+    g.setColour(theme.accent.withAlpha(0.03f));
+    g.fillRoundedRectangle(plotArea.toFloat().reduced(2.0f), cornerRadius - 2.0f);
 
-    g.setColour(theme.panelOutline);
-    g.drawRoundedRectangle(plotArea.toFloat(), cornerRadius, 1.0f);
-
-    g.setColour(theme.panelOutline.withAlpha(0.5f));
+    // Modern border with layered outlines.
+    g.setColour(theme.panelOutline.withAlpha(0.8f));
+    g.drawRoundedRectangle(plotArea.toFloat(), cornerRadius, 1.2f);
+    g.setColour(theme.panelOutline.withAlpha(0.4f));
     g.drawRoundedRectangle(plotArea.toFloat().reduced(1.0f), cornerRadius - 1.0f, 1.0f);
+    g.setColour(theme.accent.withAlpha(0.15f));
+    g.drawRoundedRectangle(plotArea.toFloat().reduced(2.0f), cornerRadius - 2.0f, 0.8f);
 
     g.saveState();
     g.reduceClipRegion(plotArea);
-
-    g.setColour(theme.grid);
 
 
     drawLabels(g, magnitudeArea);
@@ -176,34 +184,60 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     const bool drawPre = viewIndex != 2;
     const bool drawPost = viewIndex != 1;
 
-    juce::Colour preColour(0xff0f766e);
-    juce::Colour postColour(0xfff472b6);
+    // Modern spectrum colors using theme accent colors for better harmony.
+    juce::Colour preColour = theme.accent;  // Cyan/teal from theme
+    juce::Colour postColour = theme.accentAlt;  // Purple from theme
     if (selectedBand >= 0 && selectedBand < static_cast<int>(perBandActive.size())
         && perBandActive[static_cast<size_t>(selectedBand)])
     {
         const auto bandTint = ColorUtils::bandColour(selectedBand);
-        preColour = preColour.interpolatedWith(bandTint, 0.25f);
-        postColour = postColour.interpolatedWith(bandTint, 0.25f);
+        preColour = preColour.interpolatedWith(bandTint, 0.3f);
+        postColour = postColour.interpolatedWith(bandTint, 0.3f);
     }
 
-    if (drawPre)
+    // Modern spectrum rendering with gradient fills and glow.
+    if (drawPre && !prePath.isEmpty())
     {
-        g.setColour(preColour.withAlpha(0.12f));
-        g.strokePath(prePath, juce::PathStrokeType(6.0f * scale));
-        g.setColour(preColour.withAlpha(0.2f));
-        g.strokePath(prePath, juce::PathStrokeType(3.0f * scale));
-        g.setColour(preColour.withAlpha(0.85f));
-        g.strokePath(prePath, juce::PathStrokeType(1.4f * scale));
+        // Gradient fill under curve for modern look.
+        juce::Path fillPath = prePath;
+        fillPath.lineTo(plotArea.getRight(), magnitudeArea.getBottom());
+        fillPath.lineTo(plotArea.getX(), magnitudeArea.getBottom());
+        fillPath.closeSubPath();
+        juce::ColourGradient fillGradient(preColour.withAlpha(0.15f), magnitudeArea.toFloat().getTopLeft(),
+                                         preColour.withAlpha(0.05f), magnitudeArea.toFloat().getBottomLeft(), false);
+        g.setGradientFill(fillGradient);
+        g.fillPath(fillPath);
+        
+        // Glow effect.
+        g.setColour(preColour.withAlpha(0.08f));
+        g.strokePath(prePath, juce::PathStrokeType(8.0f * scale));
+        // Main curve with modern styling.
+        g.setColour(preColour.withAlpha(0.25f));
+        g.strokePath(prePath, juce::PathStrokeType(4.0f * scale));
+        g.setColour(preColour.withAlpha(0.95f));
+        g.strokePath(prePath, juce::PathStrokeType(1.8f * scale));
     }
 
-    if (drawPost)
+    if (drawPost && !postPath.isEmpty())
     {
-        g.setColour(postColour.withAlpha(0.12f));
-        g.strokePath(postPath, juce::PathStrokeType(6.0f * scale));
-        g.setColour(postColour.withAlpha(0.25f));
-        g.strokePath(postPath, juce::PathStrokeType(3.0f * scale));
-        g.setColour(postColour.withAlpha(0.9f));
-        g.strokePath(postPath, juce::PathStrokeType(1.5f * scale));
+        // Gradient fill under curve.
+        juce::Path fillPath = postPath;
+        fillPath.lineTo(plotArea.getRight(), magnitudeArea.getBottom());
+        fillPath.lineTo(plotArea.getX(), magnitudeArea.getBottom());
+        fillPath.closeSubPath();
+        juce::ColourGradient fillGradient(postColour.withAlpha(0.18f), magnitudeArea.toFloat().getTopLeft(),
+                                         postColour.withAlpha(0.06f), magnitudeArea.toFloat().getBottomLeft(), false);
+        g.setGradientFill(fillGradient);
+        g.fillPath(fillPath);
+        
+        // Glow effect.
+        g.setColour(postColour.withAlpha(0.1f));
+        g.strokePath(postPath, juce::PathStrokeType(8.0f * scale));
+        // Main curve.
+        g.setColour(postColour.withAlpha(0.3f));
+        g.strokePath(postPath, juce::PathStrokeType(4.0f * scale));
+        g.setColour(postColour.withAlpha(0.95f));
+        g.strokePath(postPath, juce::PathStrokeType(1.8f * scale));
     }
 
     const bool showExternal = parameters.getRawParameterValue(ParamIDs::analyzerExternal) != nullptr
@@ -230,17 +264,23 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         if (drawPost) items.add("Post");
         if (showExternal) items.add("Ext");
 
+        // Modern legend with better styling.
         const float legendW = 70.0f * scale;
         const float legendH = rowH * items.size() + pad * 2.0f;
         auto legend = juce::Rectangle<float>(plotArea.getRight() - legendW - pad,
                                              plotArea.getY() + pad,
                                              legendW, legendH);
-        g.setColour(theme.panel.withAlpha(0.75f));
+        // Modern legend background with subtle gradient.
+        juce::ColourGradient legendGradient(theme.panel.withAlpha(0.9f), legend.getTopLeft(),
+                                            theme.panel.darker(0.1f).withAlpha(0.85f), legend.getBottomLeft(), false);
+        g.setGradientFill(legendGradient);
         g.fillRoundedRectangle(legend, 6.0f * scale);
-        g.setColour(theme.panelOutline.withAlpha(0.8f));
-        g.drawRoundedRectangle(legend, 6.0f * scale, 1.0f);
+        g.setColour(theme.panelOutline.withAlpha(0.9f));
+        g.drawRoundedRectangle(legend, 6.0f * scale, 1.2f);
+        g.setColour(theme.accent.withAlpha(0.2f));
+        g.drawRoundedRectangle(legend.reduced(1.0f), 5.0f * scale, 0.8f);
 
-        g.setFont(12.0f * scale);
+        g.setFont(juce::Font(11.0f * scale, juce::Font::plain));
         auto row = legend.reduced(pad);
         for (int i = 0; i < items.size(); ++i)
         {
@@ -250,9 +290,13 @@ void AnalyzerComponent::paint(juce::Graphics& g)
                 swatchColour = postColour;
             else if (items[i] == "Ext")
                 swatchColour = postColour.withAlpha(0.6f);
+            // Modern swatch with glow.
+            const auto swatchRect = line.removeFromLeft(swatch).toFloat();
+            g.setColour(swatchColour.withAlpha(0.3f));
+            g.fillRoundedRectangle(swatchRect.expanded(1.0f), 2.5f);
             g.setColour(swatchColour);
-            g.fillRoundedRectangle(line.removeFromLeft(swatch), 2.0f);
-            g.setColour(theme.textMuted);
+            g.fillRoundedRectangle(swatchRect, 2.5f);
+            g.setColour(theme.textMuted.withAlpha(0.95f));
             g.drawFittedText(items[i], line.toNearestInt(),
                              juce::Justification::centredLeft, 1);
         }
@@ -1399,10 +1443,11 @@ void AnalyzerComponent::updateCurves()
 
 void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>& area)
 {
-    const auto gridColour = juce::Colour(0xffbfbfbf);
+    // Modern grid using theme colors for better harmony.
+    const auto gridColour = theme.grid.withAlpha(1.0f);
     g.setColour(theme.textMuted);
     const float scale = uiScale;
-    g.setFont(11.0f * scale);
+    g.setFont(juce::Font(11.0f * scale, juce::Font::plain));
 
     const int leftGutter = static_cast<int>(50 * scale);
     const int rightGutter = static_cast<int>(44 * scale);
@@ -1415,25 +1460,44 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
     const float majorSpacing = labelArea.getHeight() * (12.0f / (spectrumMaxDb - spectrumMinDb));
     const bool showDbLabels = majorSpacing >= 14.0f * scale;
     // Use gainToY() so the grid lines align exactly with the 0 dB line.
+    // Modern grid lines with better visual hierarchy.
     for (float db = spectrumMinDb; db <= spectrumMaxDb + 0.01f; db += spectrumStep)
     {
         const float y = gainToY(db);
         const bool major = (static_cast<int>(db) % 12 == 0);
-        g.setColour(gridColour.withAlpha(major ? 0.65f : 0.25f));
-        g.drawLine(static_cast<float>(area.getX()), y,
-                   static_cast<float>(area.getRight()), y, major ? 1.4f : 1.0f);
+        const bool isZero = std::abs(db) < 0.1f;
+        
+        // Zero dB line gets special treatment.
+        if (isZero)
+        {
+            g.setColour(theme.accent.withAlpha(0.4f));
+            g.drawLine(static_cast<float>(area.getX()), y,
+                       static_cast<float>(area.getRight()), y, 2.0f);
+        }
+        else
+        {
+            // Modern subtle grid lines.
+            g.setColour(gridColour.withAlpha(major ? 0.2f : 0.08f));
+            g.drawLine(static_cast<float>(area.getX()), y,
+                       static_cast<float>(area.getRight()), y, major ? 1.0f : 0.8f);
+        }
+        
         if (major && showDbLabels)
         {
+            // Modern label styling with better contrast.
             const auto labelRect = juce::Rectangle<int>(static_cast<int>(area.getX() + 4 * scale),
                                                         static_cast<int>(y - 7 * scale),
                                                         static_cast<int>(40 * scale),
                                                         static_cast<int>(14 * scale));
-            g.setColour(theme.panel.withAlpha(0.7f));
-            g.fillRoundedRectangle(labelRect.toFloat(), 2.0f);
-            g.setColour(theme.textMuted.withAlpha(0.75f));
+            g.setColour(theme.panel.withAlpha(0.85f));
+            g.fillRoundedRectangle(labelRect.toFloat(), 3.0f);
+            g.setColour(theme.panelOutline.withAlpha(0.5f));
+            g.drawRoundedRectangle(labelRect.toFloat(), 3.0f, 0.8f);
+            g.setColour(theme.textMuted.withAlpha(0.9f));
+            g.setFont(juce::Font(10.0f * scale, juce::Font::plain));
             g.drawFittedText(juce::String(db, 0),
                              labelRect,
-                             juce::Justification::left, 1);
+                             juce::Justification::centred, 1);
         }
     }
 
@@ -1446,36 +1510,42 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
     const float minLabelSpacing = 30.0f * scale;
     const int labelWidth = static_cast<int>(42 * scale);
     const int labelHeight = static_cast<int>(14 * scale);
+    // Modern frequency grid lines.
     for (float f : minorFreqs)
     {
         if (f < kMinFreq || f > maxFreq)
             continue;
         const float x = frequencyToX(f);
-        g.setColour(gridColour.withAlpha(0.18f));
-        g.drawVerticalLine(static_cast<int>(x), static_cast<float>(area.getY()),
-                           static_cast<float>(area.getBottom()));
+        g.setColour(gridColour.withAlpha(0.1f));
+        g.drawLine(x, static_cast<float>(area.getY()),
+                   x, static_cast<float>(area.getBottom()), 0.8f);
     }
     for (float f : majorFreqs)
     {
         if (f < kMinFreq || f > maxFreq)
             continue;
         const float x = frequencyToX(f);
-        g.setColour(gridColour.withAlpha(0.7f));
-        g.drawVerticalLine(static_cast<int>(x), static_cast<float>(area.getY()),
-                           static_cast<float>(area.getBottom()));
+        g.setColour(gridColour.withAlpha(0.25f));
+        g.drawLine(x, static_cast<float>(area.getY()),
+                   x, static_cast<float>(area.getBottom()), 1.0f);
         if (x + labelWidth <= area.getRight() && (x - lastLabelX) >= minLabelSpacing)
         {
             lastLabelX = x;
-            g.setColour(theme.textMuted);
+            // Modern frequency label styling.
+            const auto labelRect = juce::Rectangle<int>(static_cast<int>(x + 3.0f * scale),
+                                                         static_cast<int>(area.getBottom() - bottomGutter),
+                                                         labelWidth,
+                                                         labelHeight);
+            g.setColour(theme.panel.withAlpha(0.85f));
+            g.fillRoundedRectangle(labelRect.toFloat(), 3.0f);
+            g.setColour(theme.panelOutline.withAlpha(0.5f));
+            g.drawRoundedRectangle(labelRect.toFloat(), 3.0f, 0.8f);
+            g.setColour(theme.textMuted.withAlpha(0.9f));
+            g.setFont(juce::Font(10.0f * scale, juce::Font::plain));
             const juce::String text = f >= 1000.0f
                 ? juce::String(f / 1000.0f, (f >= 10000.0f ? 1 : 2)) + "k"
                 : juce::String(f, f < 100.0f ? 1 : 0);
-            g.drawFittedText(text,
-                             juce::Rectangle<int>(static_cast<int>(x + 3.0f * scale),
-                                                  static_cast<int>(area.getBottom() - bottomGutter),
-                                                  labelWidth,
-                                                  labelHeight),
-                             juce::Justification::left, 1);
+            g.drawFittedText(text, labelRect, juce::Justification::centred, 1);
         }
     }
 
@@ -1502,18 +1572,30 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
     };
     drawHighLabel(20000.0f);
 
+    // Enhanced 0 dB reference line with modern styling.
     const float db = 0.0f;
     const float y = gainToY(db);
-    g.setColour(gridColour.withAlpha(0.85f));
+    // Subtle glow around 0 dB line.
+    g.setColour(theme.accent.withAlpha(0.15f));
     g.drawLine(static_cast<float>(area.getX()), y,
-               static_cast<float>(area.getRight()), y, 1.6f);
-    g.setColour(theme.textMuted);
-    g.drawFittedText("0 dB",
-                     juce::Rectangle<int>(static_cast<int>(area.getRight() - rightGutter + 4 * scale),
-                                          static_cast<int>(y - 9 * scale),
-                                          static_cast<int>(rightGutter - 6 * scale),
-                                          static_cast<int>(14 * scale)),
-                     juce::Justification::left, 1);
+               static_cast<float>(area.getRight()), y, 3.0f);
+    // Main 0 dB line.
+    g.setColour(theme.accent.withAlpha(0.5f));
+    g.drawLine(static_cast<float>(area.getX()), y,
+               static_cast<float>(area.getRight()), y, 1.8f);
+    
+    // Modern 0 dB label.
+    const auto zeroLabelRect = juce::Rectangle<int>(static_cast<int>(area.getRight() - rightGutter + 4 * scale),
+                                                    static_cast<int>(y - 9 * scale),
+                                                    static_cast<int>(rightGutter - 6 * scale),
+                                                    static_cast<int>(14 * scale));
+    g.setColour(theme.accent.withAlpha(0.2f));
+    g.fillRoundedRectangle(zeroLabelRect.toFloat(), 3.0f);
+    g.setColour(theme.accent.withAlpha(0.6f));
+    g.drawRoundedRectangle(zeroLabelRect.toFloat(), 3.0f, 1.0f);
+    g.setColour(theme.accent.withAlpha(0.95f));
+    g.setFont(juce::Font(10.0f * scale, juce::Font::bold));
+    g.drawFittedText("0 dB", zeroLabelRect, juce::Justification::centred, 1);
 
     g.setColour(theme.textMuted.withAlpha(0.6f));
     g.drawFittedText("EQ",

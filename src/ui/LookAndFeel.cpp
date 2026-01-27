@@ -1,5 +1,4 @@
 #include "LookAndFeel.h"
-#include <BinaryData.h>
 
 void EQProLookAndFeel::setTheme(const ThemeColors& newTheme)
 {
@@ -10,17 +9,7 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
                                         float sliderPosProportional, float rotaryStartAngle,
                                         float rotaryEndAngle, juce::Slider& slider)
 {
-    if (! knobFilmstrip.isValid())
-    {
-        knobFilmstrip = juce::ImageCache::getFromMemory(BinaryData::knob86Filmstrip_png,
-                                                        BinaryData::knob86Filmstrip_pngSize);
-        if (knobFilmstrip.isValid())
-        {
-            const int frameSize = knobFilmstrip.getWidth();
-            knobFrames = frameSize > 0 ? (knobFilmstrip.getHeight() / frameSize) : 0;
-        }
-    }
-
+    // Option 1: Minimalist 3D Beveled Knob with LED layer
     const float size = static_cast<float>(juce::jmin(width, height)) - 8.0f;
     const auto bounds = juce::Rectangle<float>(0.0f, 0.0f, size, size)
                             .withCentre(juce::Point<float>(static_cast<float>(x + width / 2),
@@ -30,82 +19,153 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
     const auto angle = rotaryStartAngle
         + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
 
+    // Hover and focus indicators (subtle outer glow)
     if (slider.isMouseOverOrDragging())
     {
-        g.setColour(theme.accent.withAlpha(0.25f));
+        g.setColour(theme.accent.withAlpha(0.2f));
         g.drawEllipse(bounds.expanded(3.0f), 2.0f);
     }
     if (slider.hasKeyboardFocus(true))
     {
-        g.setColour(theme.accent.withAlpha(0.55f));
+        g.setColour(theme.accent.withAlpha(0.4f));
         g.drawEllipse(bounds.expanded(4.0f), 2.0f);
     }
 
-    g.setColour(juce::Colours::black.withAlpha(0.35f));
-    g.fillEllipse(bounds.translated(0.0f, 2.0f));
-
-    if (knobFilmstrip.isValid() && knobFrames > 0)
-    {
-        const int frame = juce::jlimit(0, knobFrames - 1,
-                                       static_cast<int>(std::round(sliderPosProportional * (knobFrames - 1))));
-        const int frameSize = knobFilmstrip.getWidth();
-        const int srcY = frame * frameSize;
-        g.drawImage(knobFilmstrip,
-                    bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(),
-                    0, srcY, frameSize, frameSize);
-    }
-    else
-    {
-        g.setColour(theme.panel.withAlpha(0.9f));
-        g.fillEllipse(bounds);
-    }
-
-    g.setColour(juce::Colours::white.withAlpha(0.06f));
-    g.drawEllipse(bounds.reduced(1.5f), 1.5f);
-
-    // Draw per-band colored LED dots over the filmstrip.
+    // Get per-band color (or default accent color)
     const auto tint = slider.findColour(juce::Slider::trackColourId);
-    const float dotRadius = 1.6f;
-    const int dotCount = 24;
-    for (int i = 0; i < dotCount; ++i)
+    const bool isEnabled = slider.isEnabled();
+
+    // Shadow/drop shadow for 3D effect
+    g.setColour(juce::Colours::black.withAlpha(0.4f));
+    g.fillEllipse(bounds.translated(0.0f, 2.5f));
+
+    // Main knob body with 3D beveled effect using gradients
+    // Outer edge (darker)
+    const float bevelWidth = 3.0f;
+    const auto outerBounds = bounds;
+    const auto innerBounds = bounds.reduced(bevelWidth);
+    
+    // Base gradient: light at top-left, dark at bottom-right for 3D bevel
+    juce::ColourGradient baseGradient(
+        theme.panel.brighter(0.15f), outerBounds.getTopLeft().toFloat(),
+        theme.panel.darker(0.3f), outerBounds.getBottomRight().toFloat(), false);
+    g.setGradientFill(baseGradient);
+    g.fillEllipse(outerBounds);
+
+    // Inner highlight for depth (lighter top section)
+    juce::ColourGradient highlightGradient(
+        theme.panel.brighter(0.25f).withAlpha(0.6f), 
+        juce::Point<float>(centre.x - radius * 0.3f, centre.y - radius * 0.3f),
+        theme.panel.withAlpha(0.0f), 
+        juce::Point<float>(centre.x, centre.y), false);
+    g.setGradientFill(highlightGradient);
+    g.fillEllipse(innerBounds);
+
+    // Subtle inner shadow (darker bottom section)
+    juce::ColourGradient shadowGradient(
+        theme.panel.withAlpha(0.0f),
+        juce::Point<float>(centre.x, centre.y),
+        juce::Colours::black.withAlpha(0.2f),
+        juce::Point<float>(centre.x + radius * 0.3f, centre.y + radius * 0.3f), false);
+    g.setGradientFill(shadowGradient);
+    g.fillEllipse(innerBounds);
+
+    // Outer border ring (subtle)
+    g.setColour(theme.panelOutline.withAlpha(0.4f));
+    g.drawEllipse(outerBounds.reduced(0.5f), 1.0f);
+
+    // Inner border ring (subtle highlight)
+    g.setColour(juce::Colours::white.withAlpha(0.08f));
+    g.drawEllipse(innerBounds.reduced(0.5f), 0.8f);
+
+    // LED Layer: Colored arc track showing active range (smooth, no dots)
+    const float trackRadius = radius - 8.0f;
+    const float trackWidth = 3.5f;
+    const float trackInnerRadius = trackRadius - trackWidth;
+    
+    // Draw inactive track (subtle background)
+    juce::Path inactiveTrack;
+    inactiveTrack.addCentredArc(centre.x, centre.y, trackRadius, trackRadius, 0.0f,
+                                rotaryStartAngle, rotaryEndAngle, true);
+    inactiveTrack.addCentredArc(centre.x, centre.y, trackInnerRadius, trackInnerRadius, 0.0f,
+                                rotaryEndAngle, rotaryStartAngle, false);
+    inactiveTrack.closeSubPath();
+    g.setColour(theme.panelOutline.withAlpha(isEnabled ? 0.15f : 0.08f));
+    g.fillPath(inactiveTrack);
+
+    // Draw active LED arc (only the portion up to current value)
+    if (sliderPosProportional > 0.001f)
     {
-        const float t = static_cast<float>(i) / static_cast<float>(dotCount - 1);
-        const float dotAngle = rotaryStartAngle + t * (rotaryEndAngle - rotaryStartAngle);
-        const float dotX = centre.x + std::cos(dotAngle) * (radius - 6.0f);
-        const float dotY = centre.y + std::sin(dotAngle) * (radius - 6.0f);
-        const float alpha = (t <= sliderPosProportional + 0.001f) ? 0.95f : 0.45f;
-        g.setColour(tint.withAlpha(slider.isEnabled() ? alpha : 0.15f));
-        g.fillEllipse(dotX - dotRadius, dotY - dotRadius, dotRadius * 2.0f, dotRadius * 2.0f);
+        juce::Path activeTrack;
+        const float activeEndAngle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
+        activeTrack.addCentredArc(centre.x, centre.y, trackRadius, trackRadius, 0.0f,
+                                  rotaryStartAngle, activeEndAngle, true);
+        activeTrack.addCentredArc(centre.x, centre.y, trackInnerRadius, trackInnerRadius, 0.0f,
+                                  activeEndAngle, rotaryStartAngle, false);
+        activeTrack.closeSubPath();
+        
+        // Colored fill with gradient for LED effect
+        juce::ColourGradient ledGradient(
+            tint.brighter(0.3f).withAlpha(isEnabled ? 0.95f : 0.3f),
+            juce::Point<float>(centre.x - trackRadius * 0.5f, centre.y - trackRadius * 0.5f),
+            tint.withAlpha(isEnabled ? 0.75f : 0.25f),
+            juce::Point<float>(centre.x + trackRadius * 0.5f, centre.y + trackRadius * 0.5f), false);
+        g.setGradientFill(ledGradient);
+        g.fillPath(activeTrack);
+        
+        // LED glow effect (outer glow on active arc)
+        g.setColour(tint.withAlpha(isEnabled ? 0.3f : 0.1f));
+        g.strokePath(activeTrack, juce::PathStrokeType(trackWidth + 2.0f));
     }
 
-    // Smaller inner LED ring to cover the filmstrip's inner dots.
-    const float innerRadius = radius - 16.0f;
-    const float innerDotRadius = 1.1f;
-    const int innerDotCount = 16;
-    for (int i = 0; i < innerDotCount; ++i)
-    {
-        const float t = static_cast<float>(i) / static_cast<float>(innerDotCount - 1);
-        const float dotAngle = rotaryStartAngle + t * (rotaryEndAngle - rotaryStartAngle);
-        const float dotX = centre.x + std::cos(dotAngle) * innerRadius;
-        const float dotY = centre.y + std::sin(dotAngle) * innerRadius;
-        const float alpha = (t <= sliderPosProportional + 0.001f) ? 0.85f : 0.35f;
-        g.setColour(tint.withAlpha(slider.isEnabled() ? alpha : 0.15f));
-        g.fillEllipse(dotX - innerDotRadius, dotY - innerDotRadius,
-                      innerDotRadius * 2.0f, innerDotRadius * 2.0f);
-    }
-
+    // Pointer with 3D effect and shadow
+    const float pointerLength = radius - 12.0f;
+    const float pointerThickness = 2.5f;
+    
+    // Pointer shadow
+    juce::Path pointerShadow;
+    pointerShadow.addRoundedRectangle(-pointerThickness * 0.5f - 0.5f, -pointerLength - 0.5f,
+                                       pointerThickness + 1.0f, pointerLength * 0.75f, 1.5f);
+    g.setColour(juce::Colours::black.withAlpha(0.4f));
+    g.fillPath(pointerShadow, juce::AffineTransform::rotation(angle).translated(centre.x + 1.0f, centre.y + 1.0f));
+    
+    // Main pointer
     juce::Path pointer;
-    const float pointerLength = radius - 10.0f;
-    const float pointerThickness = 2.0f;
     pointer.addRoundedRectangle(-pointerThickness * 0.5f, -pointerLength,
-                                pointerThickness, pointerLength * 0.7f, 1.0f);
-    g.setColour(theme.text.withAlpha(slider.isEnabled() ? 0.9f : 0.4f));
+                                pointerThickness, pointerLength * 0.75f, 1.0f);
+    
+    // Pointer gradient (lighter at tip)
+    juce::ColourGradient pointerGradient(
+        theme.text.brighter(0.2f).withAlpha(isEnabled ? 0.95f : 0.4f),
+        juce::Point<float>(0.0f, -pointerLength),
+        theme.text.withAlpha(isEnabled ? 0.85f : 0.3f),
+        juce::Point<float>(0.0f, 0.0f), false);
+    g.setGradientFill(pointerGradient);
     g.fillPath(pointer, juce::AffineTransform::rotation(angle).translated(centre.x, centre.y));
 
-    const float capRadius = 2.6f;
-    g.setColour(theme.text.withAlpha(0.8f));
-    g.fillEllipse(centre.x - capRadius, centre.y - capRadius, capRadius * 2.0f, capRadius * 2.0f);
+    // Center cap with 3D effect
+    const float capRadius = 3.0f;
+    const auto capBounds = juce::Rectangle<float>(centre.x - capRadius, centre.y - capRadius,
+                                                   capRadius * 2.0f, capRadius * 2.0f);
+    
+    // Cap shadow
+    g.setColour(juce::Colours::black.withAlpha(0.3f));
+    g.fillEllipse(capBounds.translated(0.5f, 0.5f));
+    
+    // Cap gradient (3D beveled)
+    juce::ColourGradient capGradient(
+        theme.text.brighter(0.15f).withAlpha(isEnabled ? 0.9f : 0.4f),
+        capBounds.getTopLeft().toFloat(),
+        theme.text.darker(0.2f).withAlpha(isEnabled ? 0.7f : 0.3f),
+        capBounds.getBottomRight().toFloat(), false);
+    g.setGradientFill(capGradient);
+    g.fillEllipse(capBounds);
+    
+    // Cap highlight
+    g.setColour(juce::Colours::white.withAlpha(isEnabled ? 0.2f : 0.1f));
+    g.drawEllipse(capBounds.reduced(0.5f), 0.5f);
 
+    // Default value indicator (snap point)
     if (slider.isDoubleClickReturnEnabled())
     {
         const double defaultValue = slider.getDoubleClickReturnValue();
@@ -114,10 +174,10 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
         if (std::abs(slider.getValue() - defaultValue) <= epsilon)
         {
             const float snapAngle = rotaryStartAngle;
-            const float tickX = centre.x + std::cos(snapAngle) * (radius - 8.0f);
-            const float tickY = centre.y + std::sin(snapAngle) * (radius - 8.0f);
-            g.setColour(theme.accent.withAlpha(0.85f));
-            g.fillEllipse(tickX - 1.8f, tickY - 1.8f, 3.6f, 3.6f);
+            const float tickX = centre.x + std::cos(snapAngle) * (trackRadius - 2.0f);
+            const float tickY = centre.y + std::sin(snapAngle) * (trackRadius - 2.0f);
+            g.setColour(theme.accent.withAlpha(0.9f));
+            g.fillEllipse(tickX - 2.0f, tickY - 2.0f, 4.0f, 4.0f);
         }
     }
 }

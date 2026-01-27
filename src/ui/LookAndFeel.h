@@ -10,7 +10,7 @@ public:
     // Update palette used by all custom draw calls.
     void setTheme(const ThemeColors& newTheme);
 
-    // Filmstrip-based rotary knob with hover/focus cues.
+    // Modern 3D beveled rotary knob with LED layer and per-band color support.
     void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
                           float sliderPosProportional, float rotaryStartAngle,
                           float rotaryEndAngle, juce::Slider& slider) override;
@@ -21,6 +21,4 @@ public:
 
 private:
     ThemeColors theme = makeDarkTheme();
-    juce::Image knobFilmstrip;
-    int knobFrames = 0;
 };

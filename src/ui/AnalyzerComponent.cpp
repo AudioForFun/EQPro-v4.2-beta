@@ -140,8 +140,8 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     g.saveState();
     g.reduceClipRegion(plotArea);
 
-
-    drawLabels(g, magnitudeArea);
+    // Draw grid lines early (background elements).
+    drawGridLines(g, magnitudeArea);
 
     const float maxFreq = getMaxFreq();
 
@@ -655,6 +655,10 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         g.setColour(theme.text);
         g.drawFittedText(text, hudRect, juce::Justification::centredLeft, 1);
     }
+    
+    // Draw amplitude labels LAST, after all band points and curves, so they're always visible on top.
+    // This ensures labels from -60 to +60 dB are never overlapped by graphical elements.
+    drawAmplitudeLabels(g, magnitudeArea);
 }
 
 void AnalyzerComponent::resized()
@@ -1442,30 +1446,18 @@ void AnalyzerComponent::updateCurves()
     }
 }
 
-void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>& area)
+void AnalyzerComponent::drawGridLines(juce::Graphics& g, const juce::Rectangle<int>& area)
 {
     // Modern grid using theme colors for better harmony.
     const auto gridColour = theme.grid.withAlpha(1.0f);
-    g.setColour(theme.textMuted);
     const float scale = uiScale;
-    g.setFont(juce::Font(11.0f * scale, juce::Font::plain));
-
-    // Increased gutters significantly to prevent label overlap with frame border and graphical elements.
-    // Frame has layered borders (outer 1.2px, middle 1.0px, inner 0.8px) plus corner radius.
-    // Labels need extra clearance to avoid overlap with band points, curves, and other UI elements.
-    const int leftGutter = static_cast<int>(70 * scale);  // Increased significantly to prevent all overlaps
-    const int rightGutter = static_cast<int>(44 * scale);
-    const int bottomGutter = static_cast<int>(18 * scale);
-    const auto labelArea = area.withTrimmedLeft(leftGutter).withTrimmedRight(rightGutter)
-        .withTrimmedBottom(bottomGutter);
     const float spectrumMinDb = kAnalyzerMinDb;  // -60 dB
     const float spectrumMaxDb = kAnalyzerMaxDb;   // +60 dB
     const float spectrumStep = 6.0f;
-    const float majorSpacing = labelArea.getHeight() * (12.0f / (spectrumMaxDb - spectrumMinDb));
-    const bool showDbLabels = majorSpacing >= 14.0f * scale;
+    const int rightGutter = static_cast<int>(44 * scale);
+    const int bottomGutter = static_cast<int>(18 * scale);
     
-    // Use gainToY() so the grid lines align exactly with the 0 dB line.
-    // Modern grid lines with better visual hierarchy.
+    // Draw amplitude grid lines (background elements, drawn early).
     for (float db = spectrumMinDb; db <= spectrumMaxDb + 0.01f; db += spectrumStep)
     {
         const float y = gainToY(db);
@@ -1486,32 +1478,9 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
             g.drawLine(static_cast<float>(area.getX()), y,
                        static_cast<float>(area.getRight()), y, major ? 1.0f : 0.8f);
         }
-        
-        if (major && showDbLabels)
-        {
-            // Position labels well inside the plot area to avoid ALL overlaps:
-            // - Frame border (~3px)
-            // - Band points (circular elements with radius ~6.5px + glow ~3px = ~9.5px total)
-            // - Curves and other graphical elements
-            // Labels positioned with generous margin to ensure -60 to +60 dB are all visible without overlap.
-            // Band points can be anywhere on the plot, so labels need significant clearance from left edge.
-            const int labelMargin = static_cast<int>(18 * scale);  // Increased significantly to avoid band point overlaps
-            const auto labelRect = juce::Rectangle<int>(static_cast<int>(area.getX() + labelMargin),
-                                                        static_cast<int>(y - 7 * scale),
-                                                        static_cast<int>(48 * scale),  // Wider for negative values like "-60"
-                                                        static_cast<int>(14 * scale));
-            g.setColour(theme.panel.withAlpha(0.85f));
-            g.fillRoundedRectangle(labelRect.toFloat(), 3.0f);
-            g.setColour(theme.panelOutline.withAlpha(0.5f));
-            g.drawRoundedRectangle(labelRect.toFloat(), 3.0f, 0.8f);
-            g.setColour(theme.textMuted.withAlpha(0.9f));
-            g.setFont(juce::Font(10.0f * scale, juce::Font::plain));
-            g.drawFittedText(juce::String(db, 0),
-                             labelRect,
-                             juce::Justification::centred, 1);
-        }
     }
-
+    
+    // Draw frequency grid lines and labels.
     const float maxFreq = getMaxFreq();
     const float majorFreqs[] { 20.0f, 50.0f, 100.0f, 200.0f, 500.0f, 1000.0f, 2000.0f, 5000.0f, 10000.0f, 20000.0f };
     const float minorFreqs[] { 31.5f, 40.0f, 63.0f, 80.0f, 125.0f, 160.0f, 250.0f, 315.0f, 400.0f,
@@ -1521,6 +1490,7 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
     const float minLabelSpacing = 30.0f * scale;
     const int labelWidth = static_cast<int>(42 * scale);
     const int labelHeight = static_cast<int>(14 * scale);
+    
     // Modern frequency grid lines.
     for (float f : minorFreqs)
     {
@@ -1599,6 +1569,79 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
                                           static_cast<int>(12 * scale)),
                      juce::Justification::right, 1);
     // Removed "SP" label - was never requested by user.
+}
+
+void AnalyzerComponent::drawAmplitudeLabels(juce::Graphics& g, const juce::Rectangle<int>& area)
+{
+    // Draw amplitude labels LAST, after all band points and curves, so they're always visible on top.
+    // This ensures labels from -60 to +60 dB are never overlapped by graphical elements.
+    const float scale = uiScale;
+    g.setFont(juce::Font(10.0f * scale, juce::Font::plain));
+    
+    const float spectrumMinDb = kAnalyzerMinDb;  // -60 dB
+    const float spectrumMaxDb = kAnalyzerMaxDb;   // +60 dB
+    const float spectrumStep = 6.0f;
+    
+    // Calculate spacing to determine if labels should be shown.
+    const int leftGutter = static_cast<int>(70 * scale);
+    const int rightGutter = static_cast<int>(44 * scale);
+    const int bottomGutter = static_cast<int>(18 * scale);
+    const auto labelArea = area.withTrimmedLeft(leftGutter).withTrimmedRight(rightGutter)
+        .withTrimmedBottom(bottomGutter);
+    const float majorSpacing = labelArea.getHeight() * (12.0f / (spectrumMaxDb - spectrumMinDb));
+    const bool showDbLabels = majorSpacing >= 14.0f * scale;
+    
+    // Check band point positions to avoid overlaps.
+    // Band points have radius ~6.5px + glow ~3px = ~9.5px, plus selected can be +2.5px = ~12px total.
+    const float maxBandPointRadius = (kPointRadius + 2.5f + 3.0f) * scale;  // Maximum possible radius
+    
+    // Draw amplitude labels for all major grid lines from -60 to +60 dB.
+    for (float db = spectrumMinDb; db <= spectrumMaxDb + 0.01f; db += spectrumStep)
+    {
+        const bool major = (static_cast<int>(db) % 12 == 0);
+        if (!major || !showDbLabels)
+            continue;
+            
+        const float y = gainToY(db);
+        
+        // Check if any band point is near this Y position and adjust label X position accordingly.
+        float minClearX = area.getX() + static_cast<float>(18 * scale);  // Base margin
+        for (const auto& point : bandPoints)
+        {
+            const float pointY = point.y;
+            const float yDistance = std::abs(pointY - y);
+            // If band point is within 15 pixels vertically of label, need extra horizontal clearance.
+            if (yDistance < 15.0f * scale)
+            {
+                // Calculate required X clearance to avoid overlap.
+                const float requiredClearance = maxBandPointRadius + static_cast<float>(5 * scale);
+                const float pointRightEdge = point.x + requiredClearance;
+                if (pointRightEdge > minClearX)
+                    minClearX = pointRightEdge;
+            }
+        }
+        
+        // Position label with calculated clearance to avoid all overlaps.
+        const int labelX = static_cast<int>(minClearX);
+        const auto labelRect = juce::Rectangle<int>(labelX,
+                                                    static_cast<int>(y - 7 * scale),
+                                                    static_cast<int>(48 * scale),  // Wide enough for "-60"
+                                                    static_cast<int>(14 * scale));
+        
+        // Ensure label doesn't go outside plot area.
+        if (labelRect.getRight() > area.getRight() - static_cast<int>(rightGutter))
+            continue;  // Skip this label if it would overlap with right side
+        
+        // Draw label with high visibility (drawn last, on top of everything).
+        g.setColour(theme.panel.withAlpha(0.9f));  // Higher alpha for better visibility on top
+        g.fillRoundedRectangle(labelRect.toFloat(), 3.0f);
+        g.setColour(theme.panelOutline.withAlpha(0.7f));  // Stronger border for visibility
+        g.drawRoundedRectangle(labelRect.toFloat(), 3.0f, 1.0f);
+        g.setColour(theme.textMuted.withAlpha(0.95f));  // High contrast text
+        g.drawFittedText(juce::String(db, 0),
+                         labelRect,
+                         juce::Justification::centred, 1);
+    }
 }
 
 juce::Rectangle<int> AnalyzerComponent::getPlotArea() const

@@ -49,7 +49,8 @@ private:
     // Layout helpers for plot and label regions.
     juce::Rectangle<int> getPlotArea() const;
     juce::Rectangle<int> getMagnitudeArea() const;
-    void drawLabels(juce::Graphics& g, const juce::Rectangle<int>& area);
+    void drawGridLines(juce::Graphics& g, const juce::Rectangle<int>& area);
+    void drawAmplitudeLabels(juce::Graphics& g, const juce::Rectangle<int>& area);
     float getMaxFreq() const;
 
     float xToFrequency(float x) const;

@@ -35,16 +35,10 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
     const auto tint = slider.findColour(juce::Slider::trackColourId);
     const bool isEnabled = slider.isEnabled();
 
-    // Optimized 3D beveled effect: Single gradient for performance
-    // Shadow/drop shadow for 3D effect (simplified)
-    g.setColour(juce::Colours::black.withAlpha(0.3f));
-    g.fillEllipse(bounds.translated(0.0f, 2.0f));
-
-    // Main knob body: Single optimized gradient (light top-left, dark bottom-right)
-    juce::ColourGradient baseGradient(
-        theme.panel.brighter(0.12f), bounds.getTopLeft().toFloat(),
-        theme.panel.darker(0.25f), bounds.getBottomRight().toFloat(), false);
-    g.setGradientFill(baseGradient);
+    // v4.4 beta: Fast flat rendering for rotary knobs - performance optimized
+    // Simplified from gradient to flat color for instant rendering
+    // Main knob body: Flat color (no gradient for performance)
+    g.setColour(theme.panel);
     g.fillEllipse(bounds);
 
     // Single subtle border (reduced operations)
@@ -122,70 +116,42 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
 }
 
 void EQProLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& button,
-                                         bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
+                                         bool shouldDrawButtonAsHighlighted,
+                                         bool shouldDrawButtonAsDown)
 {
-    // Option 1: Soft 3D Beveled Pill - harmonizes with modern 3D knobs
+    // v4.4 beta: Fast flat rendering for toggle buttons - performance optimized
+    // Simplified from 3D gradients to flat colors for instant rendering
     const auto bounds = button.getLocalBounds().toFloat();
     const bool isOn = button.getToggleState();
     const bool isEnabled = button.isEnabled();
     const bool isOver = button.isMouseOver();
     const bool isDown = shouldDrawButtonAsDown || button.isMouseButtonDown();
     
-    // Adjust bounds for pressed state (subtle "pushed in" effect)
     auto drawBounds = bounds.reduced(0.5f);
-    if (isDown && isEnabled)
-        drawBounds = drawBounds.translated(0.0f, 1.0f);  // Slight downward shift when pressed
-    
     const float cornerRadius = 4.0f;
     
-    // Background gradient: light top, dark bottom (same style as knobs)
-    juce::ColourGradient bgGradient(
-        isOn ? theme.accent.brighter(0.15f).withAlpha(isEnabled ? 0.7f : 0.35f)
-             : theme.panel.brighter(0.1f).withAlpha(isEnabled ? 0.3f : 0.15f),
-        drawBounds.getTopLeft().toFloat(),
-        isOn ? theme.accent.darker(0.15f).withAlpha(isEnabled ? 0.6f : 0.3f)
-             : theme.panel.darker(0.15f).withAlpha(isEnabled ? 0.25f : 0.12f),
-        drawBounds.getBottomRight().toFloat(), false);
-    
-    // Apply hover/down state adjustments
+    // Fast flat background color (no gradient for performance)
+    auto bgColour = isOn ? theme.accent.withAlpha(isEnabled ? 0.7f : 0.35f)
+                         : theme.panel.withAlpha(isEnabled ? 0.3f : 0.15f);
     if (isDown && isEnabled)
-    {
-        // Darker when pressed
-        bgGradient = juce::ColourGradient(
-            bgGradient.getColour(0).darker(0.1f),
-            drawBounds.getTopLeft().toFloat(),
-            bgGradient.getColour(1).darker(0.1f),
-            drawBounds.getBottomRight().toFloat(), false);
-    }
+        bgColour = bgColour.darker(0.15f);
     else if (isOver && isEnabled && !isOn)
-    {
-        // Slightly brighter on hover (OFF state only)
-        bgGradient = juce::ColourGradient(
-            bgGradient.getColour(0).brighter(0.05f),
-            drawBounds.getTopLeft().toFloat(),
-            bgGradient.getColour(1).brighter(0.05f),
-            drawBounds.getBottomRight().toFloat(), false);
-    }
+        bgColour = bgColour.brighter(0.1f);
     
-    g.setGradientFill(bgGradient);
+    g.setColour(bgColour);
     g.fillRoundedRectangle(drawBounds, cornerRadius);
     
-    // Optimized 3D effect: Single subtle highlight overlay (reduced operations)
-    // Simplified top-left highlight (single overlay instead of two gradients)
-    g.setColour(juce::Colours::white.withAlpha(isEnabled ? 0.06f : 0.03f));
-    g.fillRoundedRectangle(drawBounds.reduced(1.5f, 1.5f).withTrimmedBottom(drawBounds.getHeight() * 0.5f), cornerRadius - 1.5f);
-    
-    // Single clean border (theme.panelOutline or theme.accent when ON)
+    // Simple border (no complex color calculations)
     auto borderColour = theme.panelOutline;
     if (!isEnabled)
         borderColour = borderColour.withAlpha(0.5f);
     else if (isOn)
         borderColour = theme.accent.withAlpha(0.9f);
     else if (isOver)
-        borderColour = theme.panelOutline.brighter(0.15f);
+        borderColour = borderColour.brighter(0.1f);
     
     g.setColour(borderColour);
-    g.drawRoundedRectangle(drawBounds, cornerRadius, 1.2f);
+    g.drawRoundedRectangle(drawBounds, cornerRadius, 1.0f);
 
     // Draw text centered inside.
     auto textColour = button.findColour(juce::ToggleButton::textColourId);
@@ -205,61 +171,33 @@ void EQProLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& but
                                              bool shouldDrawButtonAsHighlighted,
                                              bool shouldDrawButtonAsDown)
 {
-    // v4.4 beta: Modern 3D beveled text button - harmonizes with toggle buttons and knobs
-    // Applied to all text buttons in preset section and EQ control section for consistent visual language.
+    // v4.4 beta: Fast flat rendering for text buttons - performance optimized
+    // Simplified from 3D gradients to flat colors for instant rendering
     const auto bounds = button.getLocalBounds().toFloat();
     const bool isEnabled = button.isEnabled();
     const bool isOver = button.isMouseOver();
     const bool isDown = shouldDrawButtonAsDown || button.isMouseButtonDown();
     
-    // Adjust bounds for pressed state (subtle "pushed in" effect)
     auto drawBounds = bounds.reduced(0.5f);
-    if (isDown && isEnabled)
-        drawBounds = drawBounds.translated(0.0f, 1.0f);  // Slight downward shift when pressed
-    
     const float cornerRadius = 4.0f;
     
-    // Background gradient: light top, dark bottom (same style as knobs and toggles)
-    juce::ColourGradient bgGradient(
-        theme.panel.brighter(0.1f).withAlpha(isEnabled ? 0.3f : 0.15f),
-        drawBounds.getTopLeft().toFloat(),
-        theme.panel.darker(0.15f).withAlpha(isEnabled ? 0.25f : 0.12f),
-        drawBounds.getBottomRight().toFloat(), false);
-    
-    // Apply hover/down state adjustments
+    // Fast flat background color (no gradient for performance)
+    auto bgColour = theme.panel.withAlpha(isEnabled ? 0.3f : 0.15f);
     if (isDown && isEnabled)
-    {
-        // Darker when pressed
-        bgGradient = juce::ColourGradient(
-            bgGradient.getColour(0).darker(0.1f),
-            drawBounds.getTopLeft().toFloat(),
-            bgGradient.getColour(1).darker(0.1f),
-            drawBounds.getBottomRight().toFloat(), false);
-    }
+        bgColour = bgColour.darker(0.15f);
     else if (isOver && isEnabled)
-    {
-        // Slightly brighter on hover
-        bgGradient = juce::ColourGradient(
-            bgGradient.getColour(0).brighter(0.05f),
-            drawBounds.getTopLeft().toFloat(),
-            bgGradient.getColour(1).brighter(0.05f),
-            drawBounds.getBottomRight().toFloat(), false);
-    }
+        bgColour = bgColour.brighter(0.1f);
     
-    g.setGradientFill(bgGradient);
+    g.setColour(bgColour);
     g.fillRoundedRectangle(drawBounds, cornerRadius);
     
-    // Optimized 3D effect: Single subtle highlight overlay (same as toggle buttons)
-    g.setColour(juce::Colours::white.withAlpha(isEnabled ? 0.06f : 0.03f));
-    g.fillRoundedRectangle(drawBounds.reduced(1.5f, 1.5f).withTrimmedBottom(drawBounds.getHeight() * 0.5f), cornerRadius - 1.5f);
-    
-    // Single clean border (theme.panelOutline, brighter on hover)
+    // Simple border (no complex color calculations)
     auto borderColour = theme.panelOutline;
     if (!isEnabled)
         borderColour = borderColour.withAlpha(0.5f);
     else if (isOver)
-        borderColour = theme.panelOutline.brighter(0.15f);
+        borderColour = borderColour.brighter(0.1f);
     
     g.setColour(borderColour);
-    g.drawRoundedRectangle(drawBounds, cornerRadius, 1.2f);
+    g.drawRoundedRectangle(drawBounds, cornerRadius, 1.0f);
 }

@@ -12,14 +12,14 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 
 ## Key Features
 
-### 🎛️ **Multi-Channel EQ Engine**
+###  **Multi-Channel EQ Engine**
 - **12 fully parametric bands per channel** with independent frequency, gain, Q, and filter type control
 - **Per-band mix control** (0-100%) for parallel processing workflows
 - **Per-band routing** with channel masks and Mid/Side targeting
 - **Format-aware processing** supporting stereo, surround (5.1, 7.1), and Dolby Atmos layouts
 - **Band-colored visual feedback** with dynamic LED rings and EQ frame highlighting
 
-### 🎨 **Harmonic Processing Layer (v4.5 beta)**
+###  **Harmonic Processing Layer (v4.5 beta)**
 - **Independent odd and even harmonic generation** per band (-24 to +24 dB)
 - **Per-band harmonic mix controls** (0-100%) for precise blend of harmonic content
 - **Per-band harmonic bypass** (independent for each of 12 bands, **default bypassed**)
@@ -29,7 +29,7 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 - **Non-linear waveshaping**: Cubic distortion for odd harmonics, quadratic for even harmonics
 - **Layer-based UI navigation** with dedicated EQ (Layer 1) and Harmonic (Layer 2) views
 
-### 📊 **Real-Time Spectral Analyzer**
+###  **Real-Time Spectral Analyzer**
 - **Three analyzer curves** for comprehensive visual feedback:
   - **Pre-EQ curve** (light grey): Input signal before processing
   - **Post-EQ curve** (darker grey): Output signal after EQ processing
@@ -40,27 +40,27 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 - **External analyzer input** for sidechain visualization
 - **Logarithmic frequency axis** with smooth, beautiful curve rendering
 
-### ⚡ **Phase Processing Modes**
+###  **Phase Processing Modes**
 - **Real-time Mode**: Minimum-phase IIR filters with **zero latency** - perfect for live performance and tracking
 - **Natural Phase Mode**: Short linear-phase FIR with adaptive tap length and mixed-phase blend - ideal for mixing
 - **Linear Phase Mode**: Long linear-phase FIR with adaptive taps and mixed-phase blend - perfect for mastering
 - **Adaptive quality settings** that automatically adjust FIR length based on frequency content
 - **Mixed-phase blending** for transient preservation in linear modes
 
-### 🎚️ **Dynamic Processing**
+###  **Dynamic Processing**
 - **Per-band dynamic EQ** with threshold, ratio, attack, and release controls
 - **External sidechain detection** per band for frequency-dependent ducking and enhancement
 - **Auto-gain compensation** for consistent level matching across processing modes
 - **Smart solo mode** for intelligent band isolation
 
-### 📈 **Advanced Metering**
+###  **Advanced Metering**
 - **Goniometer** with stereo width visualization
 - **Correlation meter** for phase relationship monitoring
 - **Output level meters** with peak and RMS detection
 - **Auto-gain stability** ensuring consistent metering across all processing modes
 - **Professional color scheme**: Green (safe), yellow (moderate), red (loud)
 
-### 🎯 **Workflow Features**
+###  **Workflow Features**
 - **Undo/Redo** with full state management
 - **Preset browser** with favorites, search, and prev/next navigation
 - **A/B/C/D snapshot comparison** for instant recall
@@ -69,7 +69,7 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 - **Focus rings** and hover indicators for enhanced usability
 - **Modern, polished UI** with flat-color styling and smooth animations
 
-### 🔧 **Technical Excellence**
+###  **Technical Excellence**
 - **Sample-accurate processing** with automatic latency compensation
 - **Lock-free audio thread** with zero allocations during playback
 - **Optimized performance** with deferred initialization and buffered rendering
@@ -119,8 +119,7 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 - Improved header layout with layer toggles on left, band number on right
 - Optimized toggle sizes based on text length
 - Simplified band number display (e.g., "1" instead of "1 / 12")
-### UI Scaling
-- Removed in-app UI scaling dropdown due to inconsistent behavior across hosts and standalone
+
 
 ### Performance Optimizations (v4.4 beta)
 - Critical fixes for instant GUI loading

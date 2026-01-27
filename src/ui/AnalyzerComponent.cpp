@@ -19,7 +19,8 @@ constexpr float kAnalyzerMinDb = -60.0f;
 constexpr float kAnalyzerMaxDb = 60.0f;
 constexpr float kPointRadius = 6.5f;
 constexpr float kHitRadius = 4.0f;
-constexpr float kSmoothingCoeff = 0.2f;
+// v4.4 beta: Faster smoothing for more reactive analyzer (was 0.2f, now 0.3f for quicker response)
+constexpr float kSmoothingCoeff = 0.3f;
 
 const juce::String kParamFreqSuffix = "freq";
 const juce::String kParamGainSuffix = "gain";
@@ -123,15 +124,15 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     const float scale = uiScale;
     const float cornerRadius = 8.0f * scale;
     
-    // v4.2: Modernized FFT analyzer display for better GUI harmony.
-    // Modern background with subtle gradient for depth.
-    juce::ColourGradient bgGradient(theme.analyzerBg.brighter(0.02f), plotArea.toFloat().getTopLeft(),
-                                    theme.analyzerBg.darker(0.03f), plotArea.toFloat().getBottomLeft(), false);
+    // v4.4 beta: Enhanced beautiful gradient background for depth and polish
+    // More pronounced gradient for better visual appeal
+    juce::ColourGradient bgGradient(theme.analyzerBg.brighter(0.04f), plotArea.toFloat().getTopLeft(),
+                                    theme.analyzerBg.darker(0.06f), plotArea.toFloat().getBottomLeft(), false);
     g.setGradientFill(bgGradient);
     g.fillRoundedRectangle(plotArea.toFloat(), cornerRadius);
     
-    // Subtle inner glow for modern look.
-    g.setColour(theme.accent.withAlpha(0.03f));
+    // Enhanced inner glow for more beautiful, modern look
+    g.setColour(theme.accent.withAlpha(0.05f));
     g.fillRoundedRectangle(plotArea.toFloat().reduced(2.0f), cornerRadius - 2.0f);
 
     // Modern border with layered outlines for depth and polish.
@@ -150,9 +151,12 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
     const float maxFreq = getMaxFreq();
 
+    // v4.4 beta: Smoother, more beautiful curves using quadratic interpolation
     juce::Path prePath;
     juce::Path postPath;
     bool started = false;
+    float prevPreX = 0.0f, prevPreY = 0.0f;
+    float prevPostX = 0.0f, prevPostY = 0.0f;
 
     for (int bin = 1; bin < fftBins; ++bin)
     {
@@ -175,12 +179,24 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         {
             prePath.startNewSubPath(x, preY);
             postPath.startNewSubPath(x, postY);
+            prevPreX = x;
+            prevPreY = preY;
+            prevPostX = x;
+            prevPostY = postY;
             started = true;
         }
         else
         {
-            prePath.lineTo(x, preY);
-            postPath.lineTo(x, postY);
+            // v4.4 beta: Use quadratic curves for smoother, more beautiful lines
+            const float midX = (prevPreX + x) * 0.5f;
+            const float midPreY = (prevPreY + preY) * 0.5f;
+            const float midPostY = (prevPostY + postY) * 0.5f;
+            prePath.quadraticTo(midX, midPreY, x, preY);
+            postPath.quadraticTo(midX, midPostY, x, postY);
+            prevPreX = x;
+            prevPreY = preY;
+            prevPostX = x;
+            prevPostY = postY;
         }
     }
 
@@ -199,32 +215,48 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     // Classic Pro-Q style: Clean, thin lines with subtle fill, no glow effects.
     if (drawPre && !prePath.isEmpty())
     {
-        // Very subtle fill under curve (minimal alpha for professional look).
+        // v4.4 beta: Beautiful gradient fill under curve for depth
         juce::Path fillPath = prePath;
         fillPath.lineTo(plotArea.getRight(), magnitudeArea.getBottom());
         fillPath.lineTo(plotArea.getX(), magnitudeArea.getBottom());
         fillPath.closeSubPath();
-        g.setColour(preColour.withAlpha(0.06f));  // Very subtle fill
+        
+        // Gradient fill from top (brighter) to bottom (darker) for beautiful depth
+        juce::ColourGradient fillGradient(
+            preColour.withAlpha(0.12f), fillPath.getBounds().getTopLeft(),
+            preColour.withAlpha(0.04f), fillPath.getBounds().getBottomLeft(), false);
+        g.setGradientFill(fillGradient);
         g.fillPath(fillPath);
         
-        // Clean, thin line (1.8px) - no glow effects.
-        g.setColour(preColour.withAlpha(0.9f));
-        g.strokePath(prePath, juce::PathStrokeType(1.8f * scale));
+        // Enhanced line with subtle glow for beautiful appearance
+        g.setColour(preColour.withAlpha(0.95f));
+        g.strokePath(prePath, juce::PathStrokeType(2.0f * scale));
+        // Subtle outer glow
+        g.setColour(preColour.withAlpha(0.15f));
+        g.strokePath(prePath, juce::PathStrokeType(3.5f * scale));
     }
 
     if (drawPost && !postPath.isEmpty())
     {
-        // Very subtle fill under curve.
+        // v4.4 beta: Beautiful gradient fill under curve for depth
         juce::Path fillPath = postPath;
         fillPath.lineTo(plotArea.getRight(), magnitudeArea.getBottom());
         fillPath.lineTo(plotArea.getX(), magnitudeArea.getBottom());
         fillPath.closeSubPath();
-        g.setColour(postColour.withAlpha(0.08f));  // Slightly more visible for darker grey
+        
+        // Gradient fill from top (brighter) to bottom (darker) for beautiful depth
+        juce::ColourGradient fillGradient(
+            postColour.withAlpha(0.15f), fillPath.getBounds().getTopLeft(),
+            postColour.withAlpha(0.05f), fillPath.getBounds().getBottomLeft(), false);
+        g.setGradientFill(fillGradient);
         g.fillPath(fillPath);
         
-        // Clean, thin line (1.8px) - no glow effects.
-        g.setColour(postColour.withAlpha(0.9f));
-        g.strokePath(postPath, juce::PathStrokeType(1.8f * scale));
+        // Enhanced line with subtle glow for beautiful appearance
+        g.setColour(postColour.withAlpha(0.95f));
+        g.strokePath(postPath, juce::PathStrokeType(2.0f * scale));
+        // Subtle outer glow
+        g.setColour(postColour.withAlpha(0.15f));
+        g.strokePath(postPath, juce::PathStrokeType(3.5f * scale));
     }
 
     const bool showExternal = parameters.getRawParameterValue(ParamIDs::analyzerExternal) != nullptr
@@ -1165,7 +1197,8 @@ void AnalyzerComponent::timerCallback()
 
     const float sr = static_cast<float>(processorRef.getSampleRate());
     const float effectiveSr = sr > 0.0f ? sr : lastSampleRate;
-    int hz = (analyzerSpeedIndex == 0 ? 15 : (analyzerSpeedIndex == 1 ? 30 : 60));
+    // v4.4 beta: Higher default update rates for more reactive analyzer
+    int hz = (analyzerSpeedIndex == 0 ? 20 : (analyzerSpeedIndex == 1 ? 40 : 70));
     if (effectiveSr >= 192000.0f)
         hz = juce::jmax(10, hz / 2);
     if (effectiveSr >= 384000.0f)
@@ -1186,17 +1219,17 @@ void AnalyzerComponent::timerCallback()
     if (freeze)
         hz = juce::jmax(8, hz / 2);
 
+    // v4.4 beta: More reactive - update FFT every frame for instant response
     bool didUpdate = false;
     if (! freeze)
     {
         updateFft();
         didUpdate = true;
     }
-    if (++frameCounter % 2 == 0)
-    {
-        updateCurves();
-        didUpdate = true;
-    }
+    // v4.4 beta: Update curves every frame for smoother, more reactive display
+    updateCurves();
+    didUpdate = true;
+    
     if (didUpdate)
         repaint();
 }

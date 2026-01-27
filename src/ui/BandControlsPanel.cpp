@@ -1186,6 +1186,9 @@ void BandControlsPanel::resized()
 
     const int eqKnobTop = left.getY();
     auto knobsRow = left.removeFromTop(kKnobRowHeight);
+    // Extra gap below rotary frame so Freq/Gain/Q/Band Mix labels sit a little lower and do not touch the frame.
+    const int kLabelTopGap = 6;
+    knobsRow.removeFromTop(kLabelTopGap);
     const int knobWidth = (knobsRow.getWidth() - kGap * 3) / 4;
     auto squareKnob = [](juce::Rectangle<int> area)
     {

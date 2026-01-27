@@ -172,51 +172,82 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
 void EQProLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& button,
                                          bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
 {
+    // Option 1: Soft 3D Beveled Pill - harmonizes with modern 3D knobs
     const auto bounds = button.getLocalBounds().toFloat();
     const bool isOn = button.getToggleState();
     const bool isEnabled = button.isEnabled();
     const bool isOver = button.isMouseOver();
     const bool isDown = shouldDrawButtonAsDown || button.isMouseButtonDown();
-
-    // Get colors from component properties (set via setColour with custom IDs or use theme defaults).
-    // For custom toggle buttons styled like text buttons, we use theme colors directly.
-    auto bgColour = theme.panel.withAlpha(0.2f);
-    if (isOn)
-        bgColour = theme.accent.withAlpha(0.55f);
+    
+    // Adjust bounds for pressed state (subtle "pushed in" effect)
+    auto drawBounds = bounds.reduced(0.5f);
+    if (isDown && isEnabled)
+        drawBounds = drawBounds.translated(0.0f, 1.0f);  // Slight downward shift when pressed
+    
+    const float cornerRadius = 4.0f;
+    
+    // Background gradient: light top, dark bottom (same style as knobs)
+    juce::ColourGradient bgGradient(
+        isOn ? theme.accent.brighter(0.15f).withAlpha(isEnabled ? 0.7f : 0.35f)
+             : theme.panel.brighter(0.1f).withAlpha(isEnabled ? 0.3f : 0.15f),
+        drawBounds.getTopLeft().toFloat(),
+        isOn ? theme.accent.darker(0.15f).withAlpha(isEnabled ? 0.6f : 0.3f)
+             : theme.panel.darker(0.15f).withAlpha(isEnabled ? 0.25f : 0.12f),
+        drawBounds.getBottomRight().toFloat(), false);
+    
+    // Apply hover/down state adjustments
+    if (isDown && isEnabled)
+    {
+        // Darker when pressed
+        bgGradient = juce::ColourGradient(
+            bgGradient.getColour(0).darker(0.1f),
+            drawBounds.getTopLeft().toFloat(),
+            bgGradient.getColour(1).darker(0.1f),
+            drawBounds.getBottomRight().toFloat(), false);
+    }
+    else if (isOver && isEnabled && !isOn)
+    {
+        // Slightly brighter on hover (OFF state only)
+        bgGradient = juce::ColourGradient(
+            bgGradient.getColour(0).brighter(0.05f),
+            drawBounds.getTopLeft().toFloat(),
+            bgGradient.getColour(1).brighter(0.05f),
+            drawBounds.getBottomRight().toFloat(), false);
+    }
+    
+    g.setGradientFill(bgGradient);
+    g.fillRoundedRectangle(drawBounds, cornerRadius);
+    
+    // 3D effect: Subtle highlight on top-left, shadow on bottom-right
+    // Top-left highlight (subtle white highlight)
+    juce::ColourGradient highlightGradient(
+        juce::Colours::white.withAlpha(isEnabled ? 0.08f : 0.04f),
+        drawBounds.getTopLeft().toFloat(),
+        juce::Colours::white.withAlpha(0.0f),
+        drawBounds.getCentre().toFloat(), false);
+    g.setGradientFill(highlightGradient);
+    g.fillRoundedRectangle(drawBounds.reduced(1.0f), cornerRadius - 1.0f);
+    
+    // Bottom-right shadow (subtle dark shadow)
+    juce::ColourGradient shadowGradient(
+        juce::Colours::black.withAlpha(0.0f),
+        drawBounds.getCentre().toFloat(),
+        juce::Colours::black.withAlpha(isEnabled ? 0.15f : 0.08f),
+        drawBounds.getBottomRight().toFloat(), false);
+    g.setGradientFill(shadowGradient);
+    g.fillRoundedRectangle(drawBounds.reduced(1.0f), cornerRadius - 1.0f);
+    
+    // Single clean border (theme.panelOutline or theme.accent when ON)
+    auto borderColour = theme.panelOutline;
     if (!isEnabled)
-        bgColour = bgColour.withMultipliedAlpha(0.5f);
-    else if (isDown)
-        bgColour = bgColour.brighter(0.1f);
-    else if (isOver)
-        bgColour = bgColour.brighter(0.05f);
-
-    // Draw rounded rectangle background.
-    g.setColour(bgColour);
-    g.fillRoundedRectangle(bounds.reduced(0.5f), 4.0f);
-
-    // v4.2: Clear, well-defined borders for solo toggles to match rest of GUI.
-    // Dual-layer border system ensures visibility even with shading/gradients behind.
-    // Outer border for definition (always visible).
-    auto outerBorderColour = theme.panelOutline;
-    if (!isEnabled)
-        outerBorderColour = outerBorderColour.withAlpha(0.5f);
+        borderColour = borderColour.withAlpha(0.5f);
     else if (isOn)
-        outerBorderColour = theme.accent;
+        borderColour = theme.accent.withAlpha(0.9f);
     else if (isOver)
-        outerBorderColour = theme.panelOutline.brighter(0.15f);
+        borderColour = theme.panelOutline.brighter(0.15f);
     
-    g.setColour(outerBorderColour);
-    g.drawRoundedRectangle(bounds.reduced(0.5f), 4.0f, 1.2f);
-    
-    // Inner border for depth and better definition (especially with shading behind).
-    auto innerBorderColour = theme.panelOutline.withAlpha(0.3f);
-    if (isOn)
-        innerBorderColour = theme.accent.withAlpha(0.4f);
-    else if (isOver && isEnabled)
-        innerBorderColour = theme.accent.withAlpha(0.25f);
-    
-    g.setColour(innerBorderColour);
-    g.drawRoundedRectangle(bounds.reduced(1.5f), 3.0f, 0.8f);
+    g.setColour(borderColour);
+    g.drawRoundedRectangle(drawBounds, cornerRadius, 1.2f);
 
     // Draw text centered inside.
     auto textColour = button.findColour(juce::ToggleButton::textColourId);
@@ -227,6 +258,6 @@ void EQProLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b
 
     g.setColour(textColour);
     g.setFont(juce::Font(12.0f).boldened());
-    g.drawFittedText(button.getButtonText(), bounds.toNearestInt(),
+    g.drawFittedText(button.getButtonText(), drawBounds.toNearestInt(),
                      juce::Justification::centred, 1);
 }

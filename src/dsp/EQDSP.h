@@ -36,8 +36,10 @@ public:
     float getDetectorDb(int channelIndex, int bandIndex) const;
     float getDynamicGainDb(int channelIndex, int bandIndex) const;
     // Process buffer in-place (optional detector source).
+    // If harmonicOnlyBuffer is provided, it is filled with harmonic-only content (harmonicSample - sample).
     void process(juce::AudioBuffer<float>& buffer,
-                 const juce::AudioBuffer<float>* detectorBuffer = nullptr);
+                 const juce::AudioBuffer<float>* detectorBuffer = nullptr,
+                 juce::AudioBuffer<float>* harmonicOnlyBuffer = nullptr);
 
 private:
     double sampleRateHz = 48000.0;

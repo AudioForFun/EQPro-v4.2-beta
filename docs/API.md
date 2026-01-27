@@ -61,7 +61,7 @@ Usage:
 - UI reads via `AudioFifo& getFifo()` on timer.
 
 **v4.5 beta**: Added third analyzer tap for harmonic processing visualization:
-- `analyzerHarmonicTap`: Captures program signal + harmonics after harmonic processing
+- `analyzerHarmonicTap`: Captures harmonic-only content (no dry signal) after harmonic processing
 - Accessed via `getAnalyzerHarmonicFifo()` from processor
 - Used to display red analyzer curve showing spectral impact of harmonic generation
 - Only active when harmonics are enabled on at least one band

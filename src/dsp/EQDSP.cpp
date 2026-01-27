@@ -363,12 +363,25 @@ float EQDSP::getDynamicGainDb(int channelIndex, int bandIndex) const
 }
 
 void EQDSP::process(juce::AudioBuffer<float>& buffer,
-                    const juce::AudioBuffer<float>* detectorBuffer)
+                    const juce::AudioBuffer<float>* detectorBuffer,
+                    juce::AudioBuffer<float>* harmonicOnlyBuffer)
 {
     if (globalBypass)
+    {
+        if (harmonicOnlyBuffer != nullptr)
+        {
+            harmonicOnlyBuffer->setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
+            harmonicOnlyBuffer->clear();
+        }
         return;
+    }
 
     const int samples = buffer.getNumSamples();
+    if (harmonicOnlyBuffer != nullptr)
+    {
+        harmonicOnlyBuffer->setSize(buffer.getNumChannels(), samples, false, false, true);
+        harmonicOnlyBuffer->clear();
+    }
     const bool externalAvailable = detectorBuffer != nullptr
         && detectorBuffer->getNumSamples() == samples
         && detectorBuffer->getNumChannels() > 0;
@@ -780,6 +793,9 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
     {
         auto* channelData = buffer.getWritePointer(ch);
         const auto* dryData = scratchBuffer.getReadPointer(ch);
+        float* harmonicOnlyData = harmonicOnlyBuffer != nullptr
+            ? harmonicOnlyBuffer->getWritePointer(ch)
+            : nullptr;
         juce::FloatVectorOperations::copy(channelData, dryData, samples);
         auto* rightData = (numChannels >= 2) ? buffer.getWritePointer(1) : nullptr;
         for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
@@ -1038,6 +1054,9 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 // The dry signal is already aligned (no additional delay needed for non-oversampled case)
                 // For oversampled case, latency compensation is handled via harmonicDryDelayBuffers
                 // This ensures the dry and wet harmonic signals are perfectly aligned for sample-accurate mixing
+                const float harmonicDelta = (harmonicSample - sample) * mix;
+                if (harmonicOnlyData != nullptr)
+                    harmonicOnlyData[i] += harmonicDelta;
                 channelData[i] += (harmonicSample - dry) * mix;
             }
         }

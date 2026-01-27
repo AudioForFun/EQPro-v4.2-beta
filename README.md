@@ -33,7 +33,7 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 - **Three analyzer curves** for comprehensive visual feedback:
   - **Pre-EQ curve** (light grey): Input signal before processing
   - **Post-EQ curve** (darker grey): Output signal after EQ processing
-  - **Harmonic curve** (red, v4.5 beta): Program signal + harmonics - only visible when harmonics are active
+  - **Harmonic curve** (red, v4.5 beta): Harmonic-only content (no dry signal) - only visible when harmonics are active
 - **Interactive band overlays** with color-coded frequency responses
 - **Hover readouts** showing frequency, gain, Q, and filter type
 - **Adjustable analyzer settings**: Range, speed, freeze, and view modes
@@ -110,7 +110,7 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 - Non-linear waveshaping: Cubic distortion for odd harmonics, quadratic for even harmonics
 
 ### Red Analyzer Curve
-- **Third analyzer curve** displaying program signal + harmonics in bright red
+- **Third analyzer curve** displaying harmonic-only content in bright red
 - Only visible when harmonics are active on at least one band
 - Respects all analyzer settings: range, speed, freeze
 - Provides real-time visual feedback for harmonic processing impact

@@ -55,13 +55,13 @@ AnalyzerComponent::AnalyzerComponent(EQProAudioProcessor& processor)
     : processorRef(processor),
       parameters(processor.getParameters()),
       externalFifo(processor.getAnalyzerExternalFifo()),
-      harmonicFifo(processor.getAnalyzerHarmonicFifo()),  // v4.5 beta: FIFO for program + harmonics (red curve)
+      harmonicFifo(processor.getAnalyzerHarmonicFifo()),  // v4.5 beta: FIFO for harmonic-only curve (red)
       fft(fftOrder),
       window(fftSize, juce::dsp::WindowingFunction<float>::hann)
 {
     preMagnitudes.fill(kAnalyzerMinDb);
     postMagnitudes.fill(kAnalyzerMinDb);
-    harmonicMagnitudes.fill(kAnalyzerMinDb);  // v4.5 beta: Magnitudes for program + harmonics (red curve)
+    harmonicMagnitudes.fill(kAnalyzerMinDb);  // v4.5 beta: Magnitudes for harmonic-only curve (red)
     externalMagnitudes.fill(kAnalyzerMinDb);
     selectedBands.push_back(selectedBand);
     lastTimerHz = 30;
@@ -261,10 +261,9 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         g.strokePath(postPath, juce::PathStrokeType(3.5f * scale));
     }
 
-    // v4.5 beta: Draw harmonic curve (program + harmonics) in RED
+    // v4.5 beta: Draw harmonic curve (harmonic-only content) in RED
     // This third analyzer curve provides visual feedback for the harmonic processing layer.
-    // It displays the program signal with harmonics applied, allowing users to see the spectral
-    // impact of harmonic generation in real-time.
+    // It displays only the harmonic contribution (no dry/program signal), so changes are clearer.
     //
     // Visual Design:
     // - Bright red color (0xffff4444) for clear distinction from grey pre/post curves
@@ -1409,8 +1408,8 @@ void AnalyzerComponent::updateFft()
     }
     }
 
-    // v4.5 beta: Process harmonic curve (program + harmonics) - red analyzer curve
-    // This third analyzer curve displays the program signal with harmonics applied, providing visual feedback
+    // v4.5 beta: Process harmonic curve (harmonic-only content) - red analyzer curve
+    // This third analyzer curve displays only harmonic content (no dry/program signal), providing clear feedback
     // for the harmonic processing layer. The curve is only visible when harmonics are active on at least one band.
     //
     // Visibility Logic:

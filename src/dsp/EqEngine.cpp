@@ -33,6 +33,10 @@ void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
     minPhaseDelaySamples = 0;
     oversampledBuffer.setSize(numChannels, maxBlockSize * 4);
     oversampledBuffer.clear();
+    harmonicTapBuffer.setSize(numChannels, maxBlockSize);
+    harmonicTapBuffer.clear();
+    harmonicTapOversampledBuffer.setSize(numChannels, maxBlockSize * 16);
+    harmonicTapOversampledBuffer.clear();
 
     globalMixSmoothed.reset(sampleRate, 0.02);
     globalMixSmoothed.setCurrentAndTargetValue(1.0f);
@@ -69,7 +73,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                        const juce::AudioBuffer<float>* detectorBuffer,
                        AnalyzerTap& preTap,
                        AnalyzerTap& postTap,
-                       AnalyzerTap& harmonicTap,  // v4.5 beta: Tap for program + harmonics (red curve)
+                       AnalyzerTap& harmonicTap,  // v4.5 beta: Tap for harmonic-only curve (red)
                        MeterTap& meterTap)
 {
     const int numChannels = juce::jmin(buffer.getNumChannels(), snapshot.numChannels);
@@ -230,7 +234,9 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             juce::FloatVectorOperations::copy(oversampledBuffer.getWritePointer(ch),
                                               upBlock.getChannelPointer(ch), upSamples);
 
-        eqDspOversampled.process(oversampledBuffer, detectorBuffer);
+        harmonicTapOversampledBuffer.setSize(channels, upSamples, false, false, true);
+        harmonicTapOversampledBuffer.clear();
+        eqDspOversampled.process(oversampledBuffer, detectorBuffer, &harmonicTapOversampledBuffer);
 
         if (snapshot.characterMode > 0)
         {
@@ -268,44 +274,35 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             }
         }
         
-        if (hasActiveHarmonics && buffer.getNumChannels() > 0)
+        if (hasActiveHarmonics && harmonicTapOversampledBuffer.getNumChannels() > 0)
         {
-            const float* data = buffer.getReadPointer(0);
-            const int samples = buffer.getNumSamples();
-            int stride = 1;
-            if (sampleRateHz >= 192000.0)
-                stride = 4;
-            else if (sampleRateHz >= 96000.0)
-                stride = 2;
-            if (samples > 4096)
-                stride = juce::jmax(stride, samples / 2048);
+            const float* data = harmonicTapOversampledBuffer.getReadPointer(0);
+            const int samples = harmonicTapOversampledBuffer.getNumSamples();
+            int stride = (oversamplingIndex > 0) ? (1 << oversamplingIndex) : 1;
+            const int perfStride = (sampleRateHz >= 192000.0 ? 4 : (sampleRateHz >= 96000.0 ? 2 : 1));
+            stride = juce::jmax(stride, stride * perfStride);
 
-            if (stride == 1)
+            constexpr int kChunk = 512;
+            float temp[kChunk];
+            int idx = 0;
+            for (int i = 0; i < samples; i += stride)
             {
-                harmonicTap.push(data, samples);
-            }
-            else
-            {
-                constexpr int kChunk = 512;
-                float temp[kChunk];
-                int idx = 0;
-                for (int i = 0; i < samples; i += stride)
+                temp[idx++] = data[i];
+                if (idx == kChunk)
                 {
-                    temp[idx++] = data[i];
-                    if (idx == kChunk)
-                    {
-                        harmonicTap.push(temp, idx);
-                        idx = 0;
-                    }
-                }
-                if (idx > 0)
                     harmonicTap.push(temp, idx);
+                    idx = 0;
+                }
             }
+            if (idx > 0)
+                harmonicTap.push(temp, idx);
         }
     }
     else if (phaseMode == 0)
     {
-        eqDsp.process(buffer, detectorBuffer);
+        harmonicTapBuffer.setSize(numChannels, buffer.getNumSamples(), false, false, true);
+        harmonicTapBuffer.clear();
+        eqDsp.process(buffer, detectorBuffer, &harmonicTapBuffer);
         
         // v4.5 beta: Tap signal after harmonic processing for realtime path
         // Harmonics are processed inside eqDsp, so tap right after
@@ -325,10 +322,10 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             }
         }
         
-        if (hasActiveHarmonics && buffer.getNumChannels() > 0)
+        if (hasActiveHarmonics && harmonicTapBuffer.getNumChannels() > 0)
         {
-            const float* data = buffer.getReadPointer(0);
-            const int samples = buffer.getNumSamples();
+            const float* data = harmonicTapBuffer.getReadPointer(0);
+            const int samples = harmonicTapBuffer.getNumSamples();
             int stride = 1;
             if (sampleRateHz >= 192000.0)
                 stride = 4;
@@ -407,7 +404,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                     juce::FloatVectorOperations::copy(minPhaseBuffer.getWritePointer(ch),
                                                       buffer.getReadPointer(ch), samples);
                 // Minimum-phase pass for transient preservation in linear modes.
-                eqDsp.process(minPhaseBuffer, detectorBuffer);
+                eqDsp.process(minPhaseBuffer, detectorBuffer, nullptr);
                 if (latencySamples > 0)
                 {
                     updateMinPhaseDelay(latencySamples, samples, numChannels);
@@ -485,7 +482,9 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             }
 
             // Realtime reference pass for post-mode RMS calibration.
-            eqDsp.process(calibBuffer, detectorBuffer);
+            harmonicTapBuffer.setSize(numChannels, calibBuffer.getNumSamples(), false, false, true);
+            harmonicTapBuffer.clear();
+            eqDsp.process(calibBuffer, detectorBuffer, &harmonicTapBuffer);
             
             // v4.5 beta: For linear phase mode, tap from calibBuffer which has harmonics from eqDsp
             // The calibBuffer contains the realtime reference with harmonics, which is what we want to show
@@ -505,10 +504,10 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                 }
             }
             
-            if (hasActiveHarmonics && calibBuffer.getNumChannels() > 0)
+            if (hasActiveHarmonics && harmonicTapBuffer.getNumChannels() > 0)
             {
-                const float* data = calibBuffer.getReadPointer(0);
-                const int samples = calibBuffer.getNumSamples();
+                const float* data = harmonicTapBuffer.getReadPointer(0);
+                const int samples = harmonicTapBuffer.getNumSamples();
                 int stride = 1;
                 if (sampleRateHz >= 192000.0)
                     stride = 4;

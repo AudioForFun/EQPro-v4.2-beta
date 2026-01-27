@@ -24,7 +24,7 @@ public:
                  const juce::AudioBuffer<float>* detectorBuffer,
                  AnalyzerTap& preTap,
                  AnalyzerTap& postTap,
-                 AnalyzerTap& harmonicTap,  // v4.5 beta: Tap for program + harmonics (red curve)
+                 AnalyzerTap& harmonicTap,  // v4.5 beta: Tap for harmonic-only curve (red)
                  MeterTap& meterTap);
     // Rebuild FIR paths when parameters change.
     void updateLinearPhase(const ParamSnapshot& snapshot, double sampleRate);
@@ -66,6 +66,8 @@ private:
     int minPhaseDelaySamples = 0;
     juce::AudioBuffer<float> calibBuffer;
     juce::AudioBuffer<float> oversampledBuffer;
+    juce::AudioBuffer<float> harmonicTapBuffer;
+    juce::AudioBuffer<float> harmonicTapOversampledBuffer;
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;
 
     juce::SmoothedValue<float> globalMixSmoothed;

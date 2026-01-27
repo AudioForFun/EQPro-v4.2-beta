@@ -903,6 +903,7 @@ void BandControlsPanel::setLayer(BandControlsPanel::LayerType layer)
     updateLayerVisibility();
     updateAttachments();  // Update parameter attachments for current layer
     syncUiFromParams();   // Sync UI with parameters
+    resized();  // v4.4 beta: Force layout update to reposition controls for new layer
     repaint();
 }
 
@@ -920,7 +921,7 @@ void BandControlsPanel::updateLayerVisibility()
     qSlider.setVisible(isEQLayer);
     mixSlider.setVisible(isEQLayer);
     
-    // Harmonic layer controls
+    // Harmonic layer controls - v4.4 beta: Ensure they're visible and properly added
     oddLabel.setVisible(!isEQLayer);
     mixOddLabel.setVisible(!isEQLayer);
     evenLabel.setVisible(!isEQLayer);
@@ -930,6 +931,27 @@ void BandControlsPanel::updateLayerVisibility()
     evenHarmonicSlider.setVisible(!isEQLayer);
     mixEvenSlider.setVisible(!isEQLayer);
     harmonicBypassToggle.setVisible(!isEQLayer);  // v4.4 beta: Show bypass only on Harmonic layer
+    
+    // v4.4 beta: Ensure harmonic controls are added to component tree and enabled
+    if (!isEQLayer)
+    {
+        addAndMakeVisible(oddLabel);
+        addAndMakeVisible(mixOddLabel);
+        addAndMakeVisible(evenLabel);
+        addAndMakeVisible(mixEvenLabel);
+        addAndMakeVisible(oddHarmonicSlider);
+        addAndMakeVisible(mixOddSlider);
+        addAndMakeVisible(evenHarmonicSlider);
+        addAndMakeVisible(mixEvenSlider);
+        addAndMakeVisible(harmonicBypassToggle);
+        
+        // Enable all harmonic controls
+        oddHarmonicSlider.setEnabled(true);
+        mixOddSlider.setEnabled(true);
+        evenHarmonicSlider.setEnabled(true);
+        mixEvenSlider.setEnabled(true);
+        harmonicBypassToggle.setEnabled(true);
+    }
     
     // Dropdowns: hide on Harmonic layer
     typeLabel.setVisible(isEQLayer);

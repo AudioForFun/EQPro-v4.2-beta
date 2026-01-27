@@ -1541,7 +1541,8 @@ void AnalyzerComponent::drawGridLines(juce::Graphics& g, const juce::Rectangle<i
         if (x + labelWidth <= area.getRight() && (x - lastLabelX) >= minLabelSpacing)
         {
             lastLabelX = x;
-            // Plain text frequency labels (no background boxes).
+            // v4.4 beta: Plain text frequency labels (no background boxes).
+            // Removed rounded rectangle backgrounds and borders for minimal, clean appearance.
             const auto labelRect = juce::Rectangle<int>(static_cast<int>(x + 3.0f * scale),
                                                          static_cast<int>(area.getBottom() - bottomGutter),
                                                          labelWidth,
@@ -1647,8 +1648,9 @@ void AnalyzerComponent::drawAmplitudeLabels(juce::Graphics& g, const juce::Recta
         
         const auto labelRect = juce::Rectangle<int>(labelX, labelY, labelWidth, labelHeight);
         
-        // Compact labels: No background boxes, just text for minimal space usage.
+        // v4.4 beta: Compact labels - No background boxes, just text for minimal space usage.
         // Text only (no rounded rectangle background) to reduce visual footprint.
+        // Reduced leftGutter from 70px to 52px, labelWidth from 48px to 36px for more FFT display space.
         g.setColour(theme.textMuted.withAlpha(0.9f));  // High contrast text, no background
         g.setFont(juce::Font(9.5f * scale, juce::Font::plain));  // Slightly smaller font
         g.drawFittedText(juce::String(db, 0),

@@ -1,4 +1,4 @@
-# EQ Pro (JUCE) - 4.1 beta
+# EQ Pro (JUCE) - 4.4 beta
 
 Work-in-progress JUCE multi-channel EQ plugin.
 
@@ -6,6 +6,9 @@ Work-in-progress JUCE multi-channel EQ plugin.
 EQ Pro is a precision multi-channel EQ designed for modern mixing, mastering, and immersive
 formats. It combines detailed visual feedback with fast, musical controls and phase-accurate
 processing modes for transparent or surgical work across stereo, surround, and Atmos layouts.
+
+**v4.4 beta** introduces harmonized 3D beveled styling across all UI elements (knobs, toggles, and buttons),
+optimized FFT analyzer labels for maximum display space, and a consistent modern visual language throughout the interface.
 
 ## Key Features
 - 12 fully parametric bands per channel with per-band mix and routing.
@@ -37,9 +40,14 @@ cmake --build build --config Release
 - Standalone audio device restore is disabled by default; set `EQPRO_LOAD_AUDIO_STATE=1` to enable.
 - Standalone window position restore is disabled by default; set `EQPRO_LOAD_WINDOW_POS=1` to enable.
 
-## Processing Modes (v4.1 beta)
+## Processing Modes (v4.4 beta)
 - Real-time: minimum-phase IIR (0 latency).
 - Natural: short linear-phase FIR with adaptive tap length and mixed-phase blend.
 - Linear: long linear-phase FIR with adaptive taps and mixed-phase blend.
+
+## Recent Updates (v4.4 beta)
+- **UI Harmonization**: All text buttons now feature modern 3D beveled styling matching knobs and toggles
+- **FFT Analyzer Optimization**: Compact, plain text labels (no background boxes) for maximum display space
+- **Visual Consistency**: Unified 3D gradient style across all interactive elements
 
 

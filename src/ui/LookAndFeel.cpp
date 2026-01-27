@@ -205,7 +205,8 @@ void EQProLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& but
                                              bool shouldDrawButtonAsHighlighted,
                                              bool shouldDrawButtonAsDown)
 {
-    // Modern 3D beveled text button - harmonizes with toggle buttons and knobs
+    // v4.4 beta: Modern 3D beveled text button - harmonizes with toggle buttons and knobs
+    // Applied to all text buttons in preset section and EQ control section for consistent visual language.
     const auto bounds = button.getLocalBounds().toFloat();
     const bool isEnabled = button.isEnabled();
     const bool isOver = button.isMouseOver();

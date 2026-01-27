@@ -245,7 +245,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         processorRef.getParameters(), ParamIDs::qModeAmount, qAmountSlider);
 
     autoGainLabel.setText("Auto Gain", juce::dontSendNotification);
-    autoGainLabel.setJustificationType(juce::Justification::centredLeft);
+    autoGainLabel.setJustificationType(juce::Justification::centred);
     autoGainLabel.setFont(kLabelFontSize);
     autoGainLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(autoGainLabel);
@@ -358,7 +358,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         processorRef.getParameters(), ParamIDs::midiTarget, midiTargetBox);
 
     outputTrimLabel.setText("Output", juce::dontSendNotification);
-    outputTrimLabel.setJustificationType(juce::Justification::centredLeft);
+    outputTrimLabel.setJustificationType(juce::Justification::centred);
     outputTrimLabel.setFont(kLabelFontSize);
     outputTrimLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(outputTrimLabel);
@@ -1411,10 +1411,15 @@ void EQProAudioProcessorEditor::resized()
     const int trimLabelHeight = static_cast<int>(14 * uiScale);
     auto trimArea = metersArea.removeFromBottom(trimSize + trimLabelHeight + static_cast<int>(10 * uiScale));
     auto outputArea = trimArea.removeFromLeft(trimArea.getWidth() / 2);
-    outputTrimLabel.setBounds(outputArea.removeFromTop(trimLabelHeight));
+    // Center the Output label above the slider (use slider width for centering).
+    auto outputLabelArea = outputArea.removeFromTop(trimLabelHeight);
+    outputTrimLabel.setBounds(outputLabelArea.withSizeKeepingCentre(trimSize, trimLabelHeight));
     outputTrimSlider.setBounds(outputArea.withSizeKeepingCentre(trimSize, trimSize));
-    autoGainLabel.setBounds(trimArea.removeFromTop(trimLabelHeight));
-    autoGainToggle.setBounds(trimArea.withSizeKeepingCentre(static_cast<int>(60 * uiScale),
+    // Center the Auto Gain label above the toggle button.
+    const int autoGainToggleWidth = static_cast<int>(60 * uiScale);
+    auto autoGainLabelArea = trimArea.removeFromTop(trimLabelHeight);
+    autoGainLabel.setBounds(autoGainLabelArea.withSizeKeepingCentre(autoGainToggleWidth, trimLabelHeight));
+    autoGainToggle.setBounds(trimArea.withSizeKeepingCentre(autoGainToggleWidth,
                                                             static_cast<int>(22 * uiScale)));
 
     meters.setBounds(metersArea);

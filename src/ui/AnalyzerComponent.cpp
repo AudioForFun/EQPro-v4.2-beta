@@ -591,9 +591,9 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         const float spectrumMaxDb = kAnalyzerMaxDb;   // +60 dB
         const float spectrumStep = 6.0f;
         const float amplitudeLabelHeight = 14.0f * uiScale;
-        const float leftGutter = 70.0f * uiScale;
-        const float amplitudeLabelX = magnitudeArea.getX() + 18.0f * uiScale;
-        const float amplitudeLabelWidth = 48.0f * uiScale;
+        const float leftGutter = 52.0f * uiScale;  // Updated to match reduced leftGutter
+        const float amplitudeLabelX = magnitudeArea.getX() + 8.0f * uiScale;  // Updated to match reduced margin
+        const float amplitudeLabelWidth = 36.0f * uiScale;  // Updated to match reduced labelWidth
         
         // Check if dynamic label would overlap with any amplitude scale label.
         for (float db = spectrumMinDb; db <= spectrumMaxDb + 0.01f; db += spectrumStep)
@@ -1612,7 +1612,8 @@ void AnalyzerComponent::drawAmplitudeLabels(juce::Graphics& g, const juce::Recta
     const float spectrumStep = 6.0f;
     
     // Calculate spacing to determine if labels should be shown.
-    const int leftGutter = static_cast<int>(70 * scale);
+    // Reduced space usage: smaller left gutter and more compact labels.
+    const int leftGutter = static_cast<int>(52 * scale);  // Reduced from 70 to 52 for less space usage
     const int rightGutter = static_cast<int>(44 * scale);
     const int bottomGutter = static_cast<int>(18 * scale);
     const auto labelArea = area.withTrimmedLeft(leftGutter).withTrimmedRight(rightGutter)
@@ -1620,11 +1621,8 @@ void AnalyzerComponent::drawAmplitudeLabels(juce::Graphics& g, const juce::Recta
     const float majorSpacing = labelArea.getHeight() * (12.0f / (spectrumMaxDb - spectrumMinDb));
     const bool showDbLabels = majorSpacing >= 14.0f * scale;
     
-    // Check band point positions to avoid overlaps.
-    // Band points have radius ~6.5px + glow ~3px = ~9.5px, plus selected can be +2.5px = ~12px total.
-    const float maxBandPointRadius = (kPointRadius + 2.5f + 3.0f) * scale;  // Maximum possible radius
-    
     // Draw amplitude labels for all major grid lines from -60 to +60 dB.
+    // More compact labels: smaller width, reduced margin, no background boxes for minimal space usage.
     for (float db = spectrumMinDb; db <= spectrumMaxDb + 0.01f; db += spectrumStep)
     {
         const bool major = (static_cast<int>(db) % 12 == 0);
@@ -1633,28 +1631,10 @@ void AnalyzerComponent::drawAmplitudeLabels(juce::Graphics& g, const juce::Recta
             
         const float y = gainToY(db);
         
-        // Check if any band point is near this Y position and adjust label X position accordingly.
-        float minClearX = area.getX() + static_cast<float>(18 * scale);  // Base margin
-        for (const auto& point : bandPoints)
-        {
-            const float pointY = point.y;
-            const float yDistance = std::abs(pointY - y);
-            // If band point is within 15 pixels vertically of label, need extra horizontal clearance.
-            if (yDistance < 15.0f * scale)
-            {
-                // Calculate required X clearance to avoid overlap.
-                const float requiredClearance = maxBandPointRadius + static_cast<float>(5 * scale);
-                const float pointRightEdge = point.x + requiredClearance;
-                if (pointRightEdge > minClearX)
-                    minClearX = pointRightEdge;
-            }
-        }
-        
-        // Position label with calculated clearance to avoid all overlaps.
-        // Use consistent X position for all labels (no special treatment for "0").
-        const int labelX = static_cast<int>(area.getX() + 18 * scale);  // Fixed base margin for consistent alignment
-        const int labelHeight = static_cast<int>(14 * scale);
-        const int labelWidth = static_cast<int>(48 * scale);  // Wide enough for "-60"
+        // Compact label positioning: reduced margin and width.
+        const int labelX = static_cast<int>(area.getX() + 8 * scale);  // Reduced from 18 to 8 for minimal space
+        const int labelHeight = static_cast<int>(12 * scale);  // Reduced from 14 to 12
+        const int labelWidth = static_cast<int>(36 * scale);  // Reduced from 48 to 36 (still fits "-60")
         
         // Calculate Y position, ensuring label stays within visible area bounds.
         const int labelY = static_cast<int>(y - labelHeight * 0.5f);
@@ -1671,15 +1651,13 @@ void AnalyzerComponent::drawAmplitudeLabels(juce::Graphics& g, const juce::Recta
         
         const auto labelRect = juce::Rectangle<int>(labelX, labelY, labelWidth, labelHeight);
         
-        // Draw label with high visibility (drawn last, on top of everything).
-        g.setColour(theme.panel.withAlpha(0.9f));  // Higher alpha for better visibility on top
-        g.fillRoundedRectangle(labelRect.toFloat(), 3.0f);
-        g.setColour(theme.panelOutline.withAlpha(0.7f));  // Stronger border for visibility
-        g.drawRoundedRectangle(labelRect.toFloat(), 3.0f, 1.0f);
-        g.setColour(theme.textMuted.withAlpha(0.95f));  // High contrast text
+        // Compact labels: No background boxes, just text for minimal space usage.
+        // Text only (no rounded rectangle background) to reduce visual footprint.
+        g.setColour(theme.textMuted.withAlpha(0.9f));  // High contrast text, no background
+        g.setFont(juce::Font(9.5f * scale, juce::Font::plain));  // Slightly smaller font
         g.drawFittedText(juce::String(db, 0),
                          labelRect,
-                         juce::Justification::centred, 1);
+                         juce::Justification::left, 1);  // Left-aligned for compactness
     }
 }
 

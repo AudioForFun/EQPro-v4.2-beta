@@ -1633,14 +1633,7 @@ void AnalyzerComponent::drawGridLines(juce::Graphics& g, const juce::Rectangle<i
     g.drawLine(static_cast<float>(area.getX()), y,
                static_cast<float>(area.getRight()), y, 1.6f);
 
-    g.setColour(theme.textMuted.withAlpha(0.6f));
-    g.drawFittedText("EQ",
-                     juce::Rectangle<int>(area.getRight() - static_cast<int>(rightGutter),
-                                          area.getY() + static_cast<int>(2 * scale),
-                                          static_cast<int>(rightGutter - 4 * scale),
-                                          static_cast<int>(12 * scale)),
-                     juce::Justification::right, 1);
-    // Removed "SP" label - was never requested by user.
+    // v4.4 beta: Removed "EQ" label from top right corner - user requested removal
 }
 
 void AnalyzerComponent::drawAmplitudeLabels(juce::Graphics& g, const juce::Rectangle<int>& area)

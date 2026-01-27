@@ -1407,14 +1407,15 @@ void EQProAudioProcessorEditor::resized()
     toggleRow.removeFromLeft(meterToggleGap);
     peakToggle.setBounds(toggleRow.removeFromLeft(meterToggleW)
                              .withSizeKeepingCentre(meterToggleW, meterToggleH));
-    const int trimSize = static_cast<int>(72 * uiScale);
+    // Output knob should be same size as other rotaries (86 pixels).
+    const int outputKnobSize = 86;  // Same as knobSize in BandControlsPanel
     const int trimLabelHeight = static_cast<int>(14 * uiScale);
-    auto trimArea = metersArea.removeFromBottom(trimSize + trimLabelHeight + static_cast<int>(10 * uiScale));
+    auto trimArea = metersArea.removeFromBottom(outputKnobSize + trimLabelHeight + static_cast<int>(10 * uiScale));
     auto outputArea = trimArea.removeFromLeft(trimArea.getWidth() / 2);
-    // Center the Output label above the slider (use slider width for centering).
+    // Center the Output label above the slider (use knob width for centering).
     auto outputLabelArea = outputArea.removeFromTop(trimLabelHeight);
-    outputTrimLabel.setBounds(outputLabelArea.withSizeKeepingCentre(trimSize, trimLabelHeight));
-    outputTrimSlider.setBounds(outputArea.withSizeKeepingCentre(trimSize, trimSize));
+    outputTrimLabel.setBounds(outputLabelArea.withSizeKeepingCentre(outputKnobSize, trimLabelHeight));
+    outputTrimSlider.setBounds(outputArea.withSizeKeepingCentre(outputKnobSize, outputKnobSize));
     // Center the Auto Gain label above the toggle button.
     const int autoGainToggleWidth = static_cast<int>(60 * uiScale);
     auto autoGainLabelArea = trimArea.removeFromTop(trimLabelHeight);

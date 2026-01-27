@@ -165,21 +165,8 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
     g.setColour(juce::Colours::white.withAlpha(isEnabled ? 0.2f : 0.1f));
     g.drawEllipse(capBounds.reduced(0.5f), 0.5f);
 
-    // Default value indicator (snap point)
-    if (slider.isDoubleClickReturnEnabled())
-    {
-        const double defaultValue = slider.getDoubleClickReturnValue();
-        const double range = slider.getRange().getLength();
-        const double epsilon = (range > 0.0) ? range * 0.001 : 0.0001;
-        if (std::abs(slider.getValue() - defaultValue) <= epsilon)
-        {
-            const float snapAngle = rotaryStartAngle;
-            const float tickX = centre.x + std::cos(snapAngle) * (trackRadius - 2.0f);
-            const float tickY = centre.y + std::sin(snapAngle) * (trackRadius - 2.0f);
-            g.setColour(theme.accent.withAlpha(0.9f));
-            g.fillEllipse(tickX - 2.0f, tickY - 2.0f, 4.0f, 4.0f);
-        }
-    }
+    // Default value indicator (snap point) - removed per user request (residual dot not wanted).
+    // Removed the dot that was appearing at the default value position.
 }
 
 void EQProLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& button,

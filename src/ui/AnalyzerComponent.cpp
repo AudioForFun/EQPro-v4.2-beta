@@ -1601,15 +1601,25 @@ void AnalyzerComponent::drawAmplitudeLabels(juce::Graphics& g, const juce::Recta
         }
         
         // Position label with calculated clearance to avoid all overlaps.
-        const int labelX = static_cast<int>(minClearX);
-        const auto labelRect = juce::Rectangle<int>(labelX,
-                                                    static_cast<int>(y - 7 * scale),
-                                                    static_cast<int>(48 * scale),  // Wide enough for "-60"
-                                                    static_cast<int>(14 * scale));
+        // Use consistent X position for all labels (no special treatment for "0").
+        const int labelX = static_cast<int>(area.getX() + 18 * scale);  // Fixed base margin for consistent alignment
+        const int labelHeight = static_cast<int>(14 * scale);
+        const int labelWidth = static_cast<int>(48 * scale);  // Wide enough for "-60"
         
-        // Ensure label doesn't go outside plot area.
-        if (labelRect.getRight() > area.getRight() - static_cast<int>(rightGutter))
-            continue;  // Skip this label if it would overlap with right side
+        // Calculate Y position, ensuring label stays within visible area bounds.
+        const int labelY = static_cast<int>(y - labelHeight * 0.5f);
+        const int labelTop = labelY;
+        const int labelBottom = labelY + labelHeight;
+        
+        // Ensure label doesn't go outside plot area (top and bottom bounds).
+        if (labelTop < area.getY() || labelBottom > area.getBottom())
+            continue;  // Skip label if it would be clipped at top or bottom
+        
+        // Ensure label doesn't go outside plot area (right side).
+        if (labelX + labelWidth > area.getRight() - static_cast<int>(rightGutter))
+            continue;  // Skip label if it would overlap with right side
+        
+        const auto labelRect = juce::Rectangle<int>(labelX, labelY, labelWidth, labelHeight);
         
         // Draw label with high visibility (drawn last, on top of everything).
         g.setColour(theme.panel.withAlpha(0.9f));  // Higher alpha for better visibility on top

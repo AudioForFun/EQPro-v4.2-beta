@@ -185,59 +185,40 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     const bool drawPre = viewIndex != 2;
     const bool drawPost = viewIndex != 1;
 
-    // Modern spectrum colors using theme accent colors for better harmony.
-    juce::Colour preColour = theme.accent;  // Cyan/teal from theme
-    juce::Colour postColour = theme.accentAlt;  // Purple from theme
-    if (selectedBand >= 0 && selectedBand < static_cast<int>(perBandActive.size())
-        && perBandActive[static_cast<size_t>(selectedBand)])
-    {
-        const auto bandTint = ColorUtils::bandColour(selectedBand);
-        preColour = preColour.interpolatedWith(bandTint, 0.3f);
-        postColour = postColour.interpolatedWith(bandTint, 0.3f);
-    }
+    // Option 1: Classic Pro-Q Style - Two different grey tones for pre/post curves.
+    // Pre-EQ: Light grey (medium brightness, clearly visible).
+    juce::Colour preColour = juce::Colour(0xffC0C0C0);  // Light grey #C0C0C0
+    // Post-EQ: Darker grey (darker, still distinct).
+    juce::Colour postColour = juce::Colour(0xff808080);  // Darker grey #808080
 
-    // Modern spectrum rendering with gradient fills and glow.
+    // Classic Pro-Q style: Clean, thin lines with subtle fill, no glow effects.
     if (drawPre && !prePath.isEmpty())
     {
-        // Gradient fill under curve for modern look.
+        // Very subtle fill under curve (minimal alpha for professional look).
         juce::Path fillPath = prePath;
         fillPath.lineTo(plotArea.getRight(), magnitudeArea.getBottom());
         fillPath.lineTo(plotArea.getX(), magnitudeArea.getBottom());
         fillPath.closeSubPath();
-        juce::ColourGradient fillGradient(preColour.withAlpha(0.15f), magnitudeArea.toFloat().getTopLeft(),
-                                         preColour.withAlpha(0.05f), magnitudeArea.toFloat().getBottomLeft(), false);
-        g.setGradientFill(fillGradient);
+        g.setColour(preColour.withAlpha(0.06f));  // Very subtle fill
         g.fillPath(fillPath);
         
-        // Glow effect.
-        g.setColour(preColour.withAlpha(0.08f));
-        g.strokePath(prePath, juce::PathStrokeType(8.0f * scale));
-        // Main curve with modern styling.
-        g.setColour(preColour.withAlpha(0.25f));
-        g.strokePath(prePath, juce::PathStrokeType(4.0f * scale));
-        g.setColour(preColour.withAlpha(0.95f));
+        // Clean, thin line (1.8px) - no glow effects.
+        g.setColour(preColour.withAlpha(0.9f));
         g.strokePath(prePath, juce::PathStrokeType(1.8f * scale));
     }
 
     if (drawPost && !postPath.isEmpty())
     {
-        // Gradient fill under curve.
+        // Very subtle fill under curve.
         juce::Path fillPath = postPath;
         fillPath.lineTo(plotArea.getRight(), magnitudeArea.getBottom());
         fillPath.lineTo(plotArea.getX(), magnitudeArea.getBottom());
         fillPath.closeSubPath();
-        juce::ColourGradient fillGradient(postColour.withAlpha(0.18f), magnitudeArea.toFloat().getTopLeft(),
-                                         postColour.withAlpha(0.06f), magnitudeArea.toFloat().getBottomLeft(), false);
-        g.setGradientFill(fillGradient);
+        g.setColour(postColour.withAlpha(0.08f));  // Slightly more visible for darker grey
         g.fillPath(fillPath);
         
-        // Glow effect.
-        g.setColour(postColour.withAlpha(0.1f));
-        g.strokePath(postPath, juce::PathStrokeType(8.0f * scale));
-        // Main curve.
-        g.setColour(postColour.withAlpha(0.3f));
-        g.strokePath(postPath, juce::PathStrokeType(4.0f * scale));
-        g.setColour(postColour.withAlpha(0.95f));
+        // Clean, thin line (1.8px) - no glow effects.
+        g.setColour(postColour.withAlpha(0.9f));
         g.strokePath(postPath, juce::PathStrokeType(1.8f * scale));
     }
 
@@ -291,10 +272,8 @@ void AnalyzerComponent::paint(juce::Graphics& g)
                 swatchColour = postColour;
             else if (items[i] == "Ext")
                 swatchColour = postColour.withAlpha(0.6f);
-            // Modern swatch with glow.
+            // Clean swatch matching Pro-Q style (no glow, simple fill).
             const auto swatchRect = line.removeFromLeft(swatch).toFloat();
-            g.setColour(swatchColour.withAlpha(0.3f));
-            g.fillRoundedRectangle(swatchRect.expanded(1.0f), 2.5f);
             g.setColour(swatchColour);
             g.fillRoundedRectangle(swatchRect, 2.5f);
             g.setColour(theme.textMuted.withAlpha(0.95f));

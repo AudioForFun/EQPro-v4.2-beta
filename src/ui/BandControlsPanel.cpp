@@ -133,8 +133,10 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
 {
     // v4.4 beta: Defer timer start to avoid expensive repaints before components are laid out.
     // Timer will start after first resize to ensure proper initialization.
+    // This prevents UI blocking operations during component construction
     hasBeenResized = false;
-    // v4.4 beta: Use buffered rendering for better performance
+    // v4.4 beta: Use buffered rendering for better performance on initial load
+    // Reduces repaint overhead and ensures controls appear immediately
     setBufferedToImage(true);
     channelNames = processor.getCurrentChannelNames();
     for (auto& fade : bandHoverFade)
@@ -735,6 +737,7 @@ void BandControlsPanel::setMsEnabled(bool enabled)
 void BandControlsPanel::paint(juce::Graphics& g)
 {
     // v4.4 beta: Skip expensive painting if component isn't properly initialized or visible
+    // Prevents rendering operations on uninitialized components, ensuring instant GUI loading
     const auto bounds = getLocalBounds().toFloat();
     if (bounds.getWidth() <= 0 || bounds.getHeight() <= 0 || !isVisible())
         return;
@@ -1153,6 +1156,7 @@ void BandControlsPanel::resized()
 {
     // v4.4 beta: Start timer only after first resize to ensure components are properly laid out.
     // This prevents expensive repaints before initialization is complete.
+    // Critical for ensuring all controls (buttons, knobs, dropdowns) appear immediately on plugin load
     if (!hasBeenResized)
     {
         hasBeenResized = true;

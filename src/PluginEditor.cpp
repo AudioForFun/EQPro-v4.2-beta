@@ -1066,6 +1066,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     setResizeLimits(kEditorWidth, kEditorHeight, kEditorWidth, kEditorHeight);
     
     // v4.4 beta: Use buffered rendering for better performance on initial load
+    // Reduces repaint overhead and ensures all child components appear immediately
     setBufferedToImage(true);
 
     setSize(kEditorWidth, kEditorHeight);

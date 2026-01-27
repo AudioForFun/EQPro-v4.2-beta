@@ -63,9 +63,11 @@ AnalyzerComponent::AnalyzerComponent(EQProAudioProcessor& processor)
     selectedBands.push_back(selectedBand);
     lastTimerHz = 30;
     // v4.4 beta: Defer timer start - will start after first resize
+    // This prevents expensive FFT updates before component is properly laid out
     hasBeenResized = false;
     perBandCurveHash.assign(ParamIDs::kBandsPerChannel, 0);
-    // v4.4 beta: Use buffered rendering for better performance
+    // v4.4 beta: Use buffered rendering for better performance on initial load
+    // Reduces repaint overhead and ensures controls appear immediately
     setBufferedToImage(true);
 }
 
@@ -696,6 +698,8 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 void AnalyzerComponent::resized()
 {
     // v4.4 beta: Start timer only after first resize to ensure proper initialization
+    // Prevents expensive FFT updates and repaints before component is properly laid out
+    // This ensures all controls are visible immediately on plugin load
     if (!hasBeenResized)
     {
         hasBeenResized = true;

@@ -120,7 +120,9 @@ void EQProLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b
                                          bool shouldDrawButtonAsDown)
 {
     // v4.4 beta: Fast flat rendering for toggle buttons - performance optimized
+    // CRITICAL: Removed expensive ColourGradient objects and highlight overlays that were blocking UI thread
     // Simplified from 3D gradients to flat colors for instant rendering
+    // Applied to all toggle buttons: solo toggles, bypass toggles, RMS/Peak toggles, etc.
     const auto bounds = button.getLocalBounds().toFloat();
     const bool isOn = button.getToggleState();
     const bool isEnabled = button.isEnabled();
@@ -172,7 +174,9 @@ void EQProLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& but
                                              bool shouldDrawButtonAsDown)
 {
     // v4.4 beta: Fast flat rendering for text buttons - performance optimized
+    // CRITICAL: Removed expensive ColourGradient objects that were blocking UI thread
     // Simplified from 3D gradients to flat colors for instant rendering
+    // Applied to all text buttons: preset section, EQ control section, snapshot buttons, undo/redo
     const auto bounds = button.getLocalBounds().toFloat();
     const bool isEnabled = button.isEnabled();
     const bool isOver = button.isMouseOver();

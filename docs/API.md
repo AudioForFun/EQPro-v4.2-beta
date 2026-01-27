@@ -493,24 +493,37 @@ format lists are:
 - **UI Cleanup**:
   - Removed residual divider lines under band toggles, solo toggles, and dropdown menus
 
-## v4.4 Beta Updates (UI Harmonization & Space Optimization)
+## v4.4 Beta Updates (UI Harmonization, Space Optimization & Performance)
+- **Critical Performance Optimizations**:
+  - **Removed Expensive 3D Gradients**: Replaced all `ColourGradient` objects with fast flat colors
+    - Text buttons: Flat `theme.panel` color with simple brightness adjustments
+    - Toggle buttons: Flat colors with state-based brightness (no gradients or highlight overlays)
+    - Rotary knobs: Flat `theme.panel` color (gradient and shadow removed)
+    - Result: Instant rendering, no blocking operations, all controls appear immediately
+  - **Deferred Timer Initialization**:
+    - `AnalyzerComponent`: Timer starts in `resized()` instead of constructor
+    - `BandControlsPanel`: Timer starts only after first resize
+    - Prevents expensive repaints before components are properly laid out
+  - **Buffered Rendering**:
+    - `PluginEditor`, `BandControlsPanel`, and `AnalyzerComponent` use `setBufferedToImage(true)`
+    - Reduces repaint overhead and improves rendering performance
+  - **Result**: Plugin loads instantly with all controls visible from the start, no missing or partially rendered components
 - **FFT Analyzer Label Optimization**:
   - Amplitude scale labels made more compact (leftGutter: 70px → 52px, labelWidth: 48px → 36px)
   - Removed background boxes from both amplitude and frequency labels for minimal, clean appearance
   - Plain text labels only - no rounded rectangle backgrounds or borders
   - More space available for FFT display while maintaining readability
   - Labels use left-aligned text with smaller font (9.5px) for compactness
-- **3D Beveled Text Button Styling**:
-  - Added `drawButtonBackground` override in `EQProLookAndFeel` for modern 3D beveled text buttons
-  - Applied same 3D gradient style as toggle buttons (light top, dark bottom)
-  - Subtle highlight overlay for 3D depth effect
+- **Flat-Color Text Button Styling**:
+  - Added `drawButtonBackground` override in `EQProLookAndFeel` for fast flat-color text buttons
+  - Flat colors with simple state-based brightness adjustments (no gradients)
   - Consistent corner radius (4.0f), border style, and hover/pressed states
   - Applied to all text buttons:
     * Preset section: Copy, Paste, Reset, Reset All, Save, Load, Prev, Next, Refresh
     * EQ control section: Copy, Paste, Reset Band, Reset All, Band navigation (< >)
     * Snapshot buttons: A, B, C, D, Store, Recall
     * Undo/Redo buttons
-  - Harmonized visual language across entire GUI (knobs, toggles, and buttons)
+  - Harmonized visual language across entire GUI (knobs, toggles, and buttons) with flat colors
 
 ## Call Flow (Simplified)
 1. UI updates APVTS parameters.

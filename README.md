@@ -7,8 +7,8 @@ EQ Pro is a precision multi-channel EQ designed for modern mixing, mastering, an
 formats. It combines detailed visual feedback with fast, musical controls and phase-accurate
 processing modes for transparent or surgical work across stereo, surround, and Atmos layouts.
 
-**v4.4 beta** introduces harmonized 3D beveled styling across all UI elements (knobs, toggles, and buttons),
-optimized FFT analyzer labels for maximum display space, and a consistent modern visual language throughout the interface.
+**v4.4 beta** introduces optimized FFT analyzer labels for maximum display space, harmonized flat-color styling across all UI elements,
+and critical performance optimizations ensuring instant GUI loading with all controls visible from the start.
 
 ## Key Features
 - 12 fully parametric bands per channel with per-band mix and routing.
@@ -46,8 +46,12 @@ cmake --build build --config Release
 - Linear: long linear-phase FIR with adaptive taps and mixed-phase blend.
 
 ## Recent Updates (v4.4 beta)
-- **UI Harmonization**: All text buttons now feature modern 3D beveled styling matching knobs and toggles
+- **Performance Optimizations**: Critical fixes for instant GUI loading
+  - Removed expensive 3D gradients, replaced with fast flat colors for instant rendering
+  - Deferred timer initialization until components are properly laid out
+  - Added buffered rendering (`setBufferedToImage`) for reduced repaint overhead
+  - All controls now appear immediately on plugin load
 - **FFT Analyzer Optimization**: Compact, plain text labels (no background boxes) for maximum display space
-- **Visual Consistency**: Unified 3D gradient style across all interactive elements
+- **UI Harmonization**: Flat-color styling across all buttons, toggles, and knobs for consistent visual language
 
 

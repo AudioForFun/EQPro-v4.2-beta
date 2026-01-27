@@ -1573,30 +1573,13 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
     };
     drawHighLabel(20000.0f);
 
-    // Enhanced 0 dB reference line with modern styling.
+    // 0 dB reference line (without label - label removed per user request).
     const float db = 0.0f;
     const float y = gainToY(db);
-    // Subtle glow around 0 dB line.
-    g.setColour(theme.accent.withAlpha(0.15f));
+    // Subtle 0 dB line for reference.
+    g.setColour(gridColour.withAlpha(0.85f));
     g.drawLine(static_cast<float>(area.getX()), y,
-               static_cast<float>(area.getRight()), y, 3.0f);
-    // Main 0 dB line.
-    g.setColour(theme.accent.withAlpha(0.5f));
-    g.drawLine(static_cast<float>(area.getX()), y,
-               static_cast<float>(area.getRight()), y, 1.8f);
-    
-    // Modern 0 dB label.
-    const auto zeroLabelRect = juce::Rectangle<int>(static_cast<int>(area.getRight() - rightGutter + 4 * scale),
-                                                    static_cast<int>(y - 9 * scale),
-                                                    static_cast<int>(rightGutter - 6 * scale),
-                                                    static_cast<int>(14 * scale));
-    g.setColour(theme.accent.withAlpha(0.2f));
-    g.fillRoundedRectangle(zeroLabelRect.toFloat(), 3.0f);
-    g.setColour(theme.accent.withAlpha(0.6f));
-    g.drawRoundedRectangle(zeroLabelRect.toFloat(), 3.0f, 1.0f);
-    g.setColour(theme.accent.withAlpha(0.95f));
-    g.setFont(juce::Font(10.0f * scale, juce::Font::bold));
-    g.drawFittedText("0 dB", zeroLabelRect, juce::Justification::centred, 1);
+               static_cast<float>(area.getRight()), y, 1.6f);
 
     g.setColour(theme.textMuted.withAlpha(0.6f));
     g.drawFittedText("EQ",

@@ -39,7 +39,7 @@ Role: DSP‑only engine for prepare/reset/process.
 Lifecycle:
 1. `prepare(sampleRate, maxBlockSize, numChannels)`
 2. `reset()`
-3. `process(buffer, snapshot, detectorBuffer, preTap, postTap, meterTap)`
+3. `process(buffer, snapshot, detectorBuffer, preTap, postTap, harmonicTap, meterTap)` (v4.5 beta: added harmonicTap)
 4. `updateLinearPhase(snapshot, sampleRate)` (called from timer)
 
 Notes:
@@ -59,6 +59,12 @@ Role: Lock‑free FIFO bridge for analyzer data.
 Usage:
 - DSP calls `push()` from audio thread.
 - UI reads via `AudioFifo& getFifo()` on timer.
+
+**v4.5 beta**: Added third analyzer tap for harmonic processing visualization:
+- `analyzerHarmonicTap`: Captures program signal + harmonics after harmonic processing
+- Accessed via `getAnalyzerHarmonicFifo()` from processor
+- Used to display red analyzer curve showing spectral impact of harmonic generation
+- Only active when harmonics are enabled on at least one band
 
 ### `eqdsp::MeterTap`
 Location: `src/dsp/MeterTap.h/.cpp`  

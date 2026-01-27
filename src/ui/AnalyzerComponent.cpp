@@ -262,7 +262,19 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     }
 
     // v4.5 beta: Draw harmonic curve (program + harmonics) in RED
-    // Only visible when harmonics are active on at least one band
+    // This third analyzer curve provides visual feedback for the harmonic processing layer.
+    // It displays the program signal with harmonics applied, allowing users to see the spectral
+    // impact of harmonic generation in real-time.
+    //
+    // Visual Design:
+    // - Bright red color (0xffff4444) for clear distinction from grey pre/post curves
+    // - Same rendering style as pre/post curves: gradient fill + enhanced line with subtle glow
+    // - Uses quadratic interpolation for smooth, beautiful curves
+    // - Automatically appears when harmonics are active, disappears when all harmonics are bypassed
+    //
+    // Visibility Logic:
+    // - Checks all channels and bands to determine if any harmonic processing is active
+    // - Only draws the curve if at least one band has active harmonics (same logic as updateFft)
     bool hasActiveHarmonics = false;
     for (int ch = 0; ch < ParamIDs::kMaxChannels && !hasActiveHarmonics; ++ch)
     {
@@ -275,13 +287,14 @@ void AnalyzerComponent::paint(juce::Graphics& g)
             const auto bypassParam = parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, "harmonicBypass"));
             
             if (bypassParam != nullptr && bypassParam->load() > 0.5f)
-                continue;  // Bypassed
+                continue;  // Bypassed - skip this band
             
             const float odd = oddParam != nullptr ? oddParam->load() : 0.0f;
             const float even = evenParam != nullptr ? evenParam->load() : 0.0f;
             const float mixOdd = mixOddParam != nullptr ? (mixOddParam->load() / 100.0f) : 0.0f;
             const float mixEven = mixEvenParam != nullptr ? (mixEvenParam->load() / 100.0f) : 0.0f;
             
+            // Check if this band has active harmonics (non-zero amount with mix > 0)
             if ((std::abs(odd) > 0.001f && mixOdd > 0.001f) || (std::abs(even) > 0.001f && mixEven > 0.001f))
             {
                 hasActiveHarmonics = true;
@@ -293,18 +306,23 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     if (hasActiveHarmonics)
     {
         // Build harmonic path using same frequency mapping as pre/post curves
+        // This ensures the harmonic curve aligns perfectly with the frequency axis
         juce::Path harmonicPath;
         bool harmonicStarted = false;
         float prevHarmonicX = 0.0f, prevHarmonicY = 0.0f;
         
+        // Iterate through FFT bins and map to screen coordinates
         for (int bin = 1; bin < fftBins; ++bin)
         {
+            // Calculate frequency for this bin
             const float freq = (lastSampleRate * bin) / static_cast<float>(fftSize);
             if (freq < kMinFreq || freq > maxFreq)
-                continue;
+                continue;  // Skip frequencies outside display range
 
+            // Map frequency to normalized position (logarithmic scale)
             const float xNorm = FFTUtils::freqToNorm(freq, kMinFreq, maxFreq);
             const float x = plotArea.getX() + xNorm * plotArea.getWidth();
+            // Map magnitude (dB) to screen Y coordinate
             const float harmonicDb = harmonicMagnitudes[bin];
             const float harmonicY = juce::jmap(harmonicDb, kAnalyzerMinDb, kAnalyzerMaxDb,
                                                static_cast<float>(magnitudeArea.getBottom()),
@@ -312,6 +330,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
             if (!harmonicStarted)
             {
+                // Start new path at first valid point
                 harmonicPath.startNewSubPath(x, harmonicY);
                 prevHarmonicX = x;
                 prevHarmonicY = harmonicY;
@@ -319,7 +338,8 @@ void AnalyzerComponent::paint(juce::Graphics& g)
             }
             else
             {
-                // Use quadratic curves for smoother lines (same as pre/post)
+                // Use quadratic curves for smoother, more beautiful lines (same as pre/post curves)
+                // This creates smooth transitions between points instead of sharp linear segments
                 const float midX = (prevHarmonicX + x) * 0.5f;
                 const float midHarmonicY = (prevHarmonicY + harmonicY) * 0.5f;
                 harmonicPath.quadraticTo(midX, midHarmonicY, x, harmonicY);
@@ -331,24 +351,28 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         if (!harmonicPath.isEmpty())
         {
             // Red color for harmonic curve - distinct from grey pre/post curves
-            const juce::Colour harmonicColour = juce::Colour(0xffff4444);  // Bright red
+            // Bright red (0xffff4444) provides excellent visibility and clear distinction
+            const juce::Colour harmonicColour = juce::Colour(0xffff4444);
             
-            // Gradient fill under curve for depth
+            // Create gradient fill under curve for visual depth
+            // Fill extends from curve to bottom of plot area
             juce::Path fillPath = harmonicPath;
             fillPath.lineTo(plotArea.getRight(), magnitudeArea.getBottom());
             fillPath.lineTo(plotArea.getX(), magnitudeArea.getBottom());
             fillPath.closeSubPath();
             
+            // Gradient from brighter (top) to darker (bottom) for beautiful depth effect
             juce::ColourGradient fillGradient(
                 harmonicColour.withAlpha(0.12f), fillPath.getBounds().getTopLeft(),
                 harmonicColour.withAlpha(0.04f), fillPath.getBounds().getBottomLeft(), false);
             g.setGradientFill(fillGradient);
             g.fillPath(fillPath);
             
-            // Enhanced line with subtle glow
+            // Draw main curve line with enhanced styling
+            // Primary line: bright red with high opacity for clear visibility
             g.setColour(harmonicColour.withAlpha(0.95f));
             g.strokePath(harmonicPath, juce::PathStrokeType(2.0f * scale));
-            // Subtle outer glow
+            // Subtle outer glow: softer red with lower opacity for depth
             g.setColour(harmonicColour.withAlpha(0.15f));
             g.strokePath(harmonicPath, juce::PathStrokeType(3.5f * scale));
         }
@@ -1385,8 +1409,23 @@ void AnalyzerComponent::updateFft()
     }
     }
 
-    // v4.5 beta: Process harmonic curve (program + harmonics) - red curve
-    // Check if any band has harmonics active (not bypassed and has odd/even amount > 0)
+    // v4.5 beta: Process harmonic curve (program + harmonics) - red analyzer curve
+    // This third analyzer curve displays the program signal with harmonics applied, providing visual feedback
+    // for the harmonic processing layer. The curve is only visible when harmonics are active on at least one band.
+    //
+    // Visibility Logic:
+    // - Scans all channels and bands to determine if any harmonic processing is active
+    // - A band is considered active if:
+    //   1. Harmonic bypass is OFF (harmonicBypass < 0.5)
+    //   2. At least one harmonic type (odd or even) has non-zero amount AND mix > 0
+    // - If no active harmonics are found, the curve is hidden and magnitudes are reset
+    //
+    // Processing:
+    // - Pulls audio data from the harmonic analyzer tap FIFO (tapped after harmonic processing in DSP)
+    // - Applies windowing function (Hann) for spectral leakage reduction
+    // - Performs FFT to convert time-domain to frequency-domain
+    // - Converts magnitude to decibels and applies smoothing for visual stability
+    // - Respects all analyzer settings: range, speed, freeze (via timerCallback and updateFft call)
     bool hasActiveHarmonics = false;
     for (int ch = 0; ch < ParamIDs::kMaxChannels && !hasActiveHarmonics; ++ch)
     {
@@ -1399,13 +1438,14 @@ void AnalyzerComponent::updateFft()
             const auto bypassParam = parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, "harmonicBypass"));
             
             if (bypassParam != nullptr && bypassParam->load() > 0.5f)
-                continue;  // Bypassed
+                continue;  // Bypassed - skip this band
             
             const float odd = oddParam != nullptr ? oddParam->load() : 0.0f;
             const float even = evenParam != nullptr ? evenParam->load() : 0.0f;
             const float mixOdd = mixOddParam != nullptr ? (mixOddParam->load() / 100.0f) : 0.0f;
             const float mixEven = mixEvenParam != nullptr ? (mixEvenParam->load() / 100.0f) : 0.0f;
             
+            // Check if this band has active harmonics (non-zero amount with mix > 0)
             if ((std::abs(odd) > 0.001f && mixOdd > 0.001f) || (std::abs(even) > 0.001f && mixEven > 0.001f))
             {
                 hasActiveHarmonics = true;
@@ -1416,16 +1456,23 @@ void AnalyzerComponent::updateFft()
     
     if (hasActiveHarmonics)
     {
+        // Pull audio samples from harmonic analyzer tap FIFO
+        // This FIFO is fed by the DSP engine after harmonic processing is applied
         auto& harmonicFifoRef = harmonicFifo;
         const int pulled = harmonicFifoRef.pull(timeBuffer.data(), fftSize);
         if (pulled > 0)
         {
+            // Clear FFT data buffer and copy time-domain samples
             std::fill(fftDataHarmonic.begin(), fftDataHarmonic.end(), 0.0f);
             juce::FloatVectorOperations::copy(fftDataHarmonic.data(), timeBuffer.data(),
                                               juce::jmin(pulled, fftSize));
+            // Apply Hann windowing to reduce spectral leakage
             window.multiplyWithWindowingTable(fftDataHarmonic.data(), fftSize);
+            // Perform FFT: convert time-domain to frequency-domain
             fft.performFrequencyOnlyForwardTransform(fftDataHarmonic.data());
 
+            // Convert magnitude to decibels and apply exponential smoothing
+            // Smoothing coefficient (kSmoothingCoeff) provides visual stability while maintaining responsiveness
             for (int i = 0; i < fftBins; ++i)
             {
                 const float mag = juce::Decibels::gainToDecibels(fftDataHarmonic[static_cast<size_t>(i)],
@@ -1437,6 +1484,7 @@ void AnalyzerComponent::updateFft()
     else
     {
         // Reset harmonic magnitudes when no harmonics are active
+        // This ensures the curve disappears cleanly when all harmonics are bypassed or set to zero
         harmonicMagnitudes.fill(kAnalyzerMinDb);
     }
 

@@ -147,12 +147,28 @@ void EQProLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b
     g.setColour(bgColour);
     g.fillRoundedRectangle(bounds.reduced(0.5f), 4.0f);
 
-    // Draw outline.
-    auto outlineColour = theme.panelOutline.withAlpha(isEnabled ? 0.6f : 0.3f);
-    if (isOver && isEnabled)
-        outlineColour = theme.accent.withAlpha(0.4f);
-    g.setColour(outlineColour);
-    g.drawRoundedRectangle(bounds.reduced(0.5f), 4.0f, 1.0f);
+    // Draw clear, well-defined borders for coherence with rest of GUI.
+    // Outer border for definition (always visible).
+    auto outerBorderColour = theme.panelOutline;
+    if (!isEnabled)
+        outerBorderColour = outerBorderColour.withAlpha(0.5f);
+    else if (isOn)
+        outerBorderColour = theme.accent;
+    else if (isOver)
+        outerBorderColour = theme.panelOutline.brighter(0.15f);
+    
+    g.setColour(outerBorderColour);
+    g.drawRoundedRectangle(bounds.reduced(0.5f), 4.0f, 1.2f);
+    
+    // Inner border for depth and better definition (especially with shading behind).
+    auto innerBorderColour = theme.panelOutline.withAlpha(0.3f);
+    if (isOn)
+        innerBorderColour = theme.accent.withAlpha(0.4f);
+    else if (isOver && isEnabled)
+        innerBorderColour = theme.accent.withAlpha(0.25f);
+    
+    g.setColour(innerBorderColour);
+    g.drawRoundedRectangle(bounds.reduced(1.5f), 3.0f, 0.8f);
 
     // Draw text centered inside.
     auto textColour = button.findColour(juce::ToggleButton::textColourId);

@@ -1450,7 +1450,9 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
     const float scale = uiScale;
     g.setFont(juce::Font(11.0f * scale, juce::Font::plain));
 
-    const int leftGutter = static_cast<int>(50 * scale);
+    // Increased gutters to prevent label overlap with frame border.
+    // Frame has layered borders (outer 1.2px, middle 1.0px, inner 0.8px) plus corner radius.
+    const int leftGutter = static_cast<int>(56 * scale);  // Increased from 50 to 56 for frame clearance
     const int rightGutter = static_cast<int>(44 * scale);
     const int bottomGutter = static_cast<int>(18 * scale);
     const auto labelArea = area.withTrimmedLeft(leftGutter).withTrimmedRight(rightGutter)
@@ -1460,6 +1462,7 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
     const float spectrumStep = 6.0f;
     const float majorSpacing = labelArea.getHeight() * (12.0f / (spectrumMaxDb - spectrumMinDb));
     const bool showDbLabels = majorSpacing >= 14.0f * scale;
+    
     // Use gainToY() so the grid lines align exactly with the 0 dB line.
     // Modern grid lines with better visual hierarchy.
     for (float db = spectrumMinDb; db <= spectrumMaxDb + 0.01f; db += spectrumStep)
@@ -1485,10 +1488,12 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
         
         if (major && showDbLabels)
         {
-            // Modern label styling with better contrast.
-            const auto labelRect = juce::Rectangle<int>(static_cast<int>(area.getX() + 4 * scale),
+            // Position labels well inside the plot area to avoid frame overlap.
+            // Labels positioned with sufficient margin from left edge (accounting for frame border ~3px + padding).
+            const int labelMargin = static_cast<int>(8 * scale);  // Margin from frame edge
+            const auto labelRect = juce::Rectangle<int>(static_cast<int>(area.getX() + labelMargin),
                                                         static_cast<int>(y - 7 * scale),
-                                                        static_cast<int>(40 * scale),
+                                                        static_cast<int>(42 * scale),  // Slightly wider for negative values
                                                         static_cast<int>(14 * scale));
             g.setColour(theme.panel.withAlpha(0.85f));
             g.fillRoundedRectangle(labelRect.toFloat(), 3.0f);

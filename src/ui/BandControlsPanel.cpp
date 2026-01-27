@@ -931,12 +931,6 @@ void BandControlsPanel::updateLayerVisibility()
     evenHarmonicSlider.setVisible(!isEQLayer);
     mixEvenSlider.setVisible(!isEQLayer);
     harmonicBypassToggle.setVisible(!isEQLayer);  // v4.4 beta: Show bypass only on Harmonic layer
-    if (auto* phaseModeParam = parameters.getParameter(ParamIDs::phaseMode))
-    {
-        const int phaseMode = static_cast<int>(phaseModeParam->convertFrom0to1(phaseModeParam->getValue()));
-        isRealtimeMode = (phaseMode == 0);  // 0 = min-phase (realtime), 1 = linear phase
-    }
-    
     // v4.4 beta: Ensure harmonic controls are added to component tree and enabled
     if (!isEQLayer)
     {

@@ -25,6 +25,11 @@ struct BandSnapshot
     float dynReleaseMs = 200.0f;
     bool dynAuto = true;
     bool dynExternal = false;
+    // v4.4 beta: Harmonic layer parameters
+    float oddHarmonicDb = 0.0f;
+    float mixOdd = 1.0f;
+    float evenHarmonicDb = 0.0f;
+    float mixEven = 1.0f;
 };
 
 // Full parameter snapshot used by the audio thread.

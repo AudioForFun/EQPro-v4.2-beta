@@ -122,6 +122,11 @@ private:
         std::atomic<float>* gain = nullptr;
         std::atomic<float>* q = nullptr;
         std::atomic<float>* type = nullptr;
+        // v4.4 beta: Harmonic layer parameters
+        std::atomic<float>* odd = nullptr;
+        std::atomic<float>* mixOdd = nullptr;
+        std::atomic<float>* even = nullptr;
+        std::atomic<float>* mixEven = nullptr;
         std::atomic<float>* bypass = nullptr;
         std::atomic<float>* msTarget = nullptr;
         std::atomic<float>* slope = nullptr;

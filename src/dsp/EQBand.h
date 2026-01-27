@@ -35,5 +35,10 @@ struct BandParams
     float releaseMs = 200.0f;
     bool autoScale = true;
     bool useExternalDetector = false;
+    // v4.4 beta: Harmonic layer parameters
+    float oddHarmonicDb = 0.0f;
+    float mixOdd = 1.0f;
+    float evenHarmonicDb = 0.0f;
+    float mixEven = 1.0f;
 };
 } // namespace eqdsp

@@ -113,9 +113,14 @@ private:
         }
     };
 
+    // v4.4 beta: Harmonic layer system
+    enum class LayerType { EQ, Harmonic };
+    
     void updateAttachments();
     void syncUiFromParams();
     void updateTypeUi();
+    void setLayer(LayerType layer);  // v4.4 beta: Switch between EQ and Harmonic layers
+    void updateLayerVisibility();  // v4.4 beta: Update visibility based on current layer
     int getCurrentTypeIndex() const;
     void copyBandState();
     void pasteBandState();
@@ -153,6 +158,11 @@ private:
         float dynRelease = 200.0f;
         float dynAuto = 1.0f;
         float dynExternal = 0.0f;
+        // v4.4 beta: Harmonic layer parameters
+        float odd = 0.0f;
+        float mixOdd = 100.0f;
+        float even = 0.0f;
+        float mixEven = 100.0f;
     };
 
     EQProAudioProcessor& processor;
@@ -182,6 +192,21 @@ private:
     juce::ComboBox slopeBox;
     juce::Label mixLabel;
     BandKnob mixSlider;
+    
+    // v4.4 beta: Harmonic layer controls
+    LayerType currentLayer { LayerType::EQ };
+    juce::ToggleButton eqLayerToggle;
+    juce::ToggleButton harmonicLayerToggle;
+    
+    juce::Label oddLabel;
+    BandKnob oddHarmonicSlider;
+    juce::Label mixOddLabel;
+    BandKnob mixOddSlider;
+    juce::Label evenLabel;
+    BandKnob evenHarmonicSlider;
+    juce::Label mixEvenLabel;
+    BandKnob mixEvenSlider;
+    
     juce::TextButton copyButton;
     juce::TextButton pasteButton;
     juce::ToggleButton dynEnableToggle;
@@ -205,6 +230,10 @@ private:
     std::unique_ptr<SliderAttachment> gainAttachment;
     std::unique_ptr<SliderAttachment> qAttachment;
     std::unique_ptr<SliderAttachment> mixAttachment;
+    std::unique_ptr<SliderAttachment> oddHarmonicAttachment;
+    std::unique_ptr<SliderAttachment> mixOddAttachment;
+    std::unique_ptr<SliderAttachment> evenHarmonicAttachment;
+    std::unique_ptr<SliderAttachment> mixEvenAttachment;
     std::unique_ptr<ButtonAttachment> dynEnableAttachment;
     std::unique_ptr<ComboBoxAttachment> dynModeAttachment;
     std::unique_ptr<SliderAttachment> dynThresholdAttachment;

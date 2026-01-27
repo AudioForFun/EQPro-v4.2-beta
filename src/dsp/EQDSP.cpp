@@ -872,8 +872,39 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     sample = dry + (sample - dry) * deltaGain;
                     this->dynamicGainDb[ch][band].store(deltaDb);
                 }
+                
+                // v4.4 beta: Harmonic generation (odd and even harmonics)
+                // Apply harmonics to the EQ-processed signal
+                float harmonicSample = sample;
+                if ((params.oddHarmonicDb != 0.0f && params.mixOdd > 0.0f) || 
+                    (params.evenHarmonicDb != 0.0f && params.mixEven > 0.0f))
+                {
+                    // Waveshaping for harmonic generation
+                    // Odd harmonics: cubic distortion (3rd, 5th, etc.)
+                    // Even harmonics: quadratic distortion (2nd, 4th, etc.)
+                    const float input = juce::jlimit(-1.0f, 1.0f, sample);
+                    float oddHarm = 0.0f;
+                    float evenHarm = 0.0f;
+                    
+                    if (params.oddHarmonicDb != 0.0f && params.mixOdd > 0.0f)
+                    {
+                        // Generate odd harmonics using cubic function (creates 3rd, 5th, etc.)
+                        const float oddGain = juce::Decibels::decibelsToGain(params.oddHarmonicDb) * params.mixOdd;
+                        oddHarm = input * input * input * oddGain * 0.33f;  // Scale to prevent excessive distortion
+                    }
+                    
+                    if (params.evenHarmonicDb != 0.0f && params.mixEven > 0.0f)
+                    {
+                        // Generate even harmonics using quadratic function (creates 2nd, 4th, etc.)
+                        const float evenGain = juce::Decibels::decibelsToGain(params.evenHarmonicDb) * params.mixEven;
+                        evenHarm = input * input * evenGain * 0.5f;  // Scale to prevent excessive distortion
+                    }
+                    
+                    harmonicSample = sample + oddHarm + evenHarm;
+                    harmonicSample = juce::jlimit(-1.0f, 1.0f, harmonicSample);
+                }
 
-                channelData[i] += (sample - dry) * mix;
+                channelData[i] += (harmonicSample - dry) * mix;
             }
         }
     }

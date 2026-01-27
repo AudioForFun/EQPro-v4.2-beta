@@ -214,6 +214,43 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
             onBandNavigate(target);
     };
     addAndMakeVisible(nextBandButton);
+    
+    // v4.4 beta: Layer toggle buttons (EQ/Harmonic) next to band navigator
+    eqLayerToggle.setButtonText("EQ");
+    eqLayerToggle.setClickingTogglesState(true);
+    eqLayerToggle.setToggleState(true, juce::dontSendNotification);  // EQ is default
+    eqLayerToggle.setTooltip("EQ Layer");
+    eqLayerToggle.onClick = [this]
+    {
+        if (eqLayerToggle.getToggleState())
+        {
+            harmonicLayerToggle.setToggleState(false, juce::dontSendNotification);
+            setLayer(BandControlsPanel::LayerType::EQ);
+        }
+        else
+        {
+            eqLayerToggle.setToggleState(true, juce::dontSendNotification);  // Keep one active
+        }
+    };
+    addAndMakeVisible(eqLayerToggle);
+    
+    harmonicLayerToggle.setButtonText("HARMONIC");
+    harmonicLayerToggle.setClickingTogglesState(true);
+    harmonicLayerToggle.setToggleState(false, juce::dontSendNotification);
+    harmonicLayerToggle.setTooltip("Harmonic Layer");
+    harmonicLayerToggle.onClick = [this]
+    {
+        if (harmonicLayerToggle.getToggleState())
+        {
+            eqLayerToggle.setToggleState(false, juce::dontSendNotification);
+            setLayer(BandControlsPanel::LayerType::Harmonic);
+        }
+        else
+        {
+            harmonicLayerToggle.setToggleState(true, juce::dontSendNotification);  // Keep one active
+        }
+    };
+    addAndMakeVisible(harmonicLayerToggle);
 
     for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
     {
@@ -291,6 +328,11 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     initLabel(msLabel, "CHANNEL");
     initLabel(slopeLabel, "SLOPE");
     initLabel(mixLabel, "BAND MIX");
+    // v4.4 beta: Harmonic layer labels
+    initLabel(oddLabel, "ODD");
+    initLabel(mixOddLabel, "MIX ODD");
+    initLabel(evenLabel, "EVEN");
+    initLabel(mixEvenLabel, "MIX EVEN");
     initLabel(thresholdLabel, "THRESH");
     initLabel(attackLabel, "ATTACK");
     initLabel(releaseLabel, "RELEASE");
@@ -442,6 +484,98 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         mirrorToLinkedChannel("mix", static_cast<float>(mixSlider.getValue()));
         cacheBandFromUi(selectedChannel, selectedBand);
     };
+    
+    // v4.4 beta: Initialize harmonic controls (same style as EQ controls)
+    oddHarmonicSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    oddHarmonicSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
+    oddHarmonicSlider.setTextBoxIsEditable(true);
+    oddHarmonicSlider.setTextValueSuffix(" dB");
+    oddHarmonicSlider.setRange(-24.0, 24.0, 0.1);
+    oddHarmonicSlider.setValue(0.0);
+    oddHarmonicSlider.setTooltip("Odd harmonic amount");
+    oddHarmonicSlider.onDoubleClick = [this]
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "odd")))
+            param->setValueNotifyingHost(param->convertTo0to1(0.0f));
+    };
+    addAndMakeVisible(oddHarmonicSlider);
+    oddHarmonicSlider.onValueChange = [this]
+    {
+        if (suppressParamCallbacks)
+            return;
+        ensureBandActiveFromEdit();
+        mirrorToLinkedChannel("odd", static_cast<float>(oddHarmonicSlider.getValue()));
+        cacheBandFromUi(selectedChannel, selectedBand);
+    };
+    
+    mixOddSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    mixOddSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
+    mixOddSlider.setTextBoxIsEditable(true);
+    mixOddSlider.setTextValueSuffix(" %");
+    mixOddSlider.setRange(0.0, 100.0, 0.1);
+    mixOddSlider.setValue(100.0);
+    mixOddSlider.setTooltip("Mix for odd harmonics");
+    mixOddSlider.onDoubleClick = [this]
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "mixOdd")))
+            param->setValueNotifyingHost(param->convertTo0to1(100.0f));
+    };
+    addAndMakeVisible(mixOddSlider);
+    mixOddSlider.onValueChange = [this]
+    {
+        if (suppressParamCallbacks)
+            return;
+        ensureBandActiveFromEdit();
+        mirrorToLinkedChannel("mixOdd", static_cast<float>(mixOddSlider.getValue()));
+        cacheBandFromUi(selectedChannel, selectedBand);
+    };
+    
+    evenHarmonicSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    evenHarmonicSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
+    evenHarmonicSlider.setTextBoxIsEditable(true);
+    evenHarmonicSlider.setTextValueSuffix(" dB");
+    evenHarmonicSlider.setRange(-24.0, 24.0, 0.1);
+    evenHarmonicSlider.setValue(0.0);
+    evenHarmonicSlider.setTooltip("Even harmonic amount");
+    evenHarmonicSlider.onDoubleClick = [this]
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "even")))
+            param->setValueNotifyingHost(param->convertTo0to1(0.0f));
+    };
+    addAndMakeVisible(evenHarmonicSlider);
+    evenHarmonicSlider.onValueChange = [this]
+    {
+        if (suppressParamCallbacks)
+            return;
+        ensureBandActiveFromEdit();
+        mirrorToLinkedChannel("even", static_cast<float>(evenHarmonicSlider.getValue()));
+        cacheBandFromUi(selectedChannel, selectedBand);
+    };
+    
+    mixEvenSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    mixEvenSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
+    mixEvenSlider.setTextBoxIsEditable(true);
+    mixEvenSlider.setTextValueSuffix(" %");
+    mixEvenSlider.setRange(0.0, 100.0, 0.1);
+    mixEvenSlider.setValue(100.0);
+    mixEvenSlider.setTooltip("Mix for even harmonics");
+    mixEvenSlider.onDoubleClick = [this]
+    {
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "mixEven")))
+            param->setValueNotifyingHost(param->convertTo0to1(100.0f));
+    };
+    addAndMakeVisible(mixEvenSlider);
+    mixEvenSlider.onValueChange = [this]
+    {
+        if (suppressParamCallbacks)
+            return;
+        ensureBandActiveFromEdit();
+        mirrorToLinkedChannel("mixEven", static_cast<float>(mixEvenSlider.getValue()));
+        cacheBandFromUi(selectedChannel, selectedBand);
+    };
+    
+    // Initially hide harmonic controls (EQ layer is default)
+    updateLayerVisibility();
 
     dynEnableToggle.setButtonText("DYNAMIC");
     dynEnableToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
@@ -677,6 +811,11 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     msLabel.setColour(juce::Label::textColourId, theme.textMuted);
     slopeLabel.setColour(juce::Label::textColourId, theme.textMuted);
     mixLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    // v4.4 beta: Harmonic layer labels
+    oddLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    mixOddLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    evenLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    mixEvenLabel.setColour(juce::Label::textColourId, theme.textMuted);
     msBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     msBox.setColour(juce::ComboBox::textColourId, theme.text);
     msBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
@@ -729,9 +868,60 @@ void BandControlsPanel::updateBandKnobColours()
     applyColour(gainSlider);
     applyColour(qSlider);
     applyColour(mixSlider);
+    // v4.4 beta: Apply band colors to harmonic controls
+    applyColour(oddHarmonicSlider);
+    applyColour(mixOddSlider);
+    applyColour(evenHarmonicSlider);
+    applyColour(mixEvenSlider);
     applyColour(thresholdSlider);
     applyColour(attackSlider);
     applyColour(releaseSlider);
+}
+
+// v4.4 beta: Layer switching and visibility management
+void BandControlsPanel::setLayer(BandControlsPanel::LayerType layer)
+{
+    if (currentLayer == layer)
+        return;
+    
+    currentLayer = layer;
+    updateLayerVisibility();
+    updateAttachments();  // Update parameter attachments for current layer
+    syncUiFromParams();   // Sync UI with parameters
+    repaint();
+}
+
+void BandControlsPanel::updateLayerVisibility()
+{
+    const bool isEQLayer = (currentLayer == BandControlsPanel::LayerType::EQ);
+    
+    // EQ layer controls
+    freqLabel.setVisible(isEQLayer);
+    gainLabel.setVisible(isEQLayer);
+    qLabel.setVisible(isEQLayer);
+    mixLabel.setVisible(isEQLayer);
+    freqSlider.setVisible(isEQLayer);
+    gainSlider.setVisible(isEQLayer);
+    qSlider.setVisible(isEQLayer);
+    mixSlider.setVisible(isEQLayer);
+    
+    // Harmonic layer controls
+    oddLabel.setVisible(!isEQLayer);
+    mixOddLabel.setVisible(!isEQLayer);
+    evenLabel.setVisible(!isEQLayer);
+    mixEvenLabel.setVisible(!isEQLayer);
+    oddHarmonicSlider.setVisible(!isEQLayer);
+    mixOddSlider.setVisible(!isEQLayer);
+    evenHarmonicSlider.setVisible(!isEQLayer);
+    mixEvenSlider.setVisible(!isEQLayer);
+    
+    // Dropdowns: hide on Harmonic layer
+    typeLabel.setVisible(isEQLayer);
+    typeBox.setVisible(isEQLayer);
+    slopeLabel.setVisible(isEQLayer);
+    slopeBox.setVisible(isEQLayer);
+    msLabel.setVisible(isEQLayer);
+    msBox.setVisible(isEQLayer);
 }
 
 void BandControlsPanel::setMsEnabled(bool enabled)
@@ -881,7 +1071,13 @@ void BandControlsPanel::paint(juce::Graphics& g)
     drawFocus(mixSlider);
     drawFocus(typeBox);
     drawFocus(msBox);
-    drawFocus(slopeBox);
+    // v4.4 beta: Only draw focus for visible controls
+    if (currentLayer == BandControlsPanel::LayerType::EQ)
+    {
+        drawFocus(typeBox);
+        drawFocus(msBox);
+        drawFocus(slopeBox);
+    }
 
     if (freqSlider.isMouseButtonDown() || freqSlider.hasKeyboardFocus(true))
         drawValuePill(freqSlider, formatFrequency(static_cast<float>(freqSlider.getValue())));
@@ -891,6 +1087,19 @@ void BandControlsPanel::paint(juce::Graphics& g)
         drawValuePill(qSlider, "Q " + juce::String(qSlider.getValue(), 2));
     if (mixSlider.isMouseButtonDown() || mixSlider.hasKeyboardFocus(true))
         drawValuePill(mixSlider, juce::String(mixSlider.getValue(), 0) + " %");
+    
+    // v4.4 beta: Draw value pills for harmonic controls
+    if (currentLayer == BandControlsPanel::LayerType::Harmonic)
+    {
+        if (oddHarmonicSlider.isMouseButtonDown() || oddHarmonicSlider.hasKeyboardFocus(true))
+            drawValuePill(oddHarmonicSlider, juce::String(oddHarmonicSlider.getValue(), 1) + " dB");
+        if (mixOddSlider.isMouseButtonDown() || mixOddSlider.hasKeyboardFocus(true))
+            drawValuePill(mixOddSlider, juce::String(mixOddSlider.getValue(), 0) + " %");
+        if (evenHarmonicSlider.isMouseButtonDown() || evenHarmonicSlider.hasKeyboardFocus(true))
+            drawValuePill(evenHarmonicSlider, juce::String(evenHarmonicSlider.getValue(), 1) + " dB");
+        if (mixEvenSlider.isMouseButtonDown() || mixEvenSlider.hasKeyboardFocus(true))
+            drawValuePill(mixEvenSlider, juce::String(mixEvenSlider.getValue(), 0) + " %");
+    }
 }
 
 void BandControlsPanel::timerCallback()
@@ -1010,24 +1219,37 @@ void BandControlsPanel::cacheBandFromUi(int channelIndex, int bandIndex)
         return;
 
     auto& state = bandStateCache[static_cast<size_t>(channelIndex)][static_cast<size_t>(bandIndex)];
-    state.freq = static_cast<float>(freqSlider.getValue());
-    state.gain = static_cast<float>(gainSlider.getValue());
-    state.q = static_cast<float>(qSlider.getValue());
-    state.type = static_cast<float>(typeBox.getSelectedItemIndex());
+    
+    // v4.4 beta: Cache parameters based on current layer
+    if (currentLayer == BandControlsPanel::LayerType::EQ)
+    {
+        state.freq = static_cast<float>(freqSlider.getValue());
+        state.gain = static_cast<float>(gainSlider.getValue());
+        state.q = static_cast<float>(qSlider.getValue());
+        state.type = static_cast<float>(typeBox.getSelectedItemIndex());
+        if (! msChoiceMap.empty())
+        {
+            const int msIndex = msBox.getSelectedItemIndex();
+            if (msIndex >= 0 && msIndex < static_cast<int>(msChoiceMap.size()))
+                state.ms = static_cast<float>(msChoiceMap[static_cast<size_t>(msIndex)]);
+        }
+        const int slopeIndex = slopeBox.getSelectedItemIndex();
+        if (slopeIndex >= 0)
+            state.slope = static_cast<float>((slopeIndex + 1) * 6);
+        state.mix = static_cast<float>(mixSlider.getValue());
+    }
+    else  // Harmonic layer
+    {
+        state.odd = static_cast<float>(oddHarmonicSlider.getValue());
+        state.mixOdd = static_cast<float>(mixOddSlider.getValue());
+        state.even = static_cast<float>(evenHarmonicSlider.getValue());
+        state.mixEven = static_cast<float>(mixEvenSlider.getValue());
+    }
+    
     if (auto* param = parameters.getRawParameterValue(ParamIDs::bandParamId(channelIndex, bandIndex, "bypass")))
         state.bypass = param->load();
-    if (! msChoiceMap.empty())
-    {
-        const int msIndex = msBox.getSelectedItemIndex();
-        if (msIndex >= 0 && msIndex < static_cast<int>(msChoiceMap.size()))
-            state.ms = static_cast<float>(msChoiceMap[static_cast<size_t>(msIndex)]);
-    }
-    const int slopeIndex = slopeBox.getSelectedItemIndex();
-    if (slopeIndex >= 0)
-        state.slope = static_cast<float>((slopeIndex + 1) * 6);
     if (auto* param = parameters.getRawParameterValue(ParamIDs::bandParamId(channelIndex, bandIndex, "solo")))
         state.solo = param->load();
-    state.mix = static_cast<float>(mixSlider.getValue());
     state.dynEnable = dynEnableToggle.getToggleState() ? 1.0f : 0.0f;
     state.dynMode = dynDownButton.getToggleState() ? 1.0f : 0.0f;
     state.dynThresh = static_cast<float>(thresholdSlider.getValue());
@@ -1061,6 +1283,11 @@ void BandControlsPanel::cacheBandFromParams(int channelIndex, int bandIndex)
     state.slope = readValue(bandIndex, "slope", state.slope);
     state.solo = readValue(bandIndex, "solo", state.solo);
     state.mix = readValue(bandIndex, "mix", state.mix);
+    // v4.4 beta: Harmonic parameters
+    state.odd = readValue(bandIndex, "odd", state.odd);
+    state.mixOdd = readValue(bandIndex, "mixOdd", state.mixOdd);
+    state.even = readValue(bandIndex, "even", state.even);
+    state.mixEven = readValue(bandIndex, "mixEven", state.mixEven);
     state.dynEnable = readValue(bandIndex, "dynEnable", state.dynEnable);
     state.dynMode = readValue(bandIndex, "dynMode", state.dynMode);
     state.dynThresh = readValue(bandIndex, "dynThresh", state.dynThresh);
@@ -1108,6 +1335,11 @@ void BandControlsPanel::applyCachedBandToParams(int channelIndex)
         setParamValue(band, "slope", state.slope);
         setParamValue(band, "solo", state.solo);
         setParamValue(band, "mix", state.mix);
+        // v4.4 beta: Harmonic parameters
+        setParamValue(band, "odd", state.odd);
+        setParamValue(band, "mixOdd", state.mixOdd);
+        setParamValue(band, "even", state.even);
+        setParamValue(band, "mixEven", state.mixEven);
         setParamValue(band, "dynEnable", state.dynEnable);
         setParamValue(band, "dynMode", state.dynMode);
         setParamValue(band, "dynThresh", state.dynThresh);
@@ -1128,14 +1360,26 @@ void BandControlsPanel::restoreBandFromCache()
         return;
 
     const auto& state = bandStateCache[static_cast<size_t>(selectedChannel)][static_cast<size_t>(selectedBand)];
-    freqSlider.setValue(state.freq, juce::dontSendNotification);
-    gainSlider.setValue(state.gain, juce::dontSendNotification);
-    qSlider.setValue(state.q, juce::dontSendNotification);
-    if (static_cast<int>(state.type) >= 0)
-        typeBox.setSelectedItemIndex(static_cast<int>(state.type), juce::dontSendNotification);
-    const int slopeIndex = juce::jlimit(0, 15, static_cast<int>(std::round(state.slope / 6.0f)) - 1);
-    slopeBox.setSelectedItemIndex(slopeIndex, juce::dontSendNotification);
-    mixSlider.setValue(state.mix, juce::dontSendNotification);
+    
+    // v4.4 beta: Sync parameters based on current layer
+    if (currentLayer == BandControlsPanel::LayerType::EQ)
+    {
+        freqSlider.setValue(state.freq, juce::dontSendNotification);
+        gainSlider.setValue(state.gain, juce::dontSendNotification);
+        qSlider.setValue(state.q, juce::dontSendNotification);
+        if (static_cast<int>(state.type) >= 0)
+            typeBox.setSelectedItemIndex(static_cast<int>(state.type), juce::dontSendNotification);
+        const int slopeIndex = juce::jlimit(0, 15, static_cast<int>(std::round(state.slope / 6.0f)) - 1);
+        slopeBox.setSelectedItemIndex(slopeIndex, juce::dontSendNotification);
+        mixSlider.setValue(state.mix, juce::dontSendNotification);
+    }
+    else  // Harmonic layer
+    {
+        oddHarmonicSlider.setValue(state.odd, juce::dontSendNotification);
+        mixOddSlider.setValue(state.mixOdd, juce::dontSendNotification);
+        evenHarmonicSlider.setValue(state.even, juce::dontSendNotification);
+        mixEvenSlider.setValue(state.mixEven, juce::dontSendNotification);
+    }
     dynEnableToggle.setToggleState(state.dynEnable > 0.5f, juce::dontSendNotification);
     dynUpButton.setToggleState(state.dynMode < 0.5f, juce::dontSendNotification);
     dynDownButton.setToggleState(state.dynMode > 0.5f, juce::dontSendNotification);
@@ -1192,6 +1436,14 @@ void BandControlsPanel::resized()
     const int navW = 24;
     prevBandButton.setBounds(headerRow.removeFromLeft(navW));
     nextBandButton.setBounds(headerRow.removeFromLeft(navW));
+    
+    // v4.4 beta: Layer toggle buttons next to band navigator
+    headerRow.removeFromLeft(4);  // Small gap
+    const int layerToggleW = 70;
+    eqLayerToggle.setBounds(headerRow.removeFromLeft(layerToggleW));
+    headerRow.removeFromLeft(2);  // Small gap between toggles
+    harmonicLayerToggle.setBounds(headerRow.removeFromLeft(layerToggleW));
+    
     eqSectionLabel.setBounds({0, 0, 0, 0});
 
     left.removeFromTop(2);
@@ -1228,19 +1480,41 @@ void BandControlsPanel::resized()
     };
     auto freqArea = knobsRow.removeFromLeft(knobWidth);
     freqLabel.setBounds(freqArea.removeFromTop(kLabelHeight));
-    freqSlider.setBounds(squareKnob(freqArea).withSizeKeepingCentre(knobSize, knobSize));
-    knobsRow.removeFromLeft(kGap);
-    auto gainArea = knobsRow.removeFromLeft(knobWidth);
-    gainLabel.setBounds(gainArea.removeFromTop(kLabelHeight));
-    gainSlider.setBounds(squareKnob(gainArea).withSizeKeepingCentre(knobSize, knobSize));
-    knobsRow.removeFromLeft(kGap);
-    auto qArea = knobsRow.removeFromLeft(knobWidth);
-    qLabel.setBounds(qArea.removeFromTop(kLabelHeight));
-    qSlider.setBounds(squareKnob(qArea).withSizeKeepingCentre(knobSize, knobSize));
-    knobsRow.removeFromLeft(kGap);
-    auto mixArea = knobsRow.removeFromLeft(knobWidth);
-    mixLabel.setBounds(mixArea.removeFromTop(kLabelHeight));
-    mixSlider.setBounds(squareKnob(mixArea).withSizeKeepingCentre(knobSize, knobSize));
+    // v4.4 beta: Position controls based on current layer (EQ or Harmonic)
+    if (currentLayer == BandControlsPanel::LayerType::EQ)
+    {
+        freqLabel.setBounds(freqArea.removeFromTop(kLabelHeight));
+        freqSlider.setBounds(squareKnob(freqArea).withSizeKeepingCentre(knobSize, knobSize));
+        knobsRow.removeFromLeft(kGap);
+        auto gainArea = knobsRow.removeFromLeft(knobWidth);
+        gainLabel.setBounds(gainArea.removeFromTop(kLabelHeight));
+        gainSlider.setBounds(squareKnob(gainArea).withSizeKeepingCentre(knobSize, knobSize));
+        knobsRow.removeFromLeft(kGap);
+        auto qArea = knobsRow.removeFromLeft(knobWidth);
+        qLabel.setBounds(qArea.removeFromTop(kLabelHeight));
+        qSlider.setBounds(squareKnob(qArea).withSizeKeepingCentre(knobSize, knobSize));
+        knobsRow.removeFromLeft(kGap);
+        auto mixArea = knobsRow.removeFromLeft(knobWidth);
+        mixLabel.setBounds(mixArea.removeFromTop(kLabelHeight));
+        mixSlider.setBounds(squareKnob(mixArea).withSizeKeepingCentre(knobSize, knobSize));
+    }
+    else  // Harmonic layer
+    {
+        oddLabel.setBounds(freqArea.removeFromTop(kLabelHeight));
+        oddHarmonicSlider.setBounds(squareKnob(freqArea).withSizeKeepingCentre(knobSize, knobSize));
+        knobsRow.removeFromLeft(kGap);
+        auto mixOddArea = knobsRow.removeFromLeft(knobWidth);
+        mixOddLabel.setBounds(mixOddArea.removeFromTop(kLabelHeight));
+        mixOddSlider.setBounds(squareKnob(mixOddArea).withSizeKeepingCentre(knobSize, knobSize));
+        knobsRow.removeFromLeft(kGap);
+        auto evenArea = knobsRow.removeFromLeft(knobWidth);
+        evenLabel.setBounds(evenArea.removeFromTop(kLabelHeight));
+        evenHarmonicSlider.setBounds(squareKnob(evenArea).withSizeKeepingCentre(knobSize, knobSize));
+        knobsRow.removeFromLeft(kGap);
+        auto mixEvenArea = knobsRow.removeFromLeft(knobWidth);
+        mixEvenLabel.setBounds(mixEvenArea.removeFromTop(kLabelHeight));
+        mixEvenSlider.setBounds(squareKnob(mixEvenArea).withSizeKeepingCentre(knobSize, knobSize));
+    }
 
     // Add extra spacing before dropdowns to avoid overlap with rotary frame.
     left.removeFromTop(kGap + 4);  // Extra 4 pixels to prevent overlap with frame
@@ -1299,10 +1573,36 @@ void BandControlsPanel::updateAttachments()
     dynAttackParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynAttack"));
     dynReleaseParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynRelease"));
 
-    freqAttachment = std::make_unique<SliderAttachment>(parameters, freqId, freqSlider);
-    gainAttachment = std::make_unique<SliderAttachment>(parameters, gainId, gainSlider);
-    qAttachment = std::make_unique<SliderAttachment>(parameters, qId, qSlider);
-    mixAttachment = std::make_unique<SliderAttachment>(parameters, mixId, mixSlider);
+    // v4.4 beta: Create attachments based on current layer
+    if (currentLayer == BandControlsPanel::LayerType::EQ)
+    {
+        freqAttachment = std::make_unique<SliderAttachment>(parameters, freqId, freqSlider);
+        gainAttachment = std::make_unique<SliderAttachment>(parameters, gainId, gainSlider);
+        qAttachment = std::make_unique<SliderAttachment>(parameters, qId, qSlider);
+        mixAttachment = std::make_unique<SliderAttachment>(parameters, mixId, mixSlider);
+        // Clear harmonic attachments when on EQ layer
+        oddHarmonicAttachment.reset();
+        mixOddAttachment.reset();
+        evenHarmonicAttachment.reset();
+        mixEvenAttachment.reset();
+    }
+    else  // Harmonic layer
+    {
+        const auto oddId = ParamIDs::bandParamId(selectedChannel, selectedBand, "odd");
+        const auto mixOddId = ParamIDs::bandParamId(selectedChannel, selectedBand, "mixOdd");
+        const auto evenId = ParamIDs::bandParamId(selectedChannel, selectedBand, "even");
+        const auto mixEvenId = ParamIDs::bandParamId(selectedChannel, selectedBand, "mixEven");
+        
+        oddHarmonicAttachment = std::make_unique<SliderAttachment>(parameters, oddId, oddHarmonicSlider);
+        mixOddAttachment = std::make_unique<SliderAttachment>(parameters, mixOddId, mixOddSlider);
+        evenHarmonicAttachment = std::make_unique<SliderAttachment>(parameters, evenId, evenHarmonicSlider);
+        mixEvenAttachment = std::make_unique<SliderAttachment>(parameters, mixEvenId, mixEvenSlider);
+        // Clear EQ attachments when on Harmonic layer
+        freqAttachment.reset();
+        gainAttachment.reset();
+        qAttachment.reset();
+        mixAttachment.reset();
+    }
     dynEnableAttachment = std::make_unique<ButtonAttachment>(
         parameters, ParamIDs::bandParamId(selectedChannel, selectedBand, "dynEnable"), dynEnableToggle);
     dynThresholdAttachment = std::make_unique<SliderAttachment>(
@@ -1353,10 +1653,36 @@ void BandControlsPanel::syncUiFromParams()
             button.setToggleState(param->getValue() > 0.5f, juce::dontSendNotification);
     };
 
-    setSliderFromParam(freqSlider, "freq");
-    setSliderFromParam(gainSlider, "gain");
-    setSliderFromParam(qSlider, "q");
-    setSliderFromParam(mixSlider, "mix");
+    // v4.4 beta: Sync parameters based on current layer
+    if (currentLayer == BandControlsPanel::LayerType::EQ)
+    {
+        setSliderFromParam(freqSlider, "freq");
+        setSliderFromParam(gainSlider, "gain");
+        setSliderFromParam(qSlider, "q");
+        setSliderFromParam(mixSlider, "mix");
+        
+        if (auto* typeParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "type")))
+        {
+            const int typeIndex = static_cast<int>(typeParam->convertFrom0to1(typeParam->getValue()));
+            typeBox.setSelectedItemIndex(typeIndex, juce::dontSendNotification);
+        }
+
+        if (auto* slopeParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "slope")))
+        {
+            const float slopeValue = slopeParam->convertFrom0to1(slopeParam->getValue());
+            const int slopeIndex = juce::jlimit(0, 15,
+                                                static_cast<int>(std::round(slopeValue / 6.0f)) - 1);
+            slopeBox.setSelectedItemIndex(slopeIndex, juce::dontSendNotification);
+        }
+    }
+    else  // Harmonic layer
+    {
+        setSliderFromParam(oddHarmonicSlider, "odd");
+        setSliderFromParam(mixOddSlider, "mixOdd");
+        setSliderFromParam(evenHarmonicSlider, "even");
+        setSliderFromParam(mixEvenSlider, "mixEven");
+    }
+    
     setSliderFromParam(thresholdSlider, "dynThresh");
     setSliderFromParam(attackSlider, "dynAttack");
     setSliderFromParam(releaseSlider, "dynRelease");
@@ -1364,20 +1690,6 @@ void BandControlsPanel::syncUiFromParams()
     setToggleFromParam(dynEnableToggle, "dynEnable");
     setToggleFromParam(autoScaleToggle, "dynAuto");
     setToggleFromParam(dynExternalToggle, "dynExternal");
-
-    if (auto* typeParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "type")))
-    {
-        const int typeIndex = static_cast<int>(typeParam->convertFrom0to1(typeParam->getValue()));
-        typeBox.setSelectedItemIndex(typeIndex, juce::dontSendNotification);
-    }
-
-    if (auto* slopeParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "slope")))
-    {
-        const float slopeValue = slopeParam->convertFrom0to1(slopeParam->getValue());
-        const int slopeIndex = juce::jlimit(0, 15,
-                                            static_cast<int>(std::round(slopeValue / 6.0f)) - 1);
-        slopeBox.setSelectedItemIndex(slopeIndex, juce::dontSendNotification);
-    }
 
     if (auto* dynModeParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "dynMode")))
     {

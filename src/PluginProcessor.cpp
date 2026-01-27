@@ -19,6 +19,11 @@ constexpr const char* kParamMsSuffix = "ms";
 constexpr const char* kParamSlopeSuffix = "slope";
 constexpr const char* kParamSoloSuffix = "solo";
 constexpr const char* kParamMixSuffix = "mix";
+// v4.4 beta: Harmonic layer parameters
+constexpr const char* kParamOddSuffix = "odd";
+constexpr const char* kParamMixOddSuffix = "mixOdd";
+constexpr const char* kParamEvenSuffix = "even";
+constexpr const char* kParamMixEvenSuffix = "mixEven";
 constexpr const char* kParamDynEnableSuffix = "dynEnable";
 constexpr const char* kParamDynModeSuffix = "dynMode";
 constexpr const char* kParamDynThreshSuffix = "dynThresh";
@@ -920,6 +925,15 @@ void EQProAudioProcessor::initializeParamPointers()
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamSoloSuffix));
             bandParamPointers[ch][band].mix =
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamMixSuffix));
+            // v4.4 beta: Harmonic parameter pointers
+            bandParamPointers[ch][band].odd =
+                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamOddSuffix));
+            bandParamPointers[ch][band].mixOdd =
+                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamMixOddSuffix));
+            bandParamPointers[ch][band].even =
+                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamEvenSuffix));
+            bandParamPointers[ch][band].mixEven =
+                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamMixEvenSuffix));
             bandParamPointers[ch][band].dynEnable =
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynEnableSuffix));
             bandParamPointers[ch][band].dynMode =
@@ -1102,6 +1116,31 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
                 ParamIDs::bandParamId(ch, band, kParamMixSuffix),
                 ParamIDs::bandParamName(ch, band, "Mix"),
                 juce::NormalisableRange<float>(0.0f, 100.0f, 0.01f),
+                100.0f));
+            
+            // v4.4 beta: Harmonic layer parameters
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(
+                ParamIDs::bandParamId(ch, band, kParamOddSuffix),
+                ParamIDs::bandParamName(ch, band, "Odd Harmonic"),
+                juce::NormalisableRange<float>(-24.0f, 24.0f, 0.1f),
+                0.0f));
+            
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(
+                ParamIDs::bandParamId(ch, band, kParamMixOddSuffix),
+                ParamIDs::bandParamName(ch, band, "Mix Odd"),
+                juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
+                100.0f));
+            
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(
+                ParamIDs::bandParamId(ch, band, kParamEvenSuffix),
+                ParamIDs::bandParamName(ch, band, "Even Harmonic"),
+                juce::NormalisableRange<float>(-24.0f, 24.0f, 0.1f),
+                0.0f));
+            
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(
+                ParamIDs::bandParamId(ch, band, kParamMixEvenSuffix),
+                ParamIDs::bandParamName(ch, band, "Mix Even"),
+                juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
                 100.0f));
 
             params.push_back(std::make_unique<juce::AudioParameterBool>(
@@ -1662,6 +1701,11 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
             dst.dynReleaseMs = ptrs.dynRelease != nullptr ? ptrs.dynRelease->load() : 200.0f;
             dst.dynAuto = ptrs.dynAuto != nullptr && ptrs.dynAuto->load() > 0.5f;
             dst.dynExternal = ptrs.dynExternal != nullptr && ptrs.dynExternal->load() > 0.5f;
+            // v4.4 beta: Harmonic parameters
+            dst.oddHarmonicDb = ptrs.odd != nullptr ? ptrs.odd->load() : 0.0f;
+            dst.mixOdd = ptrs.mixOdd != nullptr ? (ptrs.mixOdd->load() / 100.0f) : 1.0f;
+            dst.evenHarmonicDb = ptrs.even != nullptr ? ptrs.even->load() : 0.0f;
+            dst.mixEven = ptrs.mixEven != nullptr ? (ptrs.mixEven->load() / 100.0f) : 1.0f;
         }
     }
 

@@ -1450,15 +1450,16 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
     const float scale = uiScale;
     g.setFont(juce::Font(11.0f * scale, juce::Font::plain));
 
-    // Increased gutters to prevent label overlap with frame border.
+    // Increased gutters significantly to prevent label overlap with frame border and graphical elements.
     // Frame has layered borders (outer 1.2px, middle 1.0px, inner 0.8px) plus corner radius.
-    const int leftGutter = static_cast<int>(56 * scale);  // Increased from 50 to 56 for frame clearance
+    // Labels need extra clearance to avoid overlap with band points, curves, and other UI elements.
+    const int leftGutter = static_cast<int>(70 * scale);  // Increased significantly to prevent all overlaps
     const int rightGutter = static_cast<int>(44 * scale);
     const int bottomGutter = static_cast<int>(18 * scale);
     const auto labelArea = area.withTrimmedLeft(leftGutter).withTrimmedRight(rightGutter)
         .withTrimmedBottom(bottomGutter);
-    const float spectrumMinDb = kAnalyzerMinDb;
-    const float spectrumMaxDb = kAnalyzerMaxDb;
+    const float spectrumMinDb = kAnalyzerMinDb;  // -60 dB
+    const float spectrumMaxDb = kAnalyzerMaxDb;   // +60 dB
     const float spectrumStep = 6.0f;
     const float majorSpacing = labelArea.getHeight() * (12.0f / (spectrumMaxDb - spectrumMinDb));
     const bool showDbLabels = majorSpacing >= 14.0f * scale;
@@ -1488,12 +1489,16 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
         
         if (major && showDbLabels)
         {
-            // Position labels well inside the plot area to avoid frame overlap.
-            // Labels positioned with sufficient margin from left edge (accounting for frame border ~3px + padding).
-            const int labelMargin = static_cast<int>(8 * scale);  // Margin from frame edge
+            // Position labels well inside the plot area to avoid ALL overlaps:
+            // - Frame border (~3px)
+            // - Band points (circular elements with radius ~6.5px + glow ~3px = ~9.5px total)
+            // - Curves and other graphical elements
+            // Labels positioned with generous margin to ensure -60 to +60 dB are all visible without overlap.
+            // Band points can be anywhere on the plot, so labels need significant clearance from left edge.
+            const int labelMargin = static_cast<int>(18 * scale);  // Increased significantly to avoid band point overlaps
             const auto labelRect = juce::Rectangle<int>(static_cast<int>(area.getX() + labelMargin),
                                                         static_cast<int>(y - 7 * scale),
-                                                        static_cast<int>(42 * scale),  // Slightly wider for negative values
+                                                        static_cast<int>(48 * scale),  // Wider for negative values like "-60"
                                                         static_cast<int>(14 * scale));
             g.setColour(theme.panel.withAlpha(0.85f));
             g.fillRoundedRectangle(labelRect.toFloat(), 3.0f);
@@ -1593,12 +1598,7 @@ void AnalyzerComponent::drawLabels(juce::Graphics& g, const juce::Rectangle<int>
                                           static_cast<int>(rightGutter - 4 * scale),
                                           static_cast<int>(12 * scale)),
                      juce::Justification::right, 1);
-    g.drawFittedText("SP",
-                     juce::Rectangle<int>(area.getX() + static_cast<int>(2 * scale),
-                                          area.getY() + static_cast<int>(2 * scale),
-                                          static_cast<int>(leftGutter - 4 * scale),
-                                          static_cast<int>(12 * scale)),
-                     juce::Justification::left, 1);
+    // Removed "SP" label - was never requested by user.
 }
 
 juce::Rectangle<int> AnalyzerComponent::getPlotArea() const

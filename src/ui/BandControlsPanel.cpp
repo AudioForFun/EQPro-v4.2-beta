@@ -597,6 +597,9 @@ void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
     updateTypeUi();
     suppressParamCallbacks = false;
     applyCachedBandToParams(selectedChannel);
+    
+    // Force repaint to ensure frame color updates for all 12 bands.
+    repaint();
 }
 
 void BandControlsPanel::pushUiStateToParams()
@@ -747,22 +750,24 @@ void BandControlsPanel::paint(juce::Graphics& g)
     const auto comboRowArea = left.removeFromTop(kLabelHeight + kRowHeight);
 
     // Get band color for rotary section frame (ensure selectedBand is valid for all 12 bands).
-    // Frame color changes dynamically based on selected band.
+    // Frame color changes dynamically based on selected band - works for all 12 bands (0-11).
+    // Clamp to ensure valid index range for all bands.
     const int safeBandIndex = juce::jlimit(0, ParamIDs::kBandsPerChannel - 1, selectedBand);
     const auto bandColour = ColorUtils::bandColour(safeBandIndex);
     
     // Frame around ONLY the 4 rotaries (not including dropdowns) - dynamically colored by selected band.
     // No individual frames around each knob - single unified frame that changes color.
+    // This frame color updates automatically when selectedBand changes (0-11 for all 12 bands).
     const auto rotaryFrameArea = juce::Rectangle<float>(
         static_cast<float>(knobsArea.getX()),
         static_cast<float>(knobsArea.getY()),
         static_cast<float>(knobsArea.getWidth()),
         static_cast<float>(knobsArea.getHeight())
     ).reduced(4.0f);
-    // Background fill for rotary frame.
+    // Background fill for rotary frame - uses current selected band color.
     g.setColour(bandColour.darker(0.8f).withAlpha(0.4f));
     g.fillRoundedRectangle(rotaryFrameArea, 8.0f);
-    // Outline for rotary frame - color changes with selected band.
+    // Outline for rotary frame - color changes dynamically with selected band (all 12 bands).
     g.setColour(bandColour.withAlpha(0.75f));
     g.drawRoundedRectangle(rotaryFrameArea, 8.0f, 1.5f);
 

@@ -1500,11 +1500,10 @@ void BandControlsPanel::resized()
         const int size = std::min(area.getWidth(), area.getHeight());
         return juce::Rectangle<int>(size, size).withCentre(area.getCentre());
     };
-    auto freqArea = knobsRow.removeFromLeft(knobWidth);
-    freqLabel.setBounds(freqArea.removeFromTop(kLabelHeight));
     // v4.4 beta: Position controls based on current layer (EQ or Harmonic)
     if (currentLayer == BandControlsPanel::LayerType::EQ)
     {
+        auto freqArea = knobsRow.removeFromLeft(knobWidth);
         freqLabel.setBounds(freqArea.removeFromTop(kLabelHeight));
         freqSlider.setBounds(squareKnob(freqArea).withSizeKeepingCentre(knobSize, knobSize));
         knobsRow.removeFromLeft(kGap);
@@ -1522,6 +1521,7 @@ void BandControlsPanel::resized()
     }
     else  // Harmonic layer
     {
+        auto freqArea = knobsRow.removeFromLeft(knobWidth);
         oddLabel.setBounds(freqArea.removeFromTop(kLabelHeight));
         oddHarmonicSlider.setBounds(squareKnob(freqArea).withSizeKeepingCentre(knobSize, knobSize));
         knobsRow.removeFromLeft(kGap);

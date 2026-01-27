@@ -24,6 +24,7 @@ public:
                  const juce::AudioBuffer<float>* detectorBuffer,
                  AnalyzerTap& preTap,
                  AnalyzerTap& postTap,
+                 AnalyzerTap& harmonicTap,  // v4.5 beta: Tap for program + harmonics (red curve)
                  MeterTap& meterTap);
     // Rebuild FIR paths when parameters change.
     void updateLinearPhase(const ParamSnapshot& snapshot, double sampleRate);

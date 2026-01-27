@@ -75,6 +75,7 @@ private:
     EQProAudioProcessor& processorRef;
     juce::AudioProcessorValueTreeState& parameters;
     AudioFifo& externalFifo;
+    AudioFifo& harmonicFifo;  // v4.5 beta: FIFO for program + harmonics (red curve)
 
     int selectedBand = 0;
     int selectedChannel = 0;
@@ -119,9 +120,11 @@ private:
     std::array<float, fftSize> timeBuffer {};
     std::array<float, fftSize * 2> fftDataPre {};
     std::array<float, fftSize * 2> fftDataPost {};
+    std::array<float, fftSize * 2> fftDataHarmonic {};  // v4.5 beta: FFT data for program + harmonics (red curve)
 
     std::array<float, fftBins> preMagnitudes {};
     std::array<float, fftBins> postMagnitudes {};
+    std::array<float, fftBins> harmonicMagnitudes {};  // v4.5 beta: Magnitudes for program + harmonics (red curve)
     std::array<float, fftBins> externalMagnitudes {};
 
     std::vector<float> eqCurveDb;

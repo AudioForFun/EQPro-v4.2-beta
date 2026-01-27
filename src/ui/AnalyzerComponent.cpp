@@ -55,11 +55,13 @@ AnalyzerComponent::AnalyzerComponent(EQProAudioProcessor& processor)
     : processorRef(processor),
       parameters(processor.getParameters()),
       externalFifo(processor.getAnalyzerExternalFifo()),
+      harmonicFifo(processor.getAnalyzerHarmonicFifo()),  // v4.5 beta: FIFO for program + harmonics (red curve)
       fft(fftOrder),
       window(fftSize, juce::dsp::WindowingFunction<float>::hann)
 {
     preMagnitudes.fill(kAnalyzerMinDb);
     postMagnitudes.fill(kAnalyzerMinDb);
+    harmonicMagnitudes.fill(kAnalyzerMinDb);  // v4.5 beta: Magnitudes for program + harmonics (red curve)
     externalMagnitudes.fill(kAnalyzerMinDb);
     selectedBands.push_back(selectedBand);
     lastTimerHz = 30;
@@ -257,6 +259,99 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         // Subtle outer glow
         g.setColour(postColour.withAlpha(0.15f));
         g.strokePath(postPath, juce::PathStrokeType(3.5f * scale));
+    }
+
+    // v4.5 beta: Draw harmonic curve (program + harmonics) in RED
+    // Only visible when harmonics are active on at least one band
+    bool hasActiveHarmonics = false;
+    for (int ch = 0; ch < ParamIDs::kMaxChannels && !hasActiveHarmonics; ++ch)
+    {
+        for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+        {
+            const auto oddParam = parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, "odd"));
+            const auto evenParam = parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, "even"));
+            const auto mixOddParam = parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, "mixOdd"));
+            const auto mixEvenParam = parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, "mixEven"));
+            const auto bypassParam = parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, "harmonicBypass"));
+            
+            if (bypassParam != nullptr && bypassParam->load() > 0.5f)
+                continue;  // Bypassed
+            
+            const float odd = oddParam != nullptr ? oddParam->load() : 0.0f;
+            const float even = evenParam != nullptr ? evenParam->load() : 0.0f;
+            const float mixOdd = mixOddParam != nullptr ? (mixOddParam->load() / 100.0f) : 0.0f;
+            const float mixEven = mixEvenParam != nullptr ? (mixEvenParam->load() / 100.0f) : 0.0f;
+            
+            if ((std::abs(odd) > 0.001f && mixOdd > 0.001f) || (std::abs(even) > 0.001f && mixEven > 0.001f))
+            {
+                hasActiveHarmonics = true;
+                break;
+            }
+        }
+    }
+    
+    if (hasActiveHarmonics)
+    {
+        // Build harmonic path using same frequency mapping as pre/post curves
+        juce::Path harmonicPath;
+        bool harmonicStarted = false;
+        float prevHarmonicX = 0.0f, prevHarmonicY = 0.0f;
+        
+        for (int bin = 1; bin < fftBins; ++bin)
+        {
+            const float freq = (lastSampleRate * bin) / static_cast<float>(fftSize);
+            if (freq < kMinFreq || freq > maxFreq)
+                continue;
+
+            const float xNorm = FFTUtils::freqToNorm(freq, kMinFreq, maxFreq);
+            const float x = plotArea.getX() + xNorm * plotArea.getWidth();
+            const float harmonicDb = harmonicMagnitudes[bin];
+            const float harmonicY = juce::jmap(harmonicDb, kAnalyzerMinDb, kAnalyzerMaxDb,
+                                               static_cast<float>(magnitudeArea.getBottom()),
+                                               static_cast<float>(magnitudeArea.getY()));
+
+            if (!harmonicStarted)
+            {
+                harmonicPath.startNewSubPath(x, harmonicY);
+                prevHarmonicX = x;
+                prevHarmonicY = harmonicY;
+                harmonicStarted = true;
+            }
+            else
+            {
+                // Use quadratic curves for smoother lines (same as pre/post)
+                const float midX = (prevHarmonicX + x) * 0.5f;
+                const float midHarmonicY = (prevHarmonicY + harmonicY) * 0.5f;
+                harmonicPath.quadraticTo(midX, midHarmonicY, x, harmonicY);
+                prevHarmonicX = x;
+                prevHarmonicY = harmonicY;
+            }
+        }
+        
+        if (!harmonicPath.isEmpty())
+        {
+            // Red color for harmonic curve - distinct from grey pre/post curves
+            const juce::Colour harmonicColour = juce::Colour(0xffff4444);  // Bright red
+            
+            // Gradient fill under curve for depth
+            juce::Path fillPath = harmonicPath;
+            fillPath.lineTo(plotArea.getRight(), magnitudeArea.getBottom());
+            fillPath.lineTo(plotArea.getX(), magnitudeArea.getBottom());
+            fillPath.closeSubPath();
+            
+            juce::ColourGradient fillGradient(
+                harmonicColour.withAlpha(0.12f), fillPath.getBounds().getTopLeft(),
+                harmonicColour.withAlpha(0.04f), fillPath.getBounds().getBottomLeft(), false);
+            g.setGradientFill(fillGradient);
+            g.fillPath(fillPath);
+            
+            // Enhanced line with subtle glow
+            g.setColour(harmonicColour.withAlpha(0.95f));
+            g.strokePath(harmonicPath, juce::PathStrokeType(2.0f * scale));
+            // Subtle outer glow
+            g.setColour(harmonicColour.withAlpha(0.15f));
+            g.strokePath(harmonicPath, juce::PathStrokeType(3.5f * scale));
+        }
     }
 
     const bool showExternal = parameters.getRawParameterValue(ParamIDs::analyzerExternal) != nullptr
@@ -1288,6 +1383,61 @@ void AnalyzerComponent::updateFft()
             postMagnitudes[i] = Smoothing::smooth(postMagnitudes[i], mag, kSmoothingCoeff);
         }
     }
+    }
+
+    // v4.5 beta: Process harmonic curve (program + harmonics) - red curve
+    // Check if any band has harmonics active (not bypassed and has odd/even amount > 0)
+    bool hasActiveHarmonics = false;
+    for (int ch = 0; ch < ParamIDs::kMaxChannels && !hasActiveHarmonics; ++ch)
+    {
+        for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+        {
+            const auto oddParam = parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, "odd"));
+            const auto evenParam = parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, "even"));
+            const auto mixOddParam = parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, "mixOdd"));
+            const auto mixEvenParam = parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, "mixEven"));
+            const auto bypassParam = parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, "harmonicBypass"));
+            
+            if (bypassParam != nullptr && bypassParam->load() > 0.5f)
+                continue;  // Bypassed
+            
+            const float odd = oddParam != nullptr ? oddParam->load() : 0.0f;
+            const float even = evenParam != nullptr ? evenParam->load() : 0.0f;
+            const float mixOdd = mixOddParam != nullptr ? (mixOddParam->load() / 100.0f) : 0.0f;
+            const float mixEven = mixEvenParam != nullptr ? (mixEvenParam->load() / 100.0f) : 0.0f;
+            
+            if ((std::abs(odd) > 0.001f && mixOdd > 0.001f) || (std::abs(even) > 0.001f && mixEven > 0.001f))
+            {
+                hasActiveHarmonics = true;
+                break;
+            }
+        }
+    }
+    
+    if (hasActiveHarmonics)
+    {
+        auto& harmonicFifoRef = harmonicFifo;
+        const int pulled = harmonicFifoRef.pull(timeBuffer.data(), fftSize);
+        if (pulled > 0)
+        {
+            std::fill(fftDataHarmonic.begin(), fftDataHarmonic.end(), 0.0f);
+            juce::FloatVectorOperations::copy(fftDataHarmonic.data(), timeBuffer.data(),
+                                              juce::jmin(pulled, fftSize));
+            window.multiplyWithWindowingTable(fftDataHarmonic.data(), fftSize);
+            fft.performFrequencyOnlyForwardTransform(fftDataHarmonic.data());
+
+            for (int i = 0; i < fftBins; ++i)
+            {
+                const float mag = juce::Decibels::gainToDecibels(fftDataHarmonic[static_cast<size_t>(i)],
+                                                                minDb);
+                harmonicMagnitudes[i] = Smoothing::smooth(harmonicMagnitudes[i], mag, kSmoothingCoeff);
+            }
+        }
+    }
+    else
+    {
+        // Reset harmonic magnitudes when no harmonics are active
+        harmonicMagnitudes.fill(kAnalyzerMinDb);
     }
 
     const bool showExternal = parameters.getRawParameterValue(ParamIDs::analyzerExternal) != nullptr

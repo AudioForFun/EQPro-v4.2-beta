@@ -313,6 +313,7 @@ void EQProAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     constexpr int analyzerBufferSize = 16384;
     analyzerPreTap.prepare(analyzerBufferSize);
     analyzerPostTap.prepare(analyzerBufferSize);
+    analyzerHarmonicTap.prepare(analyzerBufferSize);  // v4.5 beta: Tap for program + harmonics (red curve)
     analyzerExternalTap.prepare(analyzerBufferSize);
 
     cachedChannelNames = getCurrentChannelNames();
@@ -408,7 +409,7 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     // Pull the active snapshot and run DSP.
     const int snapshotIndex = activeSnapshot.load();
     const auto& snapshot = snapshots[snapshotIndex];
-    eqEngine.process(buffer, snapshot, detectorBuffer, analyzerPreTap, analyzerPostTap, meterTap);
+    eqEngine.process(buffer, snapshot, detectorBuffer, analyzerPreTap, analyzerPostTap, analyzerHarmonicTap, meterTap);
 
     if (analyzerExternalParam != nullptr && analyzerExternalParam->load() > 0.5f && detectorBuffer != nullptr
         && detectorBuffer->getNumChannels() > 0)
@@ -527,6 +528,11 @@ AudioFifo& EQProAudioProcessor::getAnalyzerPreFifo()
 AudioFifo& EQProAudioProcessor::getAnalyzerPostFifo()
 {
     return analyzerPostTap.getFifo();
+}
+
+AudioFifo& EQProAudioProcessor::getAnalyzerHarmonicFifo()  // v4.5 beta: FIFO for program + harmonics (red curve)
+{
+    return analyzerHarmonicTap.getFifo();
 }
 
 AudioFifo& EQProAudioProcessor::getAnalyzerExternalFifo()

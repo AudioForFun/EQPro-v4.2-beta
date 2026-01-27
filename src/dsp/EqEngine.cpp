@@ -69,6 +69,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                        const juce::AudioBuffer<float>* detectorBuffer,
                        AnalyzerTap& preTap,
                        AnalyzerTap& postTap,
+                       AnalyzerTap& harmonicTap,  // v4.5 beta: Tap for program + harmonics (red curve)
                        MeterTap& meterTap)
 {
     const int numChannels = juce::jmin(buffer.getNumChannels(), snapshot.numChannels);
@@ -248,10 +249,116 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
         }
 
         oversampler->processSamplesDown(block);
+        
+        // v4.5 beta: Tap signal after harmonic processing for oversampled path
+        // Harmonics are processed inside eqDspOversampled, so tap after downsample
+        bool hasActiveHarmonics = false;
+        for (int ch = 0; ch < numChannels && !hasActiveHarmonics; ++ch)
+        {
+            for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+            {
+                const auto& b = snapshot.bands[ch][band];
+                if (!b.harmonicBypassed && 
+                    ((b.oddHarmonicDb != 0.0f && b.mixOdd > 0.0f) || 
+                     (b.evenHarmonicDb != 0.0f && b.mixEven > 0.0f)))
+                {
+                    hasActiveHarmonics = true;
+                    break;
+                }
+            }
+        }
+        
+        if (hasActiveHarmonics && buffer.getNumChannels() > 0)
+        {
+            const float* data = buffer.getReadPointer(0);
+            const int samples = buffer.getNumSamples();
+            int stride = 1;
+            if (sampleRateHz >= 192000.0)
+                stride = 4;
+            else if (sampleRateHz >= 96000.0)
+                stride = 2;
+            if (samples > 4096)
+                stride = juce::jmax(stride, samples / 2048);
+
+            if (stride == 1)
+            {
+                harmonicTap.push(data, samples);
+            }
+            else
+            {
+                constexpr int kChunk = 512;
+                float temp[kChunk];
+                int idx = 0;
+                for (int i = 0; i < samples; i += stride)
+                {
+                    temp[idx++] = data[i];
+                    if (idx == kChunk)
+                    {
+                        harmonicTap.push(temp, idx);
+                        idx = 0;
+                    }
+                }
+                if (idx > 0)
+                    harmonicTap.push(temp, idx);
+            }
+        }
     }
     else if (phaseMode == 0)
     {
         eqDsp.process(buffer, detectorBuffer);
+        
+        // v4.5 beta: Tap signal after harmonic processing for realtime path
+        // Harmonics are processed inside eqDsp, so tap right after
+        bool hasActiveHarmonics = false;
+        for (int ch = 0; ch < numChannels && !hasActiveHarmonics; ++ch)
+        {
+            for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+            {
+                const auto& b = snapshot.bands[ch][band];
+                if (!b.harmonicBypassed && 
+                    ((b.oddHarmonicDb != 0.0f && b.mixOdd > 0.0f) || 
+                     (b.evenHarmonicDb != 0.0f && b.mixEven > 0.0f)))
+                {
+                    hasActiveHarmonics = true;
+                    break;
+                }
+            }
+        }
+        
+        if (hasActiveHarmonics && buffer.getNumChannels() > 0)
+        {
+            const float* data = buffer.getReadPointer(0);
+            const int samples = buffer.getNumSamples();
+            int stride = 1;
+            if (sampleRateHz >= 192000.0)
+                stride = 4;
+            else if (sampleRateHz >= 96000.0)
+                stride = 2;
+            if (samples > 4096)
+                stride = juce::jmax(stride, samples / 2048);
+
+            if (stride == 1)
+            {
+                harmonicTap.push(data, samples);
+            }
+            else
+            {
+                constexpr int kChunk = 512;
+                float temp[kChunk];
+                int idx = 0;
+                for (int i = 0; i < samples; i += stride)
+                {
+                    temp[idx++] = data[i];
+                    if (idx == kChunk)
+                    {
+                        harmonicTap.push(temp, idx);
+                        idx = 0;
+                    }
+                }
+                if (idx > 0)
+                    harmonicTap.push(temp, idx);
+            }
+        }
     }
     else
     {
@@ -356,7 +463,15 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             {
                 linearPhaseEq.process(buffer);
             }
-
+            
+            // v4.5 beta: Tap signal after harmonic processing for linear phase path
+            // Note: In linear phase mode, harmonics are processed in the reference pass (calibBuffer)
+            // but we want to tap the linear phase output which doesn't have harmonics directly
+            // Actually, harmonics are processed per-band in EQDSP, so they're in the linear phase output
+            // We need to create a buffer that has harmonics applied to the linear phase output
+            // For now, tap after linear phase processing - harmonics will be in the final mix
+            // TODO: This might need adjustment if harmonics are only in the reference path
+            
             if (mixedPhaseAmount > 0.0f)
             {
                 const float dryMix = 1.0f - mixedPhaseAmount;
@@ -371,6 +486,59 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
 
             // Realtime reference pass for post-mode RMS calibration.
             eqDsp.process(calibBuffer, detectorBuffer);
+            
+            // v4.5 beta: For linear phase mode, tap from calibBuffer which has harmonics from eqDsp
+            // The calibBuffer contains the realtime reference with harmonics, which is what we want to show
+            bool hasActiveHarmonics = false;
+            for (int ch = 0; ch < numChannels && !hasActiveHarmonics; ++ch)
+            {
+                for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+                {
+                    const auto& b = snapshot.bands[ch][band];
+                    if (!b.harmonicBypassed && 
+                        ((b.oddHarmonicDb != 0.0f && b.mixOdd > 0.0f) || 
+                         (b.evenHarmonicDb != 0.0f && b.mixEven > 0.0f)))
+                    {
+                        hasActiveHarmonics = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (hasActiveHarmonics && calibBuffer.getNumChannels() > 0)
+            {
+                const float* data = calibBuffer.getReadPointer(0);
+                const int samples = calibBuffer.getNumSamples();
+                int stride = 1;
+                if (sampleRateHz >= 192000.0)
+                    stride = 4;
+                else if (sampleRateHz >= 96000.0)
+                    stride = 2;
+                if (samples > 4096)
+                    stride = juce::jmax(stride, samples / 2048);
+
+                if (stride == 1)
+                {
+                    harmonicTap.push(data, samples);
+                }
+                else
+                {
+                    constexpr int kChunk = 512;
+                    float temp[kChunk];
+                    int idx = 0;
+                    for (int i = 0; i < samples; i += stride)
+                    {
+                        temp[idx++] = data[i];
+                        if (idx == kChunk)
+                        {
+                            harmonicTap.push(temp, idx);
+                            idx = 0;
+                        }
+                    }
+                    if (idx > 0)
+                        harmonicTap.push(temp, idx);
+                }
+            }
 
             // Fallback: if the linear output collapses, keep realtime EQ so audio never drops.
             const double linRms = computeRms(buffer, numChannels);

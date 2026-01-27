@@ -56,6 +56,7 @@ public:
     // Analyzer tap accessors (UI thread).
     AudioFifo& getAnalyzerPreFifo();
     AudioFifo& getAnalyzerPostFifo();
+    AudioFifo& getAnalyzerHarmonicFifo();  // v4.5 beta: FIFO for program + harmonics (red curve)
     AudioFifo& getAnalyzerExternalFifo();
     // Current channel layout label helpers.
     std::vector<juce::String> getCurrentChannelNames() const;
@@ -191,6 +192,7 @@ private:
     eqdsp::EqEngine eqEngine;
     eqdsp::AnalyzerTap analyzerPreTap;
     eqdsp::AnalyzerTap analyzerPostTap;
+    eqdsp::AnalyzerTap analyzerHarmonicTap;  // v4.5 beta: Tap for program + harmonics curve (red)
     eqdsp::AnalyzerTap analyzerExternalTap;
     eqdsp::MeterTap meterTap;
     eqdsp::ParamSnapshot snapshots[2];

@@ -199,3 +199,66 @@ void EQProLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b
     g.drawFittedText(button.getButtonText(), drawBounds.toNearestInt(),
                      juce::Justification::centred, 1);
 }
+
+void EQProLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button,
+                                             const juce::Colour& backgroundColour,
+                                             bool shouldDrawButtonAsHighlighted,
+                                             bool shouldDrawButtonAsDown)
+{
+    // Modern 3D beveled text button - harmonizes with toggle buttons and knobs
+    const auto bounds = button.getLocalBounds().toFloat();
+    const bool isEnabled = button.isEnabled();
+    const bool isOver = button.isMouseOver();
+    const bool isDown = shouldDrawButtonAsDown || button.isMouseButtonDown();
+    
+    // Adjust bounds for pressed state (subtle "pushed in" effect)
+    auto drawBounds = bounds.reduced(0.5f);
+    if (isDown && isEnabled)
+        drawBounds = drawBounds.translated(0.0f, 1.0f);  // Slight downward shift when pressed
+    
+    const float cornerRadius = 4.0f;
+    
+    // Background gradient: light top, dark bottom (same style as knobs and toggles)
+    juce::ColourGradient bgGradient(
+        theme.panel.brighter(0.1f).withAlpha(isEnabled ? 0.3f : 0.15f),
+        drawBounds.getTopLeft().toFloat(),
+        theme.panel.darker(0.15f).withAlpha(isEnabled ? 0.25f : 0.12f),
+        drawBounds.getBottomRight().toFloat(), false);
+    
+    // Apply hover/down state adjustments
+    if (isDown && isEnabled)
+    {
+        // Darker when pressed
+        bgGradient = juce::ColourGradient(
+            bgGradient.getColour(0).darker(0.1f),
+            drawBounds.getTopLeft().toFloat(),
+            bgGradient.getColour(1).darker(0.1f),
+            drawBounds.getBottomRight().toFloat(), false);
+    }
+    else if (isOver && isEnabled)
+    {
+        // Slightly brighter on hover
+        bgGradient = juce::ColourGradient(
+            bgGradient.getColour(0).brighter(0.05f),
+            drawBounds.getTopLeft().toFloat(),
+            bgGradient.getColour(1).brighter(0.05f),
+            drawBounds.getBottomRight().toFloat(), false);
+    }
+    
+    g.setGradientFill(bgGradient);
+    g.fillRoundedRectangle(drawBounds, cornerRadius);
+    
+    // Optimized 3D effect: Single subtle highlight overlay (same as toggle buttons)
+    g.setColour(juce::Colours::white.withAlpha(isEnabled ? 0.06f : 0.03f));
+    g.fillRoundedRectangle(drawBounds.reduced(1.5f, 1.5f).withTrimmedBottom(drawBounds.getHeight() * 0.5f), cornerRadius - 1.5f);
+    
+    // Single clean border (theme.panelOutline, brighter on hover)
+    auto borderColour = theme.panelOutline;
+    if (!isEnabled)
+        borderColour = borderColour.withAlpha(0.5f);
+    else if (isOver)
+        borderColour = theme.panelOutline.brighter(0.15f);
+    
+    g.setColour(borderColour);
+    g.drawRoundedRectangle(drawBounds, cornerRadius, 1.2f);
+}

@@ -19,6 +19,12 @@ public:
     void drawToggleButton(juce::Graphics& g, juce::ToggleButton& button,
                           bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
 
+    // Modern 3D beveled text button - harmonizes with toggle buttons and knobs.
+    void drawButtonBackground(juce::Graphics& g, juce::Button& button,
+                              const juce::Colour& backgroundColour,
+                              bool shouldDrawButtonAsHighlighted,
+                              bool shouldDrawButtonAsDown) override;
+
 private:
     ThemeColors theme = makeDarkTheme();
 };

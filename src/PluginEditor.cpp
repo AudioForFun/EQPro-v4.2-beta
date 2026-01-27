@@ -109,13 +109,15 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     globalMixSlider.setColour(juce::Slider::textBoxOutlineColourId, juce::Colour(0xff1f2937));
     globalMixSlider.setTooltip("Global dry/wet mix");
     addAndMakeVisible(globalMixSlider);
-    // Meter mode toggles (RMS vs Peak) in the top bar.
+    // Meter mode toggles (RMS vs Peak) in the top bar - styled like copy/paste buttons.
+    rmsToggle.setLookAndFeel(&lookAndFeel);
     rmsToggle.setButtonText("RMS");
     rmsToggle.setClickingTogglesState(true);
     rmsToggle.setToggleState(true, juce::dontSendNotification);
     rmsToggle.setTooltip("Meter fill follows RMS");
     addAndMakeVisible(rmsToggle);
 
+    peakToggle.setLookAndFeel(&lookAndFeel);
     peakToggle.setButtonText("Peak");
     peakToggle.setClickingTogglesState(true);
     peakToggle.setToggleState(false, juce::dontSendNotification);
@@ -471,8 +473,19 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         globalMixSlider.setColour(juce::Slider::trackColourId, newTheme.accent);
         globalMixSlider.setColour(juce::Slider::textBoxTextColourId, newTheme.text);
         globalMixSlider.setColour(juce::Slider::textBoxOutlineColourId, newTheme.panelOutline);
+        // Style toggles to match copy/paste buttons with text inside.
         rmsToggle.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
+        rmsToggle.setColour(juce::ToggleButton::textColourOnId, newTheme.text);
+        rmsToggle.setColour(juce::ToggleButton::buttonColourId, newTheme.panel.withAlpha(0.2f));
+        rmsToggle.setColour(juce::ToggleButton::buttonOnColourId, newTheme.accent.withAlpha(0.55f));
+        rmsToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::transparentBlack);
+        rmsToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::transparentBlack);
         peakToggle.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
+        peakToggle.setColour(juce::ToggleButton::textColourOnId, newTheme.text);
+        peakToggle.setColour(juce::ToggleButton::buttonColourId, newTheme.panel.withAlpha(0.2f));
+        peakToggle.setColour(juce::ToggleButton::buttonOnColourId, newTheme.accent.withAlpha(0.55f));
+        peakToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::transparentBlack);
+        peakToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::transparentBlack);
         qModeLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         qAmountLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         qAmountSlider.setColour(juce::Slider::trackColourId, newTheme.accent);
@@ -692,7 +705,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     addAndMakeVisible(loadPresetButton);
 
-    presetPrevButton.setButtonText("<");
+    presetPrevButton.setButtonText("Prev");
     presetPrevButton.setTooltip("Previous preset");
     presetPrevButton.onClick = [this]
     {
@@ -707,7 +720,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     addAndMakeVisible(presetPrevButton);
 
-    presetNextButton.setButtonText(">");
+    presetNextButton.setButtonText("Next");
     presetNextButton.setTooltip("Next preset");
     presetNextButton.onClick = [this]
     {
@@ -1323,14 +1336,16 @@ void EQProAudioProcessorEditor::resized()
         presetBrowserLabel.getFont().getStringWidthFloat(presetBrowserLabel.getText()) + 8 * uiScale);
     presetBrowserLabel.setBounds(topBar.removeFromLeft(presetLabelWidth)
                                      .withSizeKeepingCentre(presetLabelWidth, globalBypassHeight));
-    const int navW = static_cast<int>(20 * uiScale);
+    // Preset navigation buttons match copy/paste button size (58 width, 22 height).
+    const int navW = 58;  // Same as btnW in BandControlsPanel
+    const int navH = 22;  // Same as kRowHeight in BandControlsPanel
     presetPrevButton.setBounds(topBar.removeFromLeft(navW)
-                                   .withSizeKeepingCentre(navW, globalBypassHeight));
+                                   .withSizeKeepingCentre(navW, navH));
     const int presetBoxW = static_cast<int>(180 * uiScale);
     presetBrowserBox.setBounds(topBar.removeFromLeft(presetBoxW)
                                    .withSizeKeepingCentre(presetBoxW, globalBypassHeight + 6));
     presetNextButton.setBounds(topBar.removeFromLeft(navW)
-                                   .withSizeKeepingCentre(navW, globalBypassHeight));
+                                   .withSizeKeepingCentre(navW, navH));
     presetDeltaToggle.setBounds({0, 0, 0, 0});
 
     auto content = bounds;
@@ -1344,9 +1359,10 @@ void EQProAudioProcessorEditor::resized()
 
     auto controlsArea = leftContent;
     auto metersArea = rightPanel;
-    const int meterToggleH = static_cast<int>(24 * uiScale);
+    // RMS/Peak toggles match copy/paste button size (58 width, 22 height).
+    const int meterToggleH = 22;  // Same as kRowHeight in BandControlsPanel
     auto meterToggleArea = metersArea.removeFromTop(meterToggleH);
-    const int meterToggleW = static_cast<int>(48 * uiScale);
+    const int meterToggleW = 58;  // Same as btnW in BandControlsPanel
     const int meterToggleGap = static_cast<int>(6 * uiScale);
     auto toggleRow = meterToggleArea.removeFromRight(meterToggleW * 2 + meterToggleGap);
     rmsToggle.setBounds(toggleRow.removeFromLeft(meterToggleW)

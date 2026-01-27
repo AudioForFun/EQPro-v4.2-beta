@@ -121,3 +121,47 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
         }
     }
 }
+
+void EQProLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& button,
+                                         bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
+{
+    const auto bounds = button.getLocalBounds().toFloat();
+    const bool isOn = button.getToggleState();
+    const bool isEnabled = button.isEnabled();
+    const bool isOver = button.isMouseOver();
+    const bool isDown = shouldDrawButtonAsDown || button.isMouseButtonDown();
+
+    // Background color - similar to text buttons.
+    auto bgColour = button.findColour(juce::ToggleButton::buttonColourId);
+    if (isOn)
+        bgColour = button.findColour(juce::ToggleButton::buttonOnColourId);
+    if (!isEnabled)
+        bgColour = bgColour.withMultipliedAlpha(0.5f);
+    else if (isDown)
+        bgColour = bgColour.brighter(0.1f);
+    else if (isOver)
+        bgColour = bgColour.brighter(0.05f);
+
+    // Draw rounded rectangle background.
+    g.setColour(bgColour);
+    g.fillRoundedRectangle(bounds.reduced(0.5f), 4.0f);
+
+    // Draw outline.
+    auto outlineColour = theme.panelOutline.withAlpha(isEnabled ? 0.6f : 0.3f);
+    if (isOver && isEnabled)
+        outlineColour = theme.accent.withAlpha(0.4f);
+    g.setColour(outlineColour);
+    g.drawRoundedRectangle(bounds.reduced(0.5f), 4.0f, 1.0f);
+
+    // Draw text centered inside.
+    auto textColour = isOn
+        ? button.findColour(juce::ToggleButton::textColourOnId)
+        : button.findColour(juce::ToggleButton::textColourId);
+    if (!isEnabled)
+        textColour = textColour.withMultipliedAlpha(0.5f);
+
+    g.setColour(textColour);
+    g.setFont(juce::Font(12.0f).boldened());
+    g.drawFittedText(button.getButtonText(), bounds.toNearestInt(),
+                     juce::Justification::centred, 1);
+}

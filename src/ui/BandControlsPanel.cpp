@@ -728,10 +728,11 @@ void BandControlsPanel::setMsEnabled(bool enabled)
 void BandControlsPanel::paint(juce::Graphics& g)
 {
     const auto bounds = getLocalBounds().toFloat();
-    g.setColour(theme.panel);
-    g.fillRoundedRectangle(bounds, 8.0f);
     const auto bandColour = ColorUtils::bandColour(selectedBand);
-    // Band frame follows the active band color.
+    // Entire frame background follows the active band color (darker for readability).
+    g.setColour(bandColour.darker(0.85f).withAlpha(0.35f));
+    g.fillRoundedRectangle(bounds, 8.0f);
+    // Band frame outline follows the active band color.
     g.setColour(bandColour.withAlpha(0.75f));
     g.drawRoundedRectangle(bounds.reduced(0.5f), 8.0f, 1.2f);
 

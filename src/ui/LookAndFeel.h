@@ -15,6 +15,10 @@ public:
                           float sliderPosProportional, float rotaryStartAngle,
                           float rotaryEndAngle, juce::Slider& slider) override;
 
+    // Custom toggle button drawing to match text button style (text inside, no checkbox).
+    void drawToggleButton(juce::Graphics& g, juce::ToggleButton& button,
+                          bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
+
 private:
     ThemeColors theme = makeDarkTheme();
     juce::Image knobFilmstrip;

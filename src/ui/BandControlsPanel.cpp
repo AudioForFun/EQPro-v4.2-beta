@@ -728,12 +728,11 @@ void BandControlsPanel::setMsEnabled(bool enabled)
 void BandControlsPanel::paint(juce::Graphics& g)
 {
     const auto bounds = getLocalBounds().toFloat();
-    const auto bandColour = ColorUtils::bandColour(selectedBand);
-    // Entire frame background follows the active band color (darker for readability).
-    g.setColour(bandColour.darker(0.85f).withAlpha(0.35f));
+    // Main panel background (fixed color, not band-dependent).
+    g.setColour(theme.panel);
     g.fillRoundedRectangle(bounds, 8.0f);
-    // Band frame outline follows the active band color.
-    g.setColour(bandColour.withAlpha(0.75f));
+    // Main panel outline (fixed color).
+    g.setColour(theme.panelOutline.withAlpha(0.75f));
     g.drawRoundedRectangle(bounds.reduced(0.5f), 8.0f, 1.2f);
 
     auto layout = getLocalBounds().reduced(kPanelPadding);
@@ -746,6 +745,24 @@ void BandControlsPanel::paint(juce::Graphics& g)
     const auto knobsArea = left.removeFromTop(kKnobRowHeight);
     left.removeFromTop(kGap);
     const auto comboRowArea = left.removeFromTop(kLabelHeight + kRowHeight);
+
+    // Get band color for rotary section frame (ensure selectedBand is valid for all 12 bands).
+    const int safeBandIndex = juce::jlimit(0, ParamIDs::kBandsPerChannel - 1, selectedBand);
+    const auto bandColour = ColorUtils::bandColour(safeBandIndex);
+    
+    // Frame around the 4 rotaries (knobsArea + gap + comboRowArea) follows the active band color.
+    const auto rotaryFrameArea = juce::Rectangle<float>(
+        static_cast<float>(knobsArea.getX()),
+        static_cast<float>(knobsArea.getY()),
+        static_cast<float>(knobsArea.getWidth()),
+        static_cast<float>(knobsArea.getHeight() + kGap + comboRowArea.getHeight())
+    ).reduced(4.0f);
+    // Background fill for rotary frame.
+    g.setColour(bandColour.darker(0.8f).withAlpha(0.4f));
+    g.fillRoundedRectangle(rotaryFrameArea, 8.0f);
+    // Outline for rotary frame.
+    g.setColour(bandColour.withAlpha(0.75f));
+    g.drawRoundedRectangle(rotaryFrameArea, 8.0f, 1.5f);
 
     const float glowAlpha = juce::jlimit(0.0f, 1.0f, selectedBandGlow);
     if (glowAlpha > 0.01f)
@@ -786,10 +803,6 @@ void BandControlsPanel::paint(juce::Graphics& g)
                static_cast<float>(comboRowArea.getBottom() + 1),
                static_cast<float>(comboRowArea.getRight()),
                static_cast<float>(comboRowArea.getBottom() + 1), 1.0f);
-
-    const auto knobGlow = juce::Rectangle<float>(knobsArea.toFloat().reduced(6.0f));
-    g.setColour(bandColour.withAlpha(0.16f));
-    g.fillRoundedRectangle(knobGlow, 8.0f);
 
     if (detectorMeterBounds.getWidth() > 1.0f && detectorMeterBounds.getHeight() > 1.0f)
     {

@@ -131,10 +131,11 @@ void EQProLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b
     const bool isOver = button.isMouseOver();
     const bool isDown = shouldDrawButtonAsDown || button.isMouseButtonDown();
 
-    // Background color - similar to text buttons.
-    auto bgColour = button.findColour(juce::ToggleButton::buttonColourId);
+    // Get colors from component properties (set via setColour with custom IDs or use theme defaults).
+    // For custom toggle buttons styled like text buttons, we use theme colors directly.
+    auto bgColour = theme.panel.withAlpha(0.2f);
     if (isOn)
-        bgColour = button.findColour(juce::ToggleButton::buttonOnColourId);
+        bgColour = theme.accent.withAlpha(0.55f);
     if (!isEnabled)
         bgColour = bgColour.withMultipliedAlpha(0.5f);
     else if (isDown)
@@ -154,9 +155,9 @@ void EQProLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b
     g.drawRoundedRectangle(bounds.reduced(0.5f), 4.0f, 1.0f);
 
     // Draw text centered inside.
-    auto textColour = isOn
-        ? button.findColour(juce::ToggleButton::textColourOnId)
-        : button.findColour(juce::ToggleButton::textColourId);
+    auto textColour = button.findColour(juce::ToggleButton::textColourId);
+    if (isOn)
+        textColour = theme.text;  // Brighter text when on
     if (!isEnabled)
         textColour = textColour.withMultipliedAlpha(0.5f);
 

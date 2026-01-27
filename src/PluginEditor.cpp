@@ -474,16 +474,11 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         globalMixSlider.setColour(juce::Slider::textBoxTextColourId, newTheme.text);
         globalMixSlider.setColour(juce::Slider::textBoxOutlineColourId, newTheme.panelOutline);
         // Style toggles to match copy/paste buttons with text inside.
+        // Colors are handled by custom LookAndFeel::drawToggleButton method.
         rmsToggle.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
-        rmsToggle.setColour(juce::ToggleButton::textColourOnId, newTheme.text);
-        rmsToggle.setColour(juce::ToggleButton::buttonColourId, newTheme.panel.withAlpha(0.2f));
-        rmsToggle.setColour(juce::ToggleButton::buttonOnColourId, newTheme.accent.withAlpha(0.55f));
         rmsToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::transparentBlack);
         rmsToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::transparentBlack);
         peakToggle.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
-        peakToggle.setColour(juce::ToggleButton::textColourOnId, newTheme.text);
-        peakToggle.setColour(juce::ToggleButton::buttonColourId, newTheme.panel.withAlpha(0.2f));
-        peakToggle.setColour(juce::ToggleButton::buttonOnColourId, newTheme.accent.withAlpha(0.55f));
         peakToggle.setColour(juce::ToggleButton::tickColourId, juce::Colours::transparentBlack);
         peakToggle.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::transparentBlack);
         qModeLabel.setColour(juce::Label::textColourId, newTheme.textMuted);

@@ -235,15 +235,15 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         g.strokePath(extPath, juce::PathStrokeType(1.0f * scale));
     }
 
-    const bool showLegend = drawPre || drawPost || showExternal;
+    // Removed "Pre" and "Post" labels per user request - users can identify curves by their grey tones.
+    // Only show legend if external analyzer is enabled.
+    const bool showLegend = showExternal;
     if (showLegend)
     {
         const float pad = 6.0f * scale;
         const float swatch = 10.0f * scale;
         const float rowH = 14.0f * scale;
         juce::StringArray items;
-        if (drawPre) items.add("Pre");
-        if (drawPost) items.add("Post");
         if (showExternal) items.add("Ext");
 
         // Modern legend with better styling.
@@ -267,11 +267,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         for (int i = 0; i < items.size(); ++i)
         {
             auto line = row.removeFromTop(rowH);
-            juce::Colour swatchColour = preColour;
-            if (items[i] == "Post")
-                swatchColour = postColour;
-            else if (items[i] == "Ext")
-                swatchColour = postColour.withAlpha(0.6f);
+            juce::Colour swatchColour = postColour.withAlpha(0.6f);  // Only "Ext" remains
             // Clean swatch matching Pro-Q style (no glow, simple fill).
             const auto swatchRect = line.removeFromLeft(swatch).toFloat();
             g.setColour(swatchColour);

@@ -574,6 +574,20 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         cacheBandFromUi(selectedChannel, selectedBand);
     };
     
+    // v4.4 beta: Harmonic bypass toggle (per-band, independent for each of 12 bands)
+    harmonicBypassToggle.setButtonText("BYPASS");
+    harmonicBypassToggle.setClickingTogglesState(true);
+    harmonicBypassToggle.setToggleState(false, juce::dontSendNotification);
+    harmonicBypassToggle.setTooltip("Bypass harmonic processing for this band");
+    harmonicBypassToggle.onClick = [this]
+    {
+        if (suppressParamCallbacks)
+            return;
+        ensureBandActiveFromEdit();
+        cacheBandFromUi(selectedChannel, selectedBand);
+    };
+    addAndMakeVisible(harmonicBypassToggle);
+    
     // Initially hide harmonic controls (EQ layer is default)
     updateLayerVisibility();
 
@@ -816,6 +830,7 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     mixOddLabel.setColour(juce::Label::textColourId, theme.textMuted);
     evenLabel.setColour(juce::Label::textColourId, theme.textMuted);
     mixEvenLabel.setColour(juce::Label::textColourId, theme.textMuted);
+    harmonicBypassToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     msBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     msBox.setColour(juce::ComboBox::textColourId, theme.text);
     msBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
@@ -914,6 +929,7 @@ void BandControlsPanel::updateLayerVisibility()
     mixOddSlider.setVisible(!isEQLayer);
     evenHarmonicSlider.setVisible(!isEQLayer);
     mixEvenSlider.setVisible(!isEQLayer);
+    harmonicBypassToggle.setVisible(!isEQLayer);  // v4.4 beta: Show bypass only on Harmonic layer
     
     // Dropdowns: hide on Harmonic layer
     typeLabel.setVisible(isEQLayer);
@@ -1244,6 +1260,8 @@ void BandControlsPanel::cacheBandFromUi(int channelIndex, int bandIndex)
         state.mixOdd = static_cast<float>(mixOddSlider.getValue());
         state.even = static_cast<float>(evenHarmonicSlider.getValue());
         state.mixEven = static_cast<float>(mixEvenSlider.getValue());
+        // v4.4 beta: Harmonic bypass (per-band, independent for each of 12 bands)
+        state.harmonicBypass = harmonicBypassToggle.getToggleState() ? 1.0f : 0.0f;
     }
     
     if (auto* param = parameters.getRawParameterValue(ParamIDs::bandParamId(channelIndex, bandIndex, "bypass")))
@@ -1283,11 +1301,12 @@ void BandControlsPanel::cacheBandFromParams(int channelIndex, int bandIndex)
     state.slope = readValue(bandIndex, "slope", state.slope);
     state.solo = readValue(bandIndex, "solo", state.solo);
     state.mix = readValue(bandIndex, "mix", state.mix);
-    // v4.4 beta: Harmonic parameters
+    // v4.4 beta: Harmonic parameters (per-band, independent for each of 12 bands)
     state.odd = readValue(bandIndex, "odd", state.odd);
     state.mixOdd = readValue(bandIndex, "mixOdd", state.mixOdd);
     state.even = readValue(bandIndex, "even", state.even);
     state.mixEven = readValue(bandIndex, "mixEven", state.mixEven);
+    state.harmonicBypass = readValue(bandIndex, "harmonicBypass", state.harmonicBypass);
     state.dynEnable = readValue(bandIndex, "dynEnable", state.dynEnable);
     state.dynMode = readValue(bandIndex, "dynMode", state.dynMode);
     state.dynThresh = readValue(bandIndex, "dynThresh", state.dynThresh);
@@ -1335,11 +1354,12 @@ void BandControlsPanel::applyCachedBandToParams(int channelIndex)
         setParamValue(band, "slope", state.slope);
         setParamValue(band, "solo", state.solo);
         setParamValue(band, "mix", state.mix);
-        // v4.4 beta: Harmonic parameters
+        // v4.4 beta: Harmonic parameters (per-band, independent for each of 12 bands)
         setParamValue(band, "odd", state.odd);
         setParamValue(band, "mixOdd", state.mixOdd);
         setParamValue(band, "even", state.even);
         setParamValue(band, "mixEven", state.mixEven);
+        setParamValue(band, "harmonicBypass", state.harmonicBypass);
         setParamValue(band, "dynEnable", state.dynEnable);
         setParamValue(band, "dynMode", state.dynMode);
         setParamValue(band, "dynThresh", state.dynThresh);
@@ -1379,6 +1399,8 @@ void BandControlsPanel::restoreBandFromCache()
         mixOddSlider.setValue(state.mixOdd, juce::dontSendNotification);
         evenHarmonicSlider.setValue(state.even, juce::dontSendNotification);
         mixEvenSlider.setValue(state.mixEven, juce::dontSendNotification);
+        // v4.4 beta: Harmonic bypass (per-band, independent for each of 12 bands)
+        harmonicBypassToggle.setToggleState(state.harmonicBypass > 0.5f, juce::dontSendNotification);
     }
     dynEnableToggle.setToggleState(state.dynEnable > 0.5f, juce::dontSendNotification);
     dynUpButton.setToggleState(state.dynMode < 0.5f, juce::dontSendNotification);
@@ -1516,27 +1538,34 @@ void BandControlsPanel::resized()
         mixEvenSlider.setBounds(squareKnob(mixEvenArea).withSizeKeepingCentre(knobSize, knobSize));
     }
 
-    // Add extra spacing before dropdowns to avoid overlap with rotary frame.
+    // v4.4 beta: Layout for dropdowns (EQ layer) or bypass toggle (Harmonic layer)
     left.removeFromTop(kGap + 4);  // Extra 4 pixels to prevent overlap with frame
-    auto comboRow = left.removeFromTop(kLabelHeight + kRowHeight);
-    const int comboColWidth = (comboRow.getWidth() - kGap * 2) / 3;
+    if (currentLayer == BandControlsPanel::LayerType::EQ)
+    {
+        auto comboRow = left.removeFromTop(kLabelHeight + kRowHeight);
+        const int comboColWidth = (comboRow.getWidth() - kGap * 2) / 3;
 
-    auto channelCol = comboRow.removeFromLeft(comboColWidth);
-    msLabel.setBounds(channelCol.removeFromTop(kLabelHeight));
-    const int msWidth = juce::jmin(channelCol.getWidth(), comboWidthMs);
-    msBox.setBounds(channelCol.withHeight(kComboHeight).withSizeKeepingCentre(msWidth, kComboHeight));
-
-    comboRow.removeFromLeft(kGap);
-    auto typeCol = comboRow.removeFromLeft(comboColWidth);
-    typeLabel.setBounds(typeCol.removeFromTop(kLabelHeight));
-    const int typeWidth = juce::jmin(typeCol.getWidth(), comboWidthType);
-    typeBox.setBounds(typeCol.withHeight(kComboHeight).withSizeKeepingCentre(typeWidth, kComboHeight));
-
-    comboRow.removeFromLeft(kGap);
-    auto slopeCol = comboRow.removeFromLeft(comboColWidth);
-    slopeLabel.setBounds(slopeCol.removeFromTop(kLabelHeight));
-    const int slopeWidth = juce::jmin(slopeCol.getWidth(), comboWidthSlope);
-    slopeBox.setBounds(slopeCol.withHeight(kComboHeight).withSizeKeepingCentre(slopeWidth, kComboHeight));
+        auto channelCol = comboRow.removeFromLeft(comboColWidth);
+        msLabel.setBounds(channelCol.removeFromTop(kLabelHeight));
+        msBox.setBounds(channelCol.withHeight(kComboHeight).withSizeKeepingCentre(comboWidthMs, kComboHeight));
+        comboRow.removeFromLeft(kGap);
+        auto typeCol = comboRow.removeFromLeft(comboColWidth);
+        typeLabel.setBounds(typeCol.removeFromTop(kLabelHeight));
+        const int typeWidth = juce::jmin(typeCol.getWidth(), comboWidthType);
+        typeBox.setBounds(typeCol.withHeight(kComboHeight).withSizeKeepingCentre(typeWidth, kComboHeight));
+        comboRow.removeFromLeft(kGap);
+        auto slopeCol = comboRow.removeFromLeft(comboColWidth);
+        slopeLabel.setBounds(slopeCol.removeFromTop(kLabelHeight));
+        const int slopeWidth = juce::jmin(slopeCol.getWidth(), comboWidthSlope);
+        slopeBox.setBounds(slopeCol.withHeight(kComboHeight).withSizeKeepingCentre(slopeWidth, kComboHeight));
+    }
+    else  // Harmonic layer: show bypass toggle
+    {
+        auto bypassRow = left.removeFromTop(kRowHeight);
+        const int bypassToggleW = 80;
+        harmonicBypassToggle.setBounds(bypassRow.removeFromLeft(bypassToggleW)
+                                          .withSizeKeepingCentre(bypassToggleW, kRowHeight));
+    }
 
     left.removeFromTop(2);
     auto togglesRow = left.removeFromTop(kRowHeight);
@@ -1585,6 +1614,7 @@ void BandControlsPanel::updateAttachments()
         mixOddAttachment.reset();
         evenHarmonicAttachment.reset();
         mixEvenAttachment.reset();
+        harmonicBypassAttachment.reset();
     }
     else  // Harmonic layer
     {
@@ -1597,6 +1627,11 @@ void BandControlsPanel::updateAttachments()
         mixOddAttachment = std::make_unique<SliderAttachment>(parameters, mixOddId, mixOddSlider);
         evenHarmonicAttachment = std::make_unique<SliderAttachment>(parameters, evenId, evenHarmonicSlider);
         mixEvenAttachment = std::make_unique<SliderAttachment>(parameters, mixEvenId, mixEvenSlider);
+        
+        // v4.4 beta: Harmonic bypass attachment (per-band, independent for each of 12 bands)
+        const auto harmonicBypassId = ParamIDs::bandParamId(selectedChannel, selectedBand, "harmonicBypass");
+        harmonicBypassAttachment = std::make_unique<ButtonAttachment>(parameters, harmonicBypassId, harmonicBypassToggle);
+        
         // Clear EQ attachments when on Harmonic layer
         freqAttachment.reset();
         gainAttachment.reset();
@@ -1681,6 +1716,9 @@ void BandControlsPanel::syncUiFromParams()
         setSliderFromParam(mixOddSlider, "mixOdd");
         setSliderFromParam(evenHarmonicSlider, "even");
         setSliderFromParam(mixEvenSlider, "mixEven");
+        
+        // v4.4 beta: Harmonic bypass toggle (per-band, independent for each of 12 bands)
+        setToggleFromParam(harmonicBypassToggle, "harmonicBypass");
     }
     
     setSliderFromParam(thresholdSlider, "dynThresh");

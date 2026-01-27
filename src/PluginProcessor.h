@@ -127,6 +127,7 @@ private:
         std::atomic<float>* mixOdd = nullptr;
         std::atomic<float>* even = nullptr;
         std::atomic<float>* mixEven = nullptr;
+        std::atomic<float>* harmonicBypass = nullptr;  // v4.4 beta: Bypass for harmonic layer (per-band)
         std::atomic<float>* bypass = nullptr;
         std::atomic<float>* msTarget = nullptr;
         std::atomic<float>* slope = nullptr;

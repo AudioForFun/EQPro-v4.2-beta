@@ -35,10 +35,11 @@ struct BandParams
     float releaseMs = 200.0f;
     bool autoScale = true;
     bool useExternalDetector = false;
-    // v4.4 beta: Harmonic layer parameters
+    // v4.4 beta: Harmonic layer parameters (per-band, independent for each of 12 bands)
     float oddHarmonicDb = 0.0f;
     float mixOdd = 1.0f;
     float evenHarmonicDb = 0.0f;
     float mixEven = 1.0f;
+    bool harmonicBypassed = false;  // v4.4 beta: Bypass for harmonic layer
 };
 } // namespace eqdsp

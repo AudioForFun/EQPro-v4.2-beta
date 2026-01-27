@@ -24,6 +24,7 @@ constexpr const char* kParamOddSuffix = "odd";
 constexpr const char* kParamMixOddSuffix = "mixOdd";
 constexpr const char* kParamEvenSuffix = "even";
 constexpr const char* kParamMixEvenSuffix = "mixEven";
+constexpr const char* kParamHarmonicBypassSuffix = "harmonicBypass";  // v4.4 beta: Harmonic bypass per band
 constexpr const char* kParamDynEnableSuffix = "dynEnable";
 constexpr const char* kParamDynModeSuffix = "dynMode";
 constexpr const char* kParamDynThreshSuffix = "dynThresh";
@@ -934,6 +935,9 @@ void EQProAudioProcessor::initializeParamPointers()
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamEvenSuffix));
             bandParamPointers[ch][band].mixEven =
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamMixEvenSuffix));
+            // v4.4 beta: Harmonic bypass pointer (per-band, independent for each of 12 bands)
+            bandParamPointers[ch][band].harmonicBypass =
+                parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamHarmonicBypassSuffix));
             bandParamPointers[ch][band].dynEnable =
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamDynEnableSuffix));
             bandParamPointers[ch][band].dynMode =
@@ -1142,6 +1146,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
                 ParamIDs::bandParamName(ch, band, "Mix Even"),
                 juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
                 100.0f));
+            
+            // v4.4 beta: Harmonic bypass parameter (per-band, independent for each of 12 bands)
+            params.push_back(std::make_unique<juce::AudioParameterBool>(
+                ParamIDs::bandParamId(ch, band, kParamHarmonicBypassSuffix),
+                ParamIDs::bandParamName(ch, band, "Harmonic Bypass"),
+                false));
 
             params.push_back(std::make_unique<juce::AudioParameterBool>(
                 ParamIDs::bandParamId(ch, band, kParamDynEnableSuffix),
@@ -1701,11 +1711,12 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
             dst.dynReleaseMs = ptrs.dynRelease != nullptr ? ptrs.dynRelease->load() : 200.0f;
             dst.dynAuto = ptrs.dynAuto != nullptr && ptrs.dynAuto->load() > 0.5f;
             dst.dynExternal = ptrs.dynExternal != nullptr && ptrs.dynExternal->load() > 0.5f;
-            // v4.4 beta: Harmonic parameters
+            // v4.4 beta: Harmonic parameters (per-band, independent for each of 12 bands)
             dst.oddHarmonicDb = ptrs.odd != nullptr ? ptrs.odd->load() : 0.0f;
             dst.mixOdd = ptrs.mixOdd != nullptr ? (ptrs.mixOdd->load() / 100.0f) : 1.0f;
             dst.evenHarmonicDb = ptrs.even != nullptr ? ptrs.even->load() : 0.0f;
             dst.mixEven = ptrs.mixEven != nullptr ? (ptrs.mixEven->load() / 100.0f) : 1.0f;
+            dst.harmonicBypassed = ptrs.harmonicBypass != nullptr && ptrs.harmonicBypass->load() > 0.5f;
         }
     }
 

@@ -873,11 +873,12 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                     this->dynamicGainDb[ch][band].store(deltaDb);
                 }
                 
-                // v4.4 beta: Harmonic generation (odd and even harmonics)
+                // v4.4 beta: Harmonic generation (odd and even harmonics) - per-band, independent for each of 12 bands
                 // Apply harmonics to the EQ-processed signal
                 float harmonicSample = sample;
-                if ((params.oddHarmonicDb != 0.0f && params.mixOdd > 0.0f) || 
-                    (params.evenHarmonicDb != 0.0f && params.mixEven > 0.0f))
+                if (!params.harmonicBypassed && 
+                    ((params.oddHarmonicDb != 0.0f && params.mixOdd > 0.0f) || 
+                     (params.evenHarmonicDb != 0.0f && params.mixEven > 0.0f)))
                 {
                     // Waveshaping for harmonic generation
                     // Odd harmonics: cubic distortion (3rd, 5th, etc.)

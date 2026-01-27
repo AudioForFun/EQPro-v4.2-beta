@@ -187,11 +187,12 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             params.mix = src.mix;
             params.dynamicEnabled = src.dynEnabled;
             params.dynamicMode = src.dynMode;
-            // v4.4 beta: Harmonic parameters
+            // v4.4 beta: Harmonic parameters (per-band, independent for each of 12 bands)
             params.oddHarmonicDb = src.oddHarmonicDb;
             params.mixOdd = src.mixOdd;
             params.evenHarmonicDb = src.evenHarmonicDb;
             params.mixEven = src.mixEven;
+            params.harmonicBypassed = src.harmonicBypassed;
             params.thresholdDb = src.dynThresholdDb;
             params.attackMs = src.dynAttackMs;
             params.releaseMs = src.dynReleaseMs;

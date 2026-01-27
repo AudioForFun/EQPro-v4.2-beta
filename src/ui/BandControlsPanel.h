@@ -163,6 +163,7 @@ private:
         float mixOdd = 100.0f;
         float even = 0.0f;
         float mixEven = 100.0f;
+        float harmonicBypass = 0.0f;  // v4.4 beta: Bypass for harmonic layer (per band)
     };
 
     EQProAudioProcessor& processor;
@@ -206,6 +207,7 @@ private:
     BandKnob evenHarmonicSlider;
     juce::Label mixEvenLabel;
     BandKnob mixEvenSlider;
+    juce::ToggleButton harmonicBypassToggle;  // v4.4 beta: Bypass for harmonic layer
     
     juce::TextButton copyButton;
     juce::TextButton pasteButton;
@@ -234,6 +236,7 @@ private:
     std::unique_ptr<SliderAttachment> mixOddAttachment;
     std::unique_ptr<SliderAttachment> evenHarmonicAttachment;
     std::unique_ptr<SliderAttachment> mixEvenAttachment;
+    std::unique_ptr<ButtonAttachment> harmonicBypassAttachment;  // v4.4 beta: Harmonic bypass attachment
     std::unique_ptr<ButtonAttachment> dynEnableAttachment;
     std::unique_ptr<ComboBoxAttachment> dynModeAttachment;
     std::unique_ptr<SliderAttachment> dynThresholdAttachment;

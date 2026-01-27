@@ -30,6 +30,7 @@ struct BandSnapshot
     float mixOdd = 1.0f;
     float evenHarmonicDb = 0.0f;
     float mixEven = 1.0f;
+    bool harmonicBypassed = false;  // v4.4 beta: Bypass for harmonic layer (per-band)
 };
 
 // Full parameter snapshot used by the audio thread.

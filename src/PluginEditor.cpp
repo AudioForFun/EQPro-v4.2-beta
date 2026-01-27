@@ -1064,6 +1064,9 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     pendingWindowRescue = false;
     setResizable(false, false);
     setResizeLimits(kEditorWidth, kEditorHeight, kEditorWidth, kEditorHeight);
+    
+    // v4.4 beta: Use buffered rendering for better performance on initial load
+    setBufferedToImage(true);
 
     setSize(kEditorWidth, kEditorHeight);
 

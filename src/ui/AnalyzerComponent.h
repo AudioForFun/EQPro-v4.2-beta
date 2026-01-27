@@ -147,5 +147,6 @@ private:
     float lastSelectedMix = 1.0f;
     float lastGlobalMix = 1.0f;
     float uiScale = 1.0f;
+    bool hasBeenResized = false;  // v4.4 beta: Defer timer start until after first resize
     ThemeColors theme = makeDarkTheme();
 };

@@ -134,6 +134,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     // v4.4 beta: Defer timer start to avoid expensive repaints before components are laid out.
     // Timer will start after first resize to ensure proper initialization.
     hasBeenResized = false;
+    // v4.4 beta: Use buffered rendering for better performance
+    setBufferedToImage(true);
     channelNames = processor.getCurrentChannelNames();
     for (auto& fade : bandHoverFade)
     {

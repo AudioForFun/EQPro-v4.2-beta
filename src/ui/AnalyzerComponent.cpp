@@ -62,8 +62,11 @@ AnalyzerComponent::AnalyzerComponent(EQProAudioProcessor& processor)
     externalMagnitudes.fill(kAnalyzerMinDb);
     selectedBands.push_back(selectedBand);
     lastTimerHz = 30;
-    startTimerHz(30);
+    // v4.4 beta: Defer timer start - will start after first resize
+    hasBeenResized = false;
     perBandCurveHash.assign(ParamIDs::kBandsPerChannel, 0);
+    // v4.4 beta: Use buffered rendering for better performance
+    setBufferedToImage(true);
 }
 
 void AnalyzerComponent::setSelectedBand(int bandIndex)
@@ -692,6 +695,12 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
 void AnalyzerComponent::resized()
 {
+    // v4.4 beta: Start timer only after first resize to ensure proper initialization
+    if (!hasBeenResized)
+    {
+        hasBeenResized = true;
+        startTimerHz(30);
+    }
     updateCurves();
 }
 

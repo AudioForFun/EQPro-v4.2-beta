@@ -158,7 +158,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     }
 
     // v4.4 beta: Remove "BAND" label, keep only number to save space
-    titleLabel.setText("1 / " + juce::String(ParamIDs::kBandsPerChannel), juce::dontSendNotification);
+    // v4.4 beta: Display only the current band number (e.g., "1" instead of "1 / 12")
+    titleLabel.setText("1", juce::dontSendNotification);
     titleLabel.setJustificationType(juce::Justification::centred);
     titleLabel.setColour(juce::Label::textColourId, theme.text);
     addAndMakeVisible(titleLabel);
@@ -733,9 +734,8 @@ void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
     selectedChannel = juce::jlimit(0, ParamIDs::kMaxChannels - 1, channelIndex);
     selectedBand = juce::jlimit(0, ParamIDs::kBandsPerChannel - 1, bandIndex);
 
-    // v4.4 beta: Remove "BAND" label, keep only number to save space
-    titleLabel.setText(juce::String(selectedBand + 1)
-                           + " / " + juce::String(ParamIDs::kBandsPerChannel),
+    // v4.4 beta: Display only the current band number (e.g., "1" instead of "1 / 12")
+    titleLabel.setText(juce::String(selectedBand + 1),
                        juce::dontSendNotification);
     for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
     {
@@ -1492,9 +1492,9 @@ void BandControlsPanel::resized()
     prevBandButton.setBounds(headerRow.removeFromLeft(navW));
     nextBandButton.setBounds(headerRow.removeFromLeft(navW));
     
-    // v4.4 beta: Band number on the RIGHT
-    // Reduced width from 100 to 60 since "BAND" label removed, saving space
-    titleLabel.setBounds(headerRow.removeFromRight(60));
+    // v4.4 beta: Band number on the RIGHT - only showing current band number (e.g., "1")
+    // Reduced width since we only show the number, not "1 / 12"
+    titleLabel.setBounds(headerRow.removeFromRight(40));
     
     eqSectionLabel.setBounds({0, 0, 0, 0});
 

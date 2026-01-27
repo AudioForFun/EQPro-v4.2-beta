@@ -5,8 +5,9 @@
 
 namespace
 {
+// v4.4 beta: Digital domain - 0 dBFS is maximum (not +6 dB)
 constexpr float kMinDb = -60.0f;
-constexpr float kMaxDb = 6.0f;
+constexpr float kMaxDb = 0.0f;
 
 juce::String formatDolbyLabel(const juce::String& label)
 {
@@ -88,7 +89,7 @@ void MetersComponent::paint(juce::Graphics& g)
     g.drawRoundedRectangle(bounds.reduced(2.5f), 6.0f, 1.0f);
 
     auto meterArea = bounds.reduced(8.0f, 12.0f);
-    const auto peakArea = meterArea.removeFromBottom(18.0f);
+    // v4.4 beta: Removed peakArea box at bottom - peak values now shown at top of bars
     
     // v4.4 beta: Add dB value labels on the left side of the meter scale
     const float labelWidth = 28.0f;
@@ -124,12 +125,26 @@ void MetersComponent::paint(juce::Graphics& g)
             return juce::jmap(clamped, kMinDb, kMaxDb,
                               meterBounds.getBottom(), meterBounds.getY());
         };
-        const float tickDb[] { -60.0f, -48.0f, -36.0f, -24.0f, -12.0f, -6.0f, 0.0f, 6.0f };
-        g.setColour(theme.grid.withAlpha(0.35f));
-        for (float tick : tickDb)
+        // v4.4 beta: Digital domain graduations - maximum is 0 dBFS
+        // Major ticks (every 12 dB)
+        const float majorTickDb[] { -60.0f, -48.0f, -36.0f, -24.0f, -12.0f, 0.0f };
+        g.setColour(theme.grid.withAlpha(0.5f));
+        for (float tick : majorTickDb)
         {
             const float y = mapDbToY(tick);
-            g.drawLine(meterBounds.getX() + 2.0f, y, meterBounds.getRight() - 2.0f, y, 1.0f);
+            // Full width major tick marks
+            g.drawLine(meterBounds.getX() + 1.0f, y, meterBounds.getRight() - 1.0f, y, 1.2f);
+        }
+        
+        // Minor ticks (every 6 dB) for better graduation
+        const float minorTickDb[] { -54.0f, -42.0f, -30.0f, -18.0f, -6.0f };
+        g.setColour(theme.grid.withAlpha(0.25f));
+        for (float tick : minorTickDb)
+        {
+            const float y = mapDbToY(tick);
+            // Shorter minor tick marks (half width)
+            const float tickWidth = (meterBounds.getWidth() - 2.0f) * 0.5f;
+            g.drawLine(meterBounds.getX() + 1.0f, y, meterBounds.getX() + 1.0f + tickWidth, y, 0.8f);
         }
         const float mainDb = showPeakAsFill ? peakDbValue : rmsDbValue;
         const float rmsY = mapDbToY(rmsDbValue);
@@ -138,8 +153,19 @@ void MetersComponent::paint(juce::Graphics& g)
         const auto fill = juce::Rectangle<float>(meterBounds.getX(), mainY,
                                                  meterBounds.getWidth(),
                                                  meterBounds.getBottom() - mainY);
-        juce::ColourGradient fillGrad(theme.meterFill.brighter(0.2f), fill.getTopLeft(),
-                                      theme.meterFill.darker(0.25f), fill.getBottomLeft(), false);
+        
+        // v4.4 beta: Color-coded meter bars based on level (green/yellow/red)
+        juce::Colour meterColour;
+        if (mainDb >= -3.0f)
+            meterColour = juce::Colour(0xffff4444);  // Red: near clipping (0 to -3 dB)
+        else if (mainDb >= -12.0f)
+            meterColour = juce::Colour(0xffffaa44);  // Yellow/Orange: moderate level (-3 to -12 dB)
+        else
+            meterColour = juce::Colour(0xff44ff44);  // Green: safe level (below -12 dB)
+        
+        // Gradient fill with color based on level
+        juce::ColourGradient fillGrad(meterColour.brighter(0.2f), fill.getTopLeft(),
+                                      meterColour.darker(0.25f), fill.getBottomLeft(), false);
         g.setGradientFill(fillGrad);
         g.fillRoundedRectangle(fill, 3.0f);
 
@@ -159,17 +185,38 @@ void MetersComponent::paint(juce::Graphics& g)
             g.drawLine(meterBounds.getX(), rmsY, meterBounds.getRight(), rmsY, 1.0f);
         }
 
+        // v4.4 beta: Channel label at bottom
         juce::String labelText = formatDolbyLabel(label);
         const float labelScale = labelText.length() <= 2 ? 0.9f : 0.75f;
         const float labelFont = juce::jlimit(6.0f, 11.0f, meterBounds.getWidth() * labelScale);
         g.setColour(theme.textMuted);
         g.setFont(labelFont);
-        g.drawFittedText(labelText, meterBounds.toNearestInt().withHeight(14),
+        g.drawFittedText(labelText, meterBounds.toNearestInt().removeFromBottom(14),
                          juce::Justification::centred, 1);
+        
+        // v4.4 beta: Peak value displayed at top of meter bar with background for visibility
+        if (peakDbValue > kMinDb + 0.5f)  // Only show if there's a meaningful peak
+        {
+            const juce::String peakText = juce::String(peakDbValue, 1);
+            const auto peakLabelRect = meterBounds.toNearestInt().removeFromTop(14);
+            
+            // Background for peak value label
+            g.setColour(theme.panel.darker(0.3f).withAlpha(0.85f));
+            g.fillRoundedRectangle(peakLabelRect.toFloat().reduced(1.0f), 2.0f);
+            g.setColour(theme.panelOutline.withAlpha(0.6f));
+            g.drawRoundedRectangle(peakLabelRect.toFloat().reduced(1.0f), 2.0f, 0.8f);
+            
+            // Peak value text
+            g.setColour(theme.text.withAlpha(0.95f));
+            g.setFont(juce::Font(8.5f, juce::Font::bold));
+            g.drawFittedText(peakText, peakLabelRect, juce::Justification::centred, 1);
+        }
     };
 
     // v4.4 beta: Draw dB value labels on the left side of the meter scale
-    const float tickDb[] { -60.0f, -48.0f, -36.0f, -24.0f, -12.0f, -6.0f, 0.0f, 6.0f };
+    // Digital domain: maximum is 0 dBFS (not +6 dB)
+    // Better graduations: major ticks every 12 dB, show labels for major ticks only
+    const float majorTickDb[] { -60.0f, -48.0f, -36.0f, -24.0f, -12.0f, 0.0f };
     const auto mapDbToY = [&meterArea](float db)
     {
         const float clamped = juce::jlimit(kMinDb, kMaxDb, db);
@@ -177,18 +224,19 @@ void MetersComponent::paint(juce::Graphics& g)
                           meterArea.getBottom(), meterArea.getY());
     };
     
-    g.setColour(theme.textMuted.withAlpha(0.8f));
-    g.setFont(juce::Font(9.0f, juce::Font::plain));
-    for (float tick : tickDb)
+    // v4.4 beta: Better looking labels with improved spacing and visibility
+    g.setColour(theme.textMuted.withAlpha(0.9f));
+    g.setFont(juce::Font(9.5f, juce::Font::plain));
+    for (float tick : majorTickDb)
     {
         const float y = mapDbToY(tick);
         // Format label: whole numbers without decimals, negative sign included
         const juce::String labelText = juce::String(static_cast<int>(tick));
         const auto labelRect = juce::Rectangle<float>(
             labelArea.getX(),
-            y - 6.0f,
+            y - 7.0f,
             labelArea.getWidth() - 4.0f,
-            12.0f
+            14.0f
         );
         g.drawFittedText(labelText, labelRect.toNearestInt(),
                          juce::Justification::centredRight, 1);
@@ -209,20 +257,7 @@ void MetersComponent::paint(juce::Graphics& g)
         drawMeter(meterBounds, rmsValue, peakValue, holdValue, label);
     }
 
-    float peakDbValue = kMinDb;
-    for (const auto value : peakDb)
-        peakDbValue = juce::jmax(peakDbValue, value);
-    g.setColour(theme.panel);
-    g.fillRoundedRectangle(peakArea, 4.0f);
-    const float peakNorm = juce::jmap(juce::jlimit(kMinDb, kMaxDb, peakDbValue),
-                                      kMinDb, kMaxDb, 0.0f, 1.0f);
-    const auto peakFill = peakArea.withWidth(peakArea.getWidth() * peakNorm);
-    g.setColour(theme.meterPeak);
-    g.fillRoundedRectangle(peakFill, 4.0f);
-    g.setColour(theme.text);
-    g.setFont(12.0f);
-    g.drawFittedText("Peak " + juce::String(peakDbValue, 1) + " dB",
-                     peakArea.toNearestInt(), juce::Justification::centred, 1);
+    // v4.4 beta: Peak meter box removed - peak values now shown at top of each meter bar
 
 }
 

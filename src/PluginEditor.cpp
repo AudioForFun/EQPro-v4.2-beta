@@ -1332,15 +1332,19 @@ void EQProAudioProcessorEditor::resized()
     presetBrowserLabel.setBounds(topBar.removeFromLeft(presetLabelWidth)
                                      .withSizeKeepingCentre(presetLabelWidth, globalBypassHeight));
     // Preset navigation buttons match copy/paste button size (58 width, 22 height).
+    // Place Prev/Next side-by-side before the dropdown.
     const int navW = 58;  // Same as btnW in BandControlsPanel
     const int navH = 22;  // Same as kRowHeight in BandControlsPanel
+    const int navGap = static_cast<int>(6 * uiScale);
     presetPrevButton.setBounds(topBar.removeFromLeft(navW)
                                    .withSizeKeepingCentre(navW, navH));
+    topBar.removeFromLeft(navGap);
+    presetNextButton.setBounds(topBar.removeFromLeft(navW)
+                                   .withSizeKeepingCentre(navW, navH));
+    topBar.removeFromLeft(static_cast<int>(8 * uiScale));
     const int presetBoxW = static_cast<int>(180 * uiScale);
     presetBrowserBox.setBounds(topBar.removeFromLeft(presetBoxW)
                                    .withSizeKeepingCentre(presetBoxW, globalBypassHeight + 6));
-    presetNextButton.setBounds(topBar.removeFromLeft(navW)
-                                   .withSizeKeepingCentre(navW, navH));
     presetDeltaToggle.setBounds({0, 0, 0, 0});
 
     auto content = bounds;
@@ -1355,11 +1359,14 @@ void EQProAudioProcessorEditor::resized()
     auto controlsArea = leftContent;
     auto metersArea = rightPanel;
     // RMS/Peak toggles match copy/paste button size (58 width, 22 height).
+    // Center them above the meters.
     const int meterToggleH = 22;  // Same as kRowHeight in BandControlsPanel
     auto meterToggleArea = metersArea.removeFromTop(meterToggleH);
     const int meterToggleW = 58;  // Same as btnW in BandControlsPanel
     const int meterToggleGap = static_cast<int>(6 * uiScale);
-    auto toggleRow = meterToggleArea.removeFromRight(meterToggleW * 2 + meterToggleGap);
+    const int totalToggleWidth = meterToggleW * 2 + meterToggleGap;
+    // Center the toggles in the available space.
+    auto toggleRow = meterToggleArea.withSizeKeepingCentre(totalToggleWidth, meterToggleH);
     rmsToggle.setBounds(toggleRow.removeFromLeft(meterToggleW)
                             .withSizeKeepingCentre(meterToggleW, meterToggleH));
     toggleRow.removeFromLeft(meterToggleGap);

@@ -132,7 +132,7 @@ For channels 1..16 and bands 1..12:
 - `ch{C}_b{B}_mixOdd` (float, %, 0..100, v4.5 beta) - Odd harmonic mix
 - `ch{C}_b{B}_even` (float, dB, -24..+24, v4.5 beta) - Even harmonic amount
 - `ch{C}_b{B}_mixEven` (float, %, 0..100, v4.5 beta) - Even harmonic mix
-- `ch{C}_b{B}_harmonicBypass` (bool, v4.5 beta) - Per-band harmonic bypass (independent for each of 12 bands)
+- `ch{C}_b{B}_harmonicBypass` (bool, v4.5 beta) - Per-band harmonic bypass (independent for each of 12 bands, default true)
 - `ch{C}_b{B}_dynEnable` (bool)
 - `ch{C}_b{B}_dynMode` (choice)
   - Up

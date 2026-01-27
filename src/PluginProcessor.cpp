@@ -1163,10 +1163,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
                 100.0f));
             
             // v4.5 beta: Harmonic bypass parameter (per-band, independent for each of 12 bands)
+            // Default to bypassed so harmonic layer is opt-in per band.
             params.push_back(std::make_unique<juce::AudioParameterBool>(
                 ParamIDs::bandParamId(ch, band, kParamHarmonicBypassSuffix),
                 ParamIDs::bandParamName(ch, band, "Harmonic Bypass"),
-                false));
+                true));
 
             params.push_back(std::make_unique<juce::AudioParameterBool>(
                 ParamIDs::bandParamId(ch, band, kParamDynEnableSuffix),

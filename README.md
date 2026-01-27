@@ -22,7 +22,7 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 ### 🎨 **Harmonic Processing Layer (v4.5 beta)**
 - **Independent odd and even harmonic generation** per band (-24 to +24 dB)
 - **Per-band harmonic mix controls** (0-100%) for precise blend of harmonic content
-- **Per-band harmonic bypass** (independent for each of 12 bands)
+- **Per-band harmonic bypass** (independent for each of 12 bands, **default bypassed**)
 - **Global harmonic layer oversampling** (NONE, 2X, 4X, 8X, 16X) - applies uniformly to all bands
 - **Oversampling available in Natural Phase and Linear Phase modes** (disabled in Real-time for zero latency)
 - **Sample-accurate dry/wet mixing** with automatic latency compensation
@@ -102,7 +102,7 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 ### Harmonic Processing Layer
 - **New Layer 2** with independent odd and even harmonic generation per band
 - Per-band controls: Odd harmonic amount (-24 to +24 dB), Mix Odd (0-100%), Even harmonic amount (-24 to +24 dB), Mix Even (0-100%)
-- Per-band harmonic bypass (independent for each of 12 bands)
+- Per-band harmonic bypass (independent for each of 12 bands, **default bypassed**)
 - Global harmonic layer oversampling (NONE, 2X, 4X, 8X, 16X) - applies uniformly to all bands
 - Oversampling only available in Natural Phase and Linear Phase modes (disabled in Real-time)
 - Layer-based UI navigation with EQ (Layer 1) and Harmonic (Layer 2) toggles

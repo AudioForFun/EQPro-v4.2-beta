@@ -28,7 +28,7 @@ Key fields (non‑exhaustive):
 - `bands[ch][band]` with freq/gain/Q/type/bypass/slope/mix/dynamic parameters
 - `bands[ch][band].oddHarmonicDb`, `bands[ch][band].mixOdd` (v4.5 beta) - Odd harmonic generation
 - `bands[ch][band].evenHarmonicDb`, `bands[ch][band].mixEven` (v4.5 beta) - Even harmonic generation
-- `bands[ch][band].harmonicBypassed` (v4.5 beta) - Per-band harmonic bypass (independent for each of 12 bands)
+- `bands[ch][band].harmonicBypassed` (v4.5 beta) - Per-band harmonic bypass (independent for each of 12 bands, default true)
 - `bands[ch][band].dynExternal` for per‑band external sidechain detection
 - `msTargets[]` and `bandChannelMasks[]` for channel routing
 

@@ -415,7 +415,9 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
 
     auto updateQualityEnabled = [this]
     {
-        const int mode = phaseModeBox.getSelectedItemIndex();
+        const auto* modeParam = processorRef.getParameters().getRawParameterValue(ParamIDs::phaseMode);
+        const int mode = modeParam != nullptr ? static_cast<int>(modeParam->load())
+                                              : phaseModeBox.getSelectedItemIndex();
         linearQualityBox.setEnabled(mode == 2);
         linearWindowBox.setEnabled(mode != 0);
         if (mode != 2)
@@ -424,7 +426,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         // v4.5 beta: Enable/disable harmonic layer oversampling toggles based on processing mode
         // Enabled for Natural Phase (mode == 1) and Linear Phase (mode == 2), disabled in Real-time (mode == 0)
         // Works with all quality settings in Natural and Linear modes
-        const bool oversamplingEnabled = (mode == 1 || mode == 2);  // Natural phase (1) or Linear phase (2)
+        const bool oversamplingEnabled = (mode == 1 || mode == 2);  // Natural (1) or Linear (2)
         harmonicLayerOversamplingNoneToggle.setEnabled(oversamplingEnabled);
         harmonicLayerOversampling2xToggle.setEnabled(oversamplingEnabled);
         harmonicLayerOversampling4xToggle.setEnabled(oversamplingEnabled);
@@ -1217,27 +1219,24 @@ void EQProAudioProcessorEditor::timerCallback()
         }
     }
     
-    // v4.5 beta: Periodically update oversampling toggle enable/disable state based on phase mode
-    // This ensures the toggles are correctly enabled when switching to Natural or Linear phase
-    static int updateCounter = 0;
-    if (++updateCounter >= 10)  // Update every 5 seconds (2Hz timer, 10 ticks = 5 seconds)
-    {
-        updateCounter = 0;
-        const int mode = phaseModeBox.getSelectedItemIndex();
-        const bool oversamplingEnabled = (mode == 1 || mode == 2);  // Natural (1) or Linear (2) phase
-        harmonicLayerOversamplingNoneToggle.setEnabled(oversamplingEnabled);
-        harmonicLayerOversampling2xToggle.setEnabled(oversamplingEnabled);
-        harmonicLayerOversampling4xToggle.setEnabled(oversamplingEnabled);
-        harmonicLayerOversampling8xToggle.setEnabled(oversamplingEnabled);
-        harmonicLayerOversampling16xToggle.setEnabled(oversamplingEnabled);
-        const float oversamplingAlpha = oversamplingEnabled ? 1.0f : 0.35f;
-        harmonicLayerOversamplingNoneToggle.setAlpha(oversamplingAlpha);
-        harmonicLayerOversampling2xToggle.setAlpha(oversamplingAlpha);
-        harmonicLayerOversampling4xToggle.setAlpha(oversamplingAlpha);
-        harmonicLayerOversampling8xToggle.setAlpha(oversamplingAlpha);
-        harmonicLayerOversampling16xToggle.setAlpha(oversamplingAlpha);
-        harmonicLayerOversamplingLabel.setAlpha(oversamplingAlpha);
-    }
+    // v4.5 beta: Keep harmonic oversampling toggles in sync with phase mode
+    // Read directly from the parameter to avoid stale UI state.
+    const auto* modeParam = processorRef.getParameters().getRawParameterValue(ParamIDs::phaseMode);
+    const int mode = modeParam != nullptr ? static_cast<int>(modeParam->load())
+                                          : phaseModeBox.getSelectedItemIndex();
+    const bool oversamplingEnabled = (mode == 1 || mode == 2);  // Natural (1) or Linear (2)
+    harmonicLayerOversamplingNoneToggle.setEnabled(oversamplingEnabled);
+    harmonicLayerOversampling2xToggle.setEnabled(oversamplingEnabled);
+    harmonicLayerOversampling4xToggle.setEnabled(oversamplingEnabled);
+    harmonicLayerOversampling8xToggle.setEnabled(oversamplingEnabled);
+    harmonicLayerOversampling16xToggle.setEnabled(oversamplingEnabled);
+    const float oversamplingAlpha = oversamplingEnabled ? 1.0f : 0.35f;
+    harmonicLayerOversamplingNoneToggle.setAlpha(oversamplingAlpha);
+    harmonicLayerOversampling2xToggle.setAlpha(oversamplingAlpha);
+    harmonicLayerOversampling4xToggle.setAlpha(oversamplingAlpha);
+    harmonicLayerOversampling8xToggle.setAlpha(oversamplingAlpha);
+    harmonicLayerOversampling16xToggle.setAlpha(oversamplingAlpha);
+    harmonicLayerOversamplingLabel.setAlpha(oversamplingAlpha);
     
     refreshChannelLayout();
 }

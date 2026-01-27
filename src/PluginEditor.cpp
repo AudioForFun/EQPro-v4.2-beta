@@ -73,13 +73,15 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     backgroundNoise = makeNoiseImage(128);
     startTimerHz(2);
 
-    headerLabel.setText("EQ Pro", juce::dontSendNotification);
+    // v4.4 beta: Uppercase for consistency
+    headerLabel.setText("EQ PRO", juce::dontSendNotification);
     headerLabel.setJustificationType(juce::Justification::centredLeft);
     headerLabel.setFont(juce::Font(kHeaderFontSize, juce::Font::bold));
     headerLabel.setColour(juce::Label::textColourId, juce::Colour(0xffe5e7eb));
     addAndMakeVisible(headerLabel);
 
-    versionLabel.setText(Version::displayString(), juce::dontSendNotification);
+    // v4.4 beta: Uppercase for consistency
+    versionLabel.setText(Version::displayString().toUpperCase(), juce::dontSendNotification);
     versionLabel.setJustificationType(juce::Justification::centredRight);
     versionLabel.setFont(juce::Font(12.0f, juce::Font::plain));
     versionLabel.setColour(juce::Label::textColourId, juce::Colour(0xff94a3b8));
@@ -744,7 +746,8 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     addAndMakeVisible(pasteInstanceButton);
 
-    presetBrowserLabel.setText("Preset", juce::dontSendNotification);
+    // v4.4 beta: Uppercase for consistency
+    presetBrowserLabel.setText("PRESET", juce::dontSendNotification);
     presetBrowserLabel.setJustificationType(juce::Justification::centredLeft);
     presetBrowserLabel.setFont(kLabelFontSize);
     addAndMakeVisible(presetBrowserLabel);

@@ -1,11 +1,12 @@
 # EQ Pro Modules
 
 ## DSP
-- `EQDSP`: per-channel EQ engine (12 bands). Handles IIR minimum-phase, tilt/flat tilt, slopes, per-band channel targets (all/MS/L/R + immersive pairs), smart solo audition, per-band mix, and dynamic band gain modulation.
-- `Biquad`: biquad filter core used by EQ bands. Computes RBJ-style coefficients and runs sample-by-sample.
-- `OnePole`: simple one-pole used for fractional HP/LP slope contributions.
-- `LinearPhaseEQ`: FIR convolution engine for linear and natural phase modes with background impulse updates and latency reporting.
-- `SpectralDynamicsDSP`: FFT-based multiband dynamics with overlap-add, threshold/ratio/attack/release/mix.
+- `EqEngine`: top-level DSP router; switches phase modes, builds FIRs, applies quality/oversampling, aligns dry/wet, and feeds analyzer/meter taps.
+- `EQDSP`: per-channel minimum-phase IIR engine (12 bands). Handles tilt/flat tilt, slopes, per-band channel targets (all/MS/L/R + immersive pairs), smart solo audition, per-band mix, dynamics, and harmonic generation.
+- `Biquad`: RBJ-style biquad core for IIR bands, sample-accurate processing.
+- `OnePole`: single-pole filter for fractional HP/LP slope contributions.
+- `LinearPhaseEQ`: FIR convolution engine for Natural/Linear modes with background impulse updates and latency reporting.
+- `SpectralDynamicsDSP`: FFT-based multiband dynamics (overlap-add, threshold/ratio/attack/release/mix).
 - `MeteringDSP`: RMS/peak metering and correlation for selected channel pairs.
 
 ## UI

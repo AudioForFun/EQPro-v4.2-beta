@@ -824,7 +824,7 @@ void EqEngine::updateLinearPhase(const ParamSnapshot& snapshot, double sampleRat
         return;
     }
 
-    // Adaptive taps: increase FIR length for complex band settings.
+    // Adaptive taps: increase FIR length when bands are dense or aggressive.
     float maxQ = 0.0f;
     float maxGain = 0.0f;
     float maxSlope = 0.0f;
@@ -849,6 +849,7 @@ void EqEngine::updateLinearPhase(const ParamSnapshot& snapshot, double sampleRat
     if (maxQ >= 14.0f || maxGain >= 30.0f || maxSlope >= 72.0f || activeBands >= 10)
         complexityBoost = 2;
 
+    // Low-frequency bands get longer FIRs for cleaner LF phase/shape.
     float minActiveFreq = 20000.0f;
     if (activeBands == 0)
         minActiveFreq = 20000.0f;
@@ -874,6 +875,7 @@ void EqEngine::updateLinearPhase(const ParamSnapshot& snapshot, double sampleRat
     if (minActiveFreq < 25.0f)
         lowFreqBoost = 3;
 
+    // Natural uses shorter FIRs with mixed-phase blend, Linear uses longer FIRs for maximum phase accuracy.
     const int quality = juce::jlimit(0, 4, snapshot.linearQuality);
     const int index = juce::jmin(4, quality + complexityBoost + lowFreqBoost);
     const std::array<int, 5> naturalTaps { 256, 512, 1024, 2048, 4096 };
@@ -1260,6 +1262,8 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int h
 
 void EqEngine::updateOversampling(const ParamSnapshot& snapshot, double sampleRate, int maxBlockSize, int channels)
 {
+    // Quality ladder drives oversampling depth for realtime EQ:
+    // Low=none, Medium=2x, High=4x, Very High=8x, Intensive=16x.
     const int quality = juce::jlimit(0, 4, snapshot.linearQuality);
     const int desiredIndex = (snapshot.phaseMode == 0) ? quality : 0;
     const bool needsRebuild = desiredIndex != lastOversamplingIndex

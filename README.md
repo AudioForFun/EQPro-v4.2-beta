@@ -84,15 +84,18 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 ### Real-time Mode
 - **Zero latency** minimum-phase IIR processing
 - Perfect for live performance, tracking, and real-time monitoring
+- Quality ladder controls oversampling depth for realtime EQ (Low=none → Intensive=16x)
 - Harmonic processing runs inside the single quality-driven oversampling path
 
 ### Natural Phase Mode
-- Short linear-phase FIR with adaptive tap length
-- Mixed-phase blend for transient preservation
+- Short linear-phase FIR with adaptive tap length and per-band complexity scaling
+- Mixed-phase blend: linear FIR response with a minimum‑phase correction pass for transient clarity
+- Window selection auto-optimizes (Hann/Blackman/Kaiser) based on quality
 
 ### Linear Phase Mode
 - Long linear-phase FIR with adaptive taps
 - Maximum phase accuracy for mastering applications
+- Quality ladder controls oversampling depth: Low=none, Medium=2x, High=4x, Very High=8x, Intensive=16x
 
 ---
 

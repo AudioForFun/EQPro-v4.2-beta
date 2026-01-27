@@ -1,4 +1,4 @@
-# EQ Pro (JUCE) - 4.5 beta
+# EQ Pro (JUCE) - 4.6 beta
 
 Professional multi-channel EQ plugin with harmonic processing and advanced visual feedback.
 
@@ -119,6 +119,8 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 - Improved header layout with layer toggles on left, band number on right
 - Optimized toggle sizes based on text length
 - Simplified band number display (e.g., "1" instead of "1 / 12")
+### UI Scaling
+- Removed in-app UI scaling dropdown due to inconsistent behavior across hosts and standalone
 
 ### Performance Optimizations (v4.4 beta)
 - Critical fixes for instant GUI loading

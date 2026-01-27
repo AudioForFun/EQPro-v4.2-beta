@@ -824,6 +824,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     presetBrowserLabel.setJustificationType(juce::Justification::centredLeft);
     presetBrowserLabel.setFont(kLabelFontSize);
     addAndMakeVisible(presetBrowserLabel);
+    // v4.6 beta: UI scaling dropdown removed due to inconsistent behavior across hosts/standalone.
 
     presetBrowserBox.setTooltip("Preset list");
     addAndMakeVisible(presetBrowserBox);
@@ -1423,7 +1424,6 @@ bool EQProAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
 
 void EQProAudioProcessorEditor::resized()
 {
-    const float uiScale = 1.0f;
     analyzer.setUiScale(uiScale);
     const int margin = static_cast<int>(kOuterMargin * uiScale);
     auto bounds = getLocalBounds().reduced(margin);

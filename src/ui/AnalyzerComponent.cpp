@@ -585,12 +585,66 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         const float pad = 6.0f * uiScale;
         const float textW = g.getCurrentFont().getStringWidthFloat(text);
         const float textH = 16.0f * uiScale;
+        
+        // Calculate initial Y position (above the point).
+        float pillY = point.y - textH - pad;
+        
+        // Check for overlap with amplitude scale labels and adjust Y position if needed.
+        // Amplitude labels are at specific Y positions for major grid lines (-60 to +60, every 12dB).
+        const float spectrumMinDb = kAnalyzerMinDb;  // -60 dB
+        const float spectrumMaxDb = kAnalyzerMaxDb;   // +60 dB
+        const float spectrumStep = 6.0f;
+        const float amplitudeLabelHeight = 14.0f * uiScale;
+        const float leftGutter = 70.0f * uiScale;
+        const float amplitudeLabelX = magnitudeArea.getX() + 18.0f * uiScale;
+        const float amplitudeLabelWidth = 48.0f * uiScale;
+        
+        // Check if dynamic label would overlap with any amplitude scale label.
+        for (float db = spectrumMinDb; db <= spectrumMaxDb + 0.01f; db += spectrumStep)
+        {
+            const bool major = (static_cast<int>(db) % 12 == 0);
+            if (!major)
+                continue;
+            
+            const float amplitudeLabelY = gainToY(db) - amplitudeLabelHeight * 0.5f;
+            const float amplitudeLabelTop = amplitudeLabelY;
+            const float amplitudeLabelBottom = amplitudeLabelY + amplitudeLabelHeight;
+            
+            // Check if dynamic label's Y position overlaps with this amplitude label.
+            const float pillTop = pillY;
+            const float pillBottom = pillY + textH;
+            
+            // If there's vertical overlap, adjust the dynamic label position.
+            if (pillBottom > amplitudeLabelTop && pillTop < amplitudeLabelBottom)
+            {
+                // Check if they're also horizontally close (amplitude labels are on the left).
+                // If the dynamic label is on the left side, move it down to avoid overlap.
+                if (point.x < magnitudeArea.getX() + leftGutter + amplitudeLabelWidth + 20.0f * uiScale)
+                {
+                    // Move dynamic label below the amplitude label.
+                    pillY = amplitudeLabelBottom + pad;
+                    break;
+                }
+            }
+        }
+        
         auto pill = juce::Rectangle<float>(point.x + pad,
-                                           point.y - textH - pad,
+                                           pillY,
                                            textW + pad * 2.0f,
                                            textH);
+        
+        // If label would go outside bounds, try positioning on the other side.
         if (! getLocalBounds().toFloat().contains(pill))
-            pill.setPosition(point.x - pill.getWidth() - pad, point.y - textH - pad);
+        {
+            pill.setPosition(point.x - pill.getWidth() - pad, pillY);
+            // Re-check bounds after repositioning.
+            if (! getLocalBounds().toFloat().contains(pill))
+            {
+                // If still outside, try below the point instead.
+                pill.setPosition(point.x + pad, point.y + pad);
+            }
+        }
+        
         g.setColour(theme.panel.darker(0.25f).withAlpha(0.9f));
         g.fillRoundedRectangle(pill, 5.0f * uiScale);
         g.setColour(theme.panelOutline.withAlpha(0.85f));

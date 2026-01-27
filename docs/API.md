@@ -22,7 +22,7 @@ Usage:
 
 Key fields (non‑exhaustive):
 - `globalBypass`, `globalMix`, `phaseMode`, `linearQuality`, `linearWindow`
-- `oversampling`, `harmonicLayerOversampling` (v4.5 beta) - Global harmonic layer oversampling (applies to all bands uniformly)
+- `oversampling` (v4.9 beta) - Quality-driven oversampling depth
 - `outputTrimDb`, `characterMode`, `smartSolo`
 - `autoGainEnabled`, `gainScale`, `phaseInvert`
 - `bands[ch][band]` with freq/gain/Q/type/bypass/slope/mix/dynamic parameters
@@ -601,7 +601,7 @@ For larger architecture and threading diagrams, see `docs/DIAGRAMS.md`.
 - `phaseMode`: Processing mode (Real-time / Natural / Linear).
 - `linearQuality`: FIR quality selector (Linear mode only).
 - `linearWindow`: FIR window selection.
-- `oversampling`: Oversampling selector (non-realtime modes).
+- `oversampling`: Quality-driven oversampling depth (single global path).
 - `outputTrim`: Output trim gain (dB).
 - `autoGainEnable`: RMS-based auto-gain enable.
 - `gainScale`: Auto-gain intensity scale (percentage).

@@ -31,7 +31,8 @@ void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
     minPhaseDelayBuffer.clear();
     minPhaseDelayWritePos = 0;
     minPhaseDelaySamples = 0;
-    oversampledBuffer.setSize(numChannels, maxBlockSize * 4);
+    constexpr int kMaxEqOversampleFactor = 16;
+    oversampledBuffer.setSize(numChannels, maxBlockSize * kMaxEqOversampleFactor);
     oversampledBuffer.clear();
     harmonicTapBuffer.setSize(numChannels, maxBlockSize);
     harmonicTapBuffer.clear();
@@ -77,6 +78,8 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                        MeterTap& meterTap)
 {
     const int numChannels = juce::jmin(buffer.getNumChannels(), snapshot.numChannels);
+    updateOversampling(snapshot, sampleRateHz, maxPreparedBlockSize, numChannels);
+    lastPhaseMode = snapshot.phaseMode;
     auto computeRms = [](const juce::AudioBuffer<float>& buf, int channels) -> double
     {
         const int n = buf.getNumSamples();
@@ -165,6 +168,8 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     if (applyGlobalMix)
     {
         const int latencySamples = getLatencySamples();
+        // v4.6 beta: Minimum-phase compensation for realtime oversampling.
+        // Keep dry/wet perfectly aligned when oversampling introduces latency.
         if (latencySamples > 0)
             updateDryDelay(latencySamples, buffer.getNumSamples(), numChannels);
         const int copyChannels = juce::jmin(numChannels, dryBuffer.getNumChannels());
@@ -199,10 +204,6 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             params.evenHarmonicDb = src.evenHarmonicDb;
             params.mixEven = src.mixEven;
             params.harmonicBypassed = src.harmonicBypassed;
-            // v4.5 beta: Global harmonic layer oversampling (applies to all bands uniformly)
-            // This is a global parameter - when changed, all bands' harmonic processing uses the same oversampling factor
-            // Only available in Natural Phase and Linear Phase modes (disabled in Real-time)
-            params.harmonicOversampling = snapshot.harmonicLayerOversampling;
             params.thresholdDb = src.dynThresholdDb;
             params.attackMs = src.dynAttackMs;
             params.releaseMs = src.dynReleaseMs;
@@ -274,14 +275,14 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             }
         }
         
+        const int samples = harmonicTapOversampledBuffer.getNumSamples();
+        int stride = (oversamplingIndex > 0) ? (1 << oversamplingIndex) : 1;
+        const int perfStride = (sampleRateHz >= 192000.0 ? 4 : (sampleRateHz >= 96000.0 ? 2 : 1));
+        stride = juce::jmax(stride, stride * perfStride);
+
         if (hasActiveHarmonics && harmonicTapOversampledBuffer.getNumChannels() > 0)
         {
             const float* data = harmonicTapOversampledBuffer.getReadPointer(0);
-            const int samples = harmonicTapOversampledBuffer.getNumSamples();
-            int stride = (oversamplingIndex > 0) ? (1 << oversamplingIndex) : 1;
-            const int perfStride = (sampleRateHz >= 192000.0 ? 4 : (sampleRateHz >= 96000.0 ? 2 : 1));
-            stride = juce::jmax(stride, stride * perfStride);
-
             constexpr int kChunk = 512;
             float temp[kChunk];
             int idx = 0;
@@ -296,6 +297,19 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             }
             if (idx > 0)
                 harmonicTap.push(temp, idx);
+        }
+        else
+        {
+            // Keep the harmonic analyzer responsive even when harmonics are bypassed.
+            constexpr int kChunk = 512;
+            float temp[kChunk] = {};
+            int remaining = (samples + stride - 1) / stride;
+            while (remaining > 0)
+            {
+                const int block = juce::jmin(remaining, kChunk);
+                harmonicTap.push(temp, block);
+                remaining -= block;
+            }
         }
     }
     else if (phaseMode == 0)
@@ -322,18 +336,18 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             }
         }
         
+        const int samples = harmonicTapBuffer.getNumSamples();
+        int stride = 1;
+        if (sampleRateHz >= 192000.0)
+            stride = 4;
+        else if (sampleRateHz >= 96000.0)
+            stride = 2;
+        if (samples > 4096)
+            stride = juce::jmax(stride, samples / 2048);
+
         if (hasActiveHarmonics && harmonicTapBuffer.getNumChannels() > 0)
         {
             const float* data = harmonicTapBuffer.getReadPointer(0);
-            const int samples = harmonicTapBuffer.getNumSamples();
-            int stride = 1;
-            if (sampleRateHz >= 192000.0)
-                stride = 4;
-            else if (sampleRateHz >= 96000.0)
-                stride = 2;
-            if (samples > 4096)
-                stride = juce::jmax(stride, samples / 2048);
-
             if (stride == 1)
             {
                 harmonicTap.push(data, samples);
@@ -354,6 +368,19 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                 }
                 if (idx > 0)
                     harmonicTap.push(temp, idx);
+            }
+        }
+        else
+        {
+            // Keep the harmonic analyzer responsive even when harmonics are bypassed.
+            constexpr int kChunk = 512;
+            float temp[kChunk] = {};
+            int remaining = (samples + stride - 1) / stride;
+            while (remaining > 0)
+            {
+                const int block = juce::jmin(remaining, kChunk);
+                harmonicTap.push(temp, block);
+                remaining -= block;
             }
         }
     }
@@ -504,28 +531,28 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                 }
             }
             
+            const int tapSamples = harmonicTapBuffer.getNumSamples();
+            int stride = 1;
+            if (sampleRateHz >= 192000.0)
+                stride = 4;
+            else if (sampleRateHz >= 96000.0)
+                stride = 2;
+            if (tapSamples > 4096)
+                stride = juce::jmax(stride, tapSamples / 2048);
+
             if (hasActiveHarmonics && harmonicTapBuffer.getNumChannels() > 0)
             {
                 const float* data = harmonicTapBuffer.getReadPointer(0);
-                const int samples = harmonicTapBuffer.getNumSamples();
-                int stride = 1;
-                if (sampleRateHz >= 192000.0)
-                    stride = 4;
-                else if (sampleRateHz >= 96000.0)
-                    stride = 2;
-                if (samples > 4096)
-                    stride = juce::jmax(stride, samples / 2048);
-
                 if (stride == 1)
                 {
-                    harmonicTap.push(data, samples);
+                    harmonicTap.push(data, tapSamples);
                 }
                 else
                 {
                     constexpr int kChunk = 512;
                     float temp[kChunk];
                     int idx = 0;
-                    for (int i = 0; i < samples; i += stride)
+                    for (int i = 0; i < tapSamples; i += stride)
                     {
                         temp[idx++] = data[i];
                         if (idx == kChunk)
@@ -536,6 +563,19 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                     }
                     if (idx > 0)
                         harmonicTap.push(temp, idx);
+                }
+            }
+            else
+            {
+                // Keep the harmonic analyzer responsive even when harmonics are bypassed.
+                constexpr int kChunk = 512;
+                float temp[kChunk] = {};
+                int remaining = (tapSamples + stride - 1) / stride;
+                while (remaining > 0)
+                {
+                    const int block = juce::jmin(remaining, kChunk);
+                    harmonicTap.push(temp, block);
+                    remaining -= block;
                 }
             }
 
@@ -602,6 +642,51 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     if (snapshot.phaseInvert)
         buffer.applyGain(-1.0f);
 
+    if (snapshot.phaseMode != 0)
+    {
+        // Match linear/natural output level to realtime RMS before auto-gain.
+        const int numSamples = buffer.getNumSamples();
+        const int refChannels = juce::jmin(numChannels, calibBuffer.getNumChannels());
+        auto mixSmoothed = globalMixSmoothed;
+        if (applyGlobalMix)
+        {
+            const float wetStart = mixSmoothed.getCurrentValue();
+            mixSmoothed.skip(numSamples);
+            const float wetEnd = mixSmoothed.getCurrentValue();
+            const float wetStep = (wetEnd - wetStart) / static_cast<float>(numSamples);
+            float wet = wetStart;
+            for (int i = 0; i < numSamples; ++i)
+            {
+                const float dryGain = 1.0f - wet;
+                for (int ch = 0; ch < refChannels; ++ch)
+                {
+                    auto* data = calibBuffer.getWritePointer(ch);
+                    const float dry = dryBuffer.getReadPointer(ch)[i];
+                    data[i] = dry * dryGain + data[i] * wet;
+                }
+                wet += wetStep;
+            }
+        }
+
+        auto computeRms = [](const juce::AudioBuffer<float>& buf, int channels) -> double
+        {
+            const int n = buf.getNumSamples();
+            double sum = 0.0;
+            for (int ch = 0; ch < channels; ++ch)
+            {
+                const float* data = buf.getReadPointer(ch);
+                for (int i = 0; i < n; ++i)
+                    sum += static_cast<double>(data[i]) * static_cast<double>(data[i]);
+            }
+            return std::sqrt(sum / static_cast<double>(n * juce::jmax(1, channels)));
+        };
+        const double refRms = computeRms(calibBuffer, refChannels);
+        const double linRms = computeRms(buffer, numChannels);
+        if (refRms > 1.0e-9 && linRms > 1.0e-9)
+            buffer.applyGain(static_cast<float>(refRms / linRms));
+    }
+
+    // Auto-gain matches the processed RMS to the input RMS.
     float autoGainDb = 0.0f;
     if (snapshot.autoGainEnabled)
     {
@@ -629,57 +714,6 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
         const float endGain = outputTrimGainSmoothed.getCurrentValue();
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             buffer.applyGainRamp(ch, 0, numSamples, startGain, endGain);
-    }
-
-    if (snapshot.phaseMode != 0)
-    {
-        // Match linear/natural output level to realtime RMS for consistent meters.
-        const int numSamples = buffer.getNumSamples();
-        const int refChannels = juce::jmin(numChannels, calibBuffer.getNumChannels());
-        auto mixSmoothed = globalMixSmoothed;
-        if (applyGlobalMix)
-        {
-            const float wetStart = mixSmoothed.getCurrentValue();
-            mixSmoothed.skip(numSamples);
-            const float wetEnd = mixSmoothed.getCurrentValue();
-            const float wetStep = (wetEnd - wetStart) / static_cast<float>(numSamples);
-            float wet = wetStart;
-            for (int i = 0; i < numSamples; ++i)
-            {
-                const float dryGain = 1.0f - wet;
-                for (int ch = 0; ch < refChannels; ++ch)
-                {
-                    auto* data = calibBuffer.getWritePointer(ch);
-                    const float dry = dryBuffer.getReadPointer(ch)[i];
-                    data[i] = dry * dryGain + data[i] * wet;
-                }
-                wet += wetStep;
-            }
-        }
-
-        auto trimSmoothed = outputTrimGainSmoothed;
-        const float startGain = trimSmoothed.getCurrentValue();
-        trimSmoothed.skip(numSamples);
-        const float endGain = trimSmoothed.getCurrentValue();
-        for (int ch = 0; ch < refChannels; ++ch)
-            calibBuffer.applyGainRamp(ch, 0, numSamples, startGain, endGain);
-
-        auto computeRms = [](const juce::AudioBuffer<float>& buf, int channels) -> double
-        {
-            const int n = buf.getNumSamples();
-            double sum = 0.0;
-            for (int ch = 0; ch < channels; ++ch)
-            {
-                const float* data = buf.getReadPointer(ch);
-                for (int i = 0; i < n; ++i)
-                    sum += static_cast<double>(data[i]) * static_cast<double>(data[i]);
-            }
-            return std::sqrt(sum / static_cast<double>(n * juce::jmax(1, channels)));
-        };
-        const double refRms = computeRms(calibBuffer, refChannels);
-        const double linRms = computeRms(buffer, numChannels);
-        if (refRms > 1.0e-9 && linRms > 1.0e-9)
-            buffer.applyGain(static_cast<float>(refRms / linRms));
     }
     }
 
@@ -776,6 +810,8 @@ void EqEngine::setDebugToneFrequency(float frequencyHz)
 
 int EqEngine::getLatencySamples() const
 {
+    if (lastPhaseMode == 0)
+        return oversamplingLatencySamples;
     return linearPhaseEq.getLatencySamples();
 }
 
@@ -813,10 +849,35 @@ void EqEngine::updateLinearPhase(const ParamSnapshot& snapshot, double sampleRat
     if (maxQ >= 14.0f || maxGain >= 30.0f || maxSlope >= 72.0f || activeBands >= 10)
         complexityBoost = 2;
 
+    float minActiveFreq = 20000.0f;
+    if (activeBands == 0)
+        minActiveFreq = 20000.0f;
+    else
+    {
+        for (int ch = 0; ch < snapshot.numChannels; ++ch)
+        {
+            for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
+            {
+                const auto& b = snapshot.bands[ch][band];
+                if (b.bypassed || b.mix <= 0.0005f)
+                    continue;
+                minActiveFreq = std::min(minActiveFreq, b.frequencyHz);
+            }
+        }
+    }
+
+    int lowFreqBoost = 0;
+    if (minActiveFreq < 80.0f)
+        lowFreqBoost = 1;
+    if (minActiveFreq < 40.0f)
+        lowFreqBoost = 2;
+    if (minActiveFreq < 25.0f)
+        lowFreqBoost = 3;
+
     const int quality = juce::jlimit(0, 4, snapshot.linearQuality);
-    const int index = juce::jmin(4, quality + complexityBoost);
-    const std::array<int, 5> naturalTaps { 128, 256, 512, 1024, 2048 };
-    const std::array<int, 5> linearTaps { 512, 1024, 2048, 4096, 8192 };
+    const int index = juce::jmin(4, quality + complexityBoost + lowFreqBoost);
+    const std::array<int, 5> naturalTaps { 256, 512, 1024, 2048, 4096 };
+    const std::array<int, 5> linearTaps { 1024, 2048, 4096, 8192, 16384 };
     const int taps = snapshot.phaseMode == 1 ? naturalTaps[static_cast<size_t>(index)]
                                              : linearTaps[static_cast<size_t>(index)];
 
@@ -1199,11 +1260,41 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int h
 
 void EqEngine::updateOversampling(const ParamSnapshot& snapshot, double sampleRate, int maxBlockSize, int channels)
 {
-    oversamplingIndex = 0;
+    const int quality = juce::jlimit(0, 4, snapshot.linearQuality);
+    const int desiredIndex = (snapshot.phaseMode == 0) ? quality : 0;
+    const bool needsRebuild = desiredIndex != lastOversamplingIndex
+        || sampleRate != lastOversamplingSampleRate
+        || maxBlockSize != lastOversamplingBlockSize
+        || channels != lastOversamplingChannels;
+
+    if (! needsRebuild)
+        return;
+
+    oversamplingIndex = desiredIndex;
+    lastOversamplingIndex = desiredIndex;
+    lastOversamplingSampleRate = sampleRate;
+    lastOversamplingBlockSize = maxBlockSize;
+    lastOversamplingChannels = channels;
+    oversamplingLatencySamples = 0;
     oversampler.reset();
     oversampledBuffer.setSize(0, 0);
-    juce::ignoreUnused(snapshot, sampleRate, maxBlockSize, channels);
-    return;
+
+    if (oversamplingIndex <= 0 || channels <= 0 || maxBlockSize <= 0)
+        return;
+
+    oversampler = std::make_unique<juce::dsp::Oversampling<float>>(
+        channels,
+        oversamplingIndex,
+        juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR,
+        true);
+    oversampler->initProcessing(static_cast<size_t>(maxBlockSize));
+    oversamplingLatencySamples = static_cast<int>(oversampler->getLatencyInSamples());
+
+    const int upFactor = 1 << oversamplingIndex;
+    oversampledBuffer.setSize(channels, maxBlockSize * upFactor);
+    oversampledBuffer.clear();
+    eqDspOversampled.prepare(sampleRate * upFactor, maxBlockSize * upFactor, channels);
+    eqDspOversampled.reset();
 }
 
 void EqEngine::updateDryDelay(int latencySamples, int maxBlockSize, int numChannels)

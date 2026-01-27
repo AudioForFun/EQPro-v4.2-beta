@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(EQPro VERSION 4.6.0)
+project(EQPro VERSION 4.9.0)
 
 # Generate a Windows version resource with the project version.
 set(EQPRO_VERSION_RC "${CMAKE_CURRENT_BINARY_DIR}/EQProVersion.rc")
@@ -19,6 +19,23 @@ configure_file(
 # Set this to your local JUCE path or pass -DJUCE_DIR=... when configuring.
 if (NOT DEFINED JUCE_DIR)
     set(JUCE_DIR "${CMAKE_CURRENT_LIST_DIR}/JUCE")
+endif()
+
+# ASIO support (Windows standalone)
+if (WIN32)
+    option(EQPRO_ENABLE_ASIO "Enable ASIO support" ON)
+    set(EQPRO_ASIO_SDK_PATH "" CACHE PATH "Path to Steinberg ASIO SDK")
+    if (EQPRO_ENABLE_ASIO)
+        set(JUCE_ASIO 1 CACHE BOOL "Enable JUCE ASIO support" FORCE)
+        if (NOT EQPRO_ASIO_SDK_PATH STREQUAL "")
+            set(JUCE_ASIO_SDK_PATH "${EQPRO_ASIO_SDK_PATH}" CACHE PATH "Path to ASIO SDK" FORCE)
+        endif()
+        if (NOT DEFINED JUCE_ASIO_SDK_PATH OR JUCE_ASIO_SDK_PATH STREQUAL "")
+            message(WARNING "ASIO enabled but JUCE_ASIO_SDK_PATH is not set. Install the Steinberg ASIO SDK and set EQPRO_ASIO_SDK_PATH.")
+        endif()
+    else()
+        set(JUCE_ASIO 0 CACHE BOOL "Disable JUCE ASIO support" FORCE)
+    endif()
 endif()
 
 add_subdirectory(${JUCE_DIR} JUCE)
@@ -100,7 +117,7 @@ target_compile_definitions(EQPro PUBLIC
     JUCE_USE_CURL=0
     JUCE_IGNORE_VST3_MISMATCHED_PARAMETER_ID_WARNING=1
     EQPRO_VERSION="${PROJECT_VERSION}"
-    EQPRO_ITERATION="4.6 beta"
+    EQPRO_ITERATION="4.9 beta"
     JUCE_USER_DEFINED_RC_FILE="${EQPRO_VERSION_RC}"
 )
 
@@ -114,5 +131,13 @@ target_link_libraries(EQPro PRIVATE
 target_include_directories(EQPro PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/EQPro_artefacts/JuceLibraryCode
 )
+
+if (WIN32 AND EQPRO_ENABLE_ASIO AND NOT JUCE_ASIO_SDK_PATH STREQUAL "")
+    target_compile_definitions(EQPro PUBLIC JUCE_ASIO=1)
+    target_include_directories(EQPro PRIVATE
+        ${JUCE_ASIO_SDK_PATH}/common
+        ${JUCE_ASIO_SDK_PATH}/host
+    )
+endif()
 
 

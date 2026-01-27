@@ -15,7 +15,6 @@ extern const juce::String phaseMode;
 extern const juce::String linearQuality;
 extern const juce::String linearWindow;
 extern const juce::String oversampling;
-extern const juce::String harmonicLayerOversampling;  // v4.5 beta: Global harmonic layer oversampling (applies to all bands uniformly)
 extern const juce::String outputTrim;
 extern const juce::String spectralEnable;
 extern const juce::String spectralThreshold;

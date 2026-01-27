@@ -1362,6 +1362,24 @@ void AnalyzerComponent::updateFft()
     if (lastSampleRate <= 0.0f)
         lastSampleRate = 48000.0f;
 
+    // Stabilize the very low-frequency bins (sub-20 Hz region) so the curve remains readable
+    // while still showing energy below 20 Hz.
+    const int lowBinLimit = juce::jlimit(1, fftBins - 1,
+                                         static_cast<int>((25.0f * fftSize) / lastSampleRate));
+    auto stabilizeLowBins = [lowBinLimit](std::array<float, fftBins>& mags)
+    {
+        if (lowBinLimit <= 1)
+            return;
+
+        float sum = 0.0f;
+        for (int i = 1; i <= lowBinLimit; ++i)
+            sum += mags[i];
+        const float avg = sum / static_cast<float>(lowBinLimit);
+
+        for (int i = 1; i <= lowBinLimit; ++i)
+            mags[i] = Smoothing::smooth(mags[i], avg, 0.15f);
+    };
+
     const int viewIndex = parameters.getRawParameterValue(ParamIDs::analyzerView) != nullptr
         ? static_cast<int>(parameters.getRawParameterValue(ParamIDs::analyzerView)->load())
         : 0;
@@ -1385,6 +1403,7 @@ void AnalyzerComponent::updateFft()
                                                             minDb);
             preMagnitudes[i] = Smoothing::smooth(preMagnitudes[i], mag, kSmoothingCoeff);
         }
+        stabilizeLowBins(preMagnitudes);
     }
     }
 
@@ -1405,6 +1424,7 @@ void AnalyzerComponent::updateFft()
                                                             minDb);
             postMagnitudes[i] = Smoothing::smooth(postMagnitudes[i], mag, kSmoothingCoeff);
         }
+        stabilizeLowBins(postMagnitudes);
     }
     }
 
@@ -1478,6 +1498,7 @@ void AnalyzerComponent::updateFft()
                                                                 minDb);
                 harmonicMagnitudes[i] = Smoothing::smooth(harmonicMagnitudes[i], mag, kSmoothingCoeff);
             }
+            stabilizeLowBins(harmonicMagnitudes);
         }
     }
     else
@@ -1502,6 +1523,7 @@ void AnalyzerComponent::updateFft()
                                                             minDb);
             externalMagnitudes[i] = Smoothing::smooth(externalMagnitudes[i], mag, kSmoothingCoeff);
         }
+        stabilizeLowBins(externalMagnitudes);
     }
 }
 

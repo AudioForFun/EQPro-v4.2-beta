@@ -44,9 +44,6 @@ struct ParamSnapshot
     int linearQuality = 1;
     int linearWindow = 0;
     int oversampling = 0;
-    int harmonicLayerOversampling = 0;  // v4.5 beta: Global harmonic layer oversampling (applies to all bands uniformly)
-    // When this value changes, all bands' harmonic processing uses the same oversampling factor
-    // Only available in Natural Phase and Linear Phase modes (disabled in Real-time)
     float outputTrimDb = 0.0f;
     int characterMode = 0;
     bool smartSolo = false;

@@ -8,7 +8,6 @@ const juce::String phaseMode = "phaseMode";
 const juce::String linearQuality = "linearQuality";
 const juce::String linearWindow = "linearWindow";
 const juce::String oversampling = "oversampling";
-const juce::String harmonicLayerOversampling = "harmonicLayerOversampling";  // v4.5 beta: Global harmonic layer oversampling (applies to all bands uniformly)
 const juce::String outputTrim = "outputTrim";
 const juce::String spectralEnable = "spectralEnable";
 const juce::String spectralThreshold = "spectralThreshold";

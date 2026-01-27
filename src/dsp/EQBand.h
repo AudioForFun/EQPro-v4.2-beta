@@ -41,6 +41,5 @@ struct BandParams
     float evenHarmonicDb = 0.0f;
     float mixEven = 1.0f;
     bool harmonicBypassed = false;  // v4.4 beta: Bypass for harmonic layer
-    int harmonicOversampling = 0;  // v4.4 beta: Oversampling for harmonic layer (0=NONE, 1=2x, 2=4x, 3=8x, 4=16x)
 };
 } // namespace eqdsp

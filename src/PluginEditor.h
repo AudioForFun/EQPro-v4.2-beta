@@ -51,12 +51,6 @@ private:
     juce::Label qualityLabel;
     juce::ComboBox linearQualityBox;
     // v4.4 beta: Global Harmonic layer oversampling toggles (applies to all bands uniformly)
-    juce::Label harmonicLayerOversamplingLabel;
-    juce::ToggleButton harmonicLayerOversamplingNoneToggle;
-    juce::ToggleButton harmonicLayerOversampling2xToggle;
-    juce::ToggleButton harmonicLayerOversampling4xToggle;
-    juce::ToggleButton harmonicLayerOversampling8xToggle;
-    juce::ToggleButton harmonicLayerOversampling16xToggle;
     juce::Label windowLabel;
     juce::ComboBox linearWindowBox;
     juce::Label oversamplingLabel;
@@ -163,7 +157,6 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> phaseModeAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> linearQualityAttachment;
     // v4.4 beta: Global Harmonic layer oversampling attachment
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> harmonicLayerOversamplingAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> linearWindowAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> oversamplingAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> outputTrimAttachment;

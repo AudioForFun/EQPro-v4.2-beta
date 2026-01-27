@@ -105,7 +105,7 @@ void EQDSP::prepare(double sampleRate, int maxBlockSize, int channels)
 {
     sampleRateHz = sampleRate;
     numChannels = juce::jlimit(0, ParamIDs::kMaxChannels, channels);
-    this->maxBlockSize = maxBlockSize;  // v4.4 beta: Store for use in updateBandParams
+    this->maxBlockSize = maxBlockSize;
     const uint32_t maskAll = (numChannels >= 32)
         ? 0xFFFFFFFFu
         : (numChannels > 0 ? ((1u << static_cast<uint32_t>(numChannels)) - 1u) : 0u);
@@ -123,26 +123,6 @@ void EQDSP::prepare(double sampleRate, int maxBlockSize, int channels)
     scratchBuffer.setSize(numChannels, maxBlockSize);
     scratchBuffer.clear();
     
-    // v4.4 beta: Initialize harmonic oversampling buffers (per-band, per-channel)
-    for (int ch = 0; ch < numChannels; ++ch)
-    {
-        for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
-        {
-            harmonicOversampledBuffers[ch][band].setSize(1, maxBlockSize * 16);  // Max 16x oversampling
-            harmonicOversampledBuffers[ch][band].clear();
-            harmonicDryBuffers[ch][band].setSize(1, maxBlockSize);
-            harmonicDryBuffers[ch][band].clear();
-            harmonicDryDelayBuffers[ch][band].setSize(1, maxBlockSize + 8192);  // Delay buffer for latency compensation
-            harmonicDryDelayBuffers[ch][band].clear();
-            harmonicProcessBuffers[ch][band].setSize(1, maxBlockSize);  // Buffer to collect samples for block processing
-            harmonicProcessBuffers[ch][band].clear();
-            harmonicOversamplingFactors[ch][band] = 0;  // NONE by default
-            harmonicLatencySamples[ch][band] = 0;
-            harmonicDryDelayWritePos[ch][band] = 0;
-            harmonicBufferWritePos[ch][band] = 0;
-            harmonicOversamplers[ch][band].reset();
-        }
-    }
 
     for (int ch = 0; ch < numChannels; ++ch)
     {
@@ -191,22 +171,6 @@ void EQDSP::prepare(double sampleRate, int maxBlockSize, int channels)
 
 void EQDSP::reset()
 {
-    // v4.4 beta: Reset harmonic oversamplers
-    for (int ch = 0; ch < numChannels; ++ch)
-    {
-        for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
-        {
-            if (harmonicOversamplers[ch][band] != nullptr)
-                harmonicOversamplers[ch][band]->reset();
-            harmonicOversampledBuffers[ch][band].clear();
-            harmonicDryBuffers[ch][band].clear();
-            harmonicDryDelayBuffers[ch][band].clear();
-            harmonicProcessBuffers[ch][band].clear();
-            harmonicDryDelayWritePos[ch][band] = 0;
-            harmonicBufferWritePos[ch][band] = 0;
-        }
-    }
-    
     for (int ch = 0; ch < numChannels; ++ch)
         for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
         {
@@ -271,60 +235,6 @@ void EQDSP::updateBandParams(int channelIndex, int bandIndex, const BandParams& 
     smoothMix[channelIndex][bandIndex].setTargetValue(params.mix);
     smoothDynThresh[channelIndex][bandIndex].setTargetValue(params.thresholdDb);
     
-    // v4.5 beta: Update harmonic oversampling when parameter changes
-    // NOTE: This is a GLOBAL parameter - all bands must use the same oversampling factor
-    // The oversampling value comes from snapshot.harmonicLayerOversampling and is applied uniformly to all bands
-    // When the global oversampling value changes, all bands' oversamplers are updated together
-    // Only available in Natural Phase and Linear Phase modes (disabled in Real-time)
-    const int newOversampling = params.harmonicOversampling;
-    
-    // Update oversampling for ALL bands when the global value changes
-    // Check if we need to update any band's oversampler
-    bool needsUpdate = false;
-    for (int b = 0; b < ParamIDs::kBandsPerChannel; ++b)
-    {
-        if (harmonicOversamplingFactors[channelIndex][b] != newOversampling)
-        {
-            needsUpdate = true;
-            break;
-        }
-    }
-    
-    if (needsUpdate)
-    {
-        // Update ALL bands to use the same global oversampling value
-        for (int b = 0; b < ParamIDs::kBandsPerChannel; ++b)
-        {
-            harmonicOversamplingFactors[channelIndex][b] = newOversampling;
-            harmonicOversamplers[channelIndex][b].reset();
-            
-            if (newOversampling > 0 && newOversampling <= 4)
-            {
-                // Create oversampler: 0=NONE, 1=2x, 2=4x, 3=8x, 4=16x
-                const int numStages = newOversampling;  // 1 stage = 2x, 2 stages = 4x, etc.
-                harmonicOversamplers[channelIndex][b] = 
-                    std::make_unique<juce::dsp::Oversampling<float>>(
-                        1,  // Single channel per band
-                        numStages,
-                        juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR,
-                        true);  // Use steep filter
-            
-                harmonicOversamplers[channelIndex][b]->initProcessing(static_cast<size_t>(maxBlockSize));
-                harmonicLatencySamples[channelIndex][b] = 
-                    static_cast<int>(harmonicOversamplers[channelIndex][b]->getLatencyInSamples());
-                
-                // Clear delay buffers and reset write positions
-                harmonicDryDelayBuffers[channelIndex][b].clear();
-                harmonicDryDelayWritePos[channelIndex][b] = 0;
-            }
-            else
-            {
-                harmonicLatencySamples[channelIndex][b] = 0;
-                harmonicDryDelayBuffers[channelIndex][b].clear();
-                harmonicDryDelayWritePos[channelIndex][b] = 0;
-            }
-        }
-    }
 }
 
 void EQDSP::updateMsBandParams(int bandIndex, const BandParams& params)
@@ -988,73 +898,44 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 // Even harmonics: quadratic waveshaping (input^2) for tube-like saturation
                 // Each band can have independent odd/even amounts and mix values
                 float harmonicSample = sample;
+                if (!std::isfinite(harmonicSample))
+                    harmonicSample = 0.0f;
                 if (!params.harmonicBypassed && 
                     ((params.oddHarmonicDb != 0.0f && params.mixOdd > 0.0f) || 
                      (params.evenHarmonicDb != 0.0f && params.mixEven > 0.0f)))
                 {
-                    // Process harmonics - with or without oversampling
-                    const int osFactor = params.harmonicOversampling;
-                    if (osFactor > 0 && osFactor <= 4 && harmonicOversamplers[ch][band] != nullptr)
+                    // Safety-focused harmonic generation (no dedicated harmonic oversampling).
+                    const float input = juce::jlimit(-1.0f, 1.0f, harmonicSample);
+                    float oddHarm = 0.0f;
+                    float evenHarm = 0.0f;
+
+                    if (params.oddHarmonicDb != 0.0f && params.mixOdd > 0.0f)
                     {
-                        // v4.4 beta: Process with oversampling (block-based, requires buffering)
-                        // For now, process sample-by-sample but note that proper oversampling
-                        // requires block processing for optimal quality
-                        // This is a simplified implementation - full block-based oversampling
-                        // with latency compensation would require architectural changes
-                        const float input = juce::jlimit(-1.0f, 1.0f, sample);
-                        float oddHarm = 0.0f;
-                        float evenHarm = 0.0f;
-                        
-                        if (params.oddHarmonicDb != 0.0f && params.mixOdd > 0.0f)
-                        {
-                            const float oddGain = juce::Decibels::decibelsToGain(params.oddHarmonicDb) * params.mixOdd;
-                            oddHarm = input * input * input * oddGain * 0.33f;
-                        }
-                        
-                        if (params.evenHarmonicDb != 0.0f && params.mixEven > 0.0f)
-                        {
-                            const float evenGain = juce::Decibels::decibelsToGain(params.evenHarmonicDb) * params.mixEven;
-                            evenHarm = input * input * evenGain * 0.5f;
-                        }
-                        
-                        harmonicSample = sample + oddHarm + evenHarm;
-                        harmonicSample = juce::jlimit(-1.0f, 1.0f, harmonicSample);
-                        
-                        // NOTE: Full oversampling implementation with proper latency compensation
-                        // requires block-based processing. The current sample-by-sample architecture
-                        // limits optimal oversampling. For now, harmonics are processed without
-                        // actual oversampling, but the parameter system is in place.
-                        // TODO: Implement full block-based oversampling with latency compensation
+                        const float oddGain = juce::Decibels::decibelsToGain(params.oddHarmonicDb) * params.mixOdd;
+                        oddHarm = input * input * input * oddGain * 0.33f;
                     }
-                    else
+
+                    if (params.evenHarmonicDb != 0.0f && params.mixEven > 0.0f)
                     {
-                        // No oversampling - process directly
-                        const float input = juce::jlimit(-1.0f, 1.0f, sample);
-                        float oddHarm = 0.0f;
-                        float evenHarm = 0.0f;
-                        
-                        if (params.oddHarmonicDb != 0.0f && params.mixOdd > 0.0f)
-                        {
-                            const float oddGain = juce::Decibels::decibelsToGain(params.oddHarmonicDb) * params.mixOdd;
-                            oddHarm = input * input * input * oddGain * 0.33f;
-                        }
-                        
-                        if (params.evenHarmonicDb != 0.0f && params.mixEven > 0.0f)
-                        {
-                            const float evenGain = juce::Decibels::decibelsToGain(params.evenHarmonicDb) * params.mixEven;
-                            evenHarm = input * input * evenGain * 0.5f;
-                        }
-                        
-                        harmonicSample = sample + oddHarm + evenHarm;
-                        harmonicSample = juce::jlimit(-1.0f, 1.0f, harmonicSample);
+                        const float evenGain = juce::Decibels::decibelsToGain(params.evenHarmonicDb) * params.mixEven;
+                        evenHarm = input * input * evenGain * 0.5f;
                     }
+
+                    harmonicSample = input + oddHarm + evenHarm;
+                    if (!std::isfinite(harmonicSample))
+                        harmonicSample = 0.0f;
+                    if (std::abs(harmonicSample) > 1.0f)
+                        harmonicSample = std::tanh(harmonicSample);
                 }
                 
                 // v4.5 beta: Sample-accurate mixing with latency compensation
                 // The dry signal is already aligned (no additional delay needed for non-oversampled case)
                 // For oversampled case, latency compensation is handled via harmonicDryDelayBuffers
                 // This ensures the dry and wet harmonic signals are perfectly aligned for sample-accurate mixing
-                const float harmonicDelta = (harmonicSample - sample) * mix;
+                float harmonicDelta = (harmonicSample - sample) * mix;
+                if (!std::isfinite(harmonicDelta))
+                    harmonicDelta = 0.0f;
+                harmonicDelta = juce::jlimit(-4.0f, 4.0f, harmonicDelta);
                 if (harmonicOnlyData != nullptr)
                     harmonicOnlyData[i] += harmonicDelta;
                 channelData[i] += (harmonicSample - dry) * mix;
@@ -1062,111 +943,4 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
         }
     }
 }
-// v4.4 beta: Process harmonics with oversampling and latency compensation (block-based)
-// This processes a block of samples with oversampling and ensures sample-accurate mixing
-void EQDSP::processHarmonicsBlock(int ch, int band, const BandParams& params,
-                                  juce::AudioBuffer<float>& harmonicBuffer,
-                                  const juce::AudioBuffer<float>& dryBuffer,
-                                  int numSamples)
-{
-    if (params.harmonicBypassed || numSamples <= 0)
-        return;
-    
-    const int osFactor = params.harmonicOversampling;
-    if (osFactor > 0 && osFactor <= 4 && harmonicOversamplers[ch][band] != nullptr)
-    {
-        // v4.4 beta: Process with oversampling - block-based
-        auto block = juce::dsp::AudioBlock<float>(harmonicBuffer);
-        auto upBlock = harmonicOversamplers[ch][band]->processSamplesUp(block);
-        const int upSamples = static_cast<int>(upBlock.getNumSamples());
-        
-        // Process harmonics at oversampled rate
-        auto* upData = upBlock.getChannelPointer(0);
-        for (int i = 0; i < upSamples; ++i)
-        {
-            const float input = juce::jlimit(-1.0f, 1.0f, upData[i]);
-            float oddHarm = 0.0f;
-            float evenHarm = 0.0f;
-            
-            if (params.oddHarmonicDb != 0.0f && params.mixOdd > 0.0f)
-            {
-                const float oddGain = juce::Decibels::decibelsToGain(params.oddHarmonicDb) * params.mixOdd;
-                oddHarm = input * input * input * oddGain * 0.33f;
-            }
-            
-            if (params.evenHarmonicDb != 0.0f && params.mixEven > 0.0f)
-            {
-                const float evenGain = juce::Decibels::decibelsToGain(params.evenHarmonicDb) * params.mixEven;
-                evenHarm = input * input * evenGain * 0.5f;
-            }
-            
-            upData[i] = input + oddHarm + evenHarm;
-            upData[i] = juce::jlimit(-1.0f, 1.0f, upData[i]);
-        }
-        
-        // Downsample back
-        harmonicOversamplers[ch][band]->processSamplesDown(block);
-        
-        // v4.4 beta: Apply latency compensation to dry signal for sample-accurate mixing
-        const int latency = harmonicLatencySamples[ch][band];
-        if (latency > 0)
-        {
-            auto* delayData = harmonicDryDelayBuffers[ch][band].getWritePointer(0);
-            const auto* dryData = dryBuffer.getReadPointer(0);
-            const int bufferSize = harmonicDryDelayBuffers[ch][band].getNumSamples();
-            int writePos = harmonicDryDelayWritePos[ch][band];
-            
-            for (int i = 0; i < numSamples; ++i)
-            {
-                // Write current dry sample to delay buffer
-                delayData[writePos] = dryData[i];
-                
-                // Read delayed dry sample
-                int readPos = writePos - latency;
-                if (readPos < 0)
-                    readPos += bufferSize;
-                
-                // The dry signal is now aligned with the oversampled harmonic signal
-                // This ensures sample-accurate mixing
-                const float delayedDry = delayData[readPos];
-                harmonicBuffer.getWritePointer(0)[i] = delayedDry + 
-                    (harmonicBuffer.getReadPointer(0)[i] - delayedDry) * params.mixOdd * params.mixEven;
-                
-                if (++writePos >= bufferSize)
-                    writePos = 0;
-            }
-            
-            harmonicDryDelayWritePos[ch][band] = writePos;
-        }
-    }
-    else
-    {
-        // No oversampling - process directly (sample-accurate, no latency)
-        auto* harmonicData = harmonicBuffer.getWritePointer(0);
-        const auto* dryData = dryBuffer.getReadPointer(0);
-        
-        for (int i = 0; i < numSamples; ++i)
-        {
-            const float input = juce::jlimit(-1.0f, 1.0f, harmonicData[i]);
-            float oddHarm = 0.0f;
-            float evenHarm = 0.0f;
-            
-            if (params.oddHarmonicDb != 0.0f && params.mixOdd > 0.0f)
-            {
-                const float oddGain = juce::Decibels::decibelsToGain(params.oddHarmonicDb) * params.mixOdd;
-                oddHarm = input * input * input * oddGain * 0.33f;
-            }
-            
-            if (params.evenHarmonicDb != 0.0f && params.mixEven > 0.0f)
-            {
-                const float evenGain = juce::Decibels::decibelsToGain(params.evenHarmonicDb) * params.mixEven;
-                evenHarm = input * input * evenGain * 0.5f;
-            }
-            
-            harmonicData[i] = input + oddHarm + evenHarm;
-            harmonicData[i] = juce::jlimit(-1.0f, 1.0f, harmonicData[i]);
-        }
-    }
-}
-
 } // namespace eqdsp

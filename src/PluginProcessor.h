@@ -165,7 +165,6 @@ private:
     std::atomic<float>* linearQualityParam = nullptr;
     std::atomic<float>* linearWindowParam = nullptr;
     std::atomic<float>* oversamplingParam = nullptr;
-    std::atomic<float>* harmonicLayerOversamplingParam = nullptr;  // v4.4 beta: Global harmonic layer oversampling
     std::atomic<float>* outputTrimParam = nullptr;
     std::atomic<float>* spectralEnableParam = nullptr;
     std::atomic<float>* spectralThresholdParam = nullptr;

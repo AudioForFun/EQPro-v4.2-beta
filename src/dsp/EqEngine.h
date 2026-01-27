@@ -75,6 +75,11 @@ private:
     juce::SmoothedValue<float> autoGainSmoothed;
 
     int oversamplingIndex = 0;
+    int oversamplingLatencySamples = 0;
+    int lastOversamplingIndex = -1;
+    double lastOversamplingSampleRate = 0.0;
+    int lastOversamplingBlockSize = 0;
+    int lastOversamplingChannels = 0;
     int maxPreparedBlockSize = 0;
     double sampleRateHz = 48000.0;
     int meterSkipFactor = 1;

@@ -1,4 +1,4 @@
-# EQ Pro (JUCE) - 4.6 beta
+# EQ Pro (JUCE) - 4.9 beta
 
 Professional multi-channel EQ plugin with harmonic processing and advanced visual feedback.
 
@@ -19,12 +19,10 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 - **Format-aware processing** supporting stereo, surround (5.1, 7.1), and Dolby Atmos layouts
 - **Band-colored visual feedback** with dynamic LED rings and EQ frame highlighting
 
-###  **Harmonic Processing Layer (v4.5 beta)**
+### 🎨 **Harmonic Processing Layer (v4.9 beta)**
 - **Independent odd and even harmonic generation** per band (-24 to +24 dB)
 - **Per-band harmonic mix controls** (0-100%) for precise blend of harmonic content
 - **Per-band harmonic bypass** (independent for each of 12 bands, **default bypassed**)
-- **Global harmonic layer oversampling** (NONE, 2X, 4X, 8X, 16X) - applies uniformly to all bands
-- **Oversampling available in Natural Phase and Linear Phase modes** (disabled in Real-time for zero latency)
 - **Sample-accurate dry/wet mixing** with automatic latency compensation
 - **Non-linear waveshaping**: Cubic distortion for odd harmonics, quadratic for even harmonics
 - **Layer-based UI navigation** with dedicated EQ (Layer 1) and Harmonic (Layer 2) views
@@ -76,6 +74,9 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 - **Professional DSP architecture** with clean separation between audio and UI threads
 - **Comprehensive parameter automation** support for all controls
 
+## Build Notes (Windows)
+- **ASIO support** requires the Steinberg ASIO SDK (not bundled). After installing it, set `EQPRO_ASIO_SDK_PATH` in CMake to the SDK folder to enable ASIO in the standalone app.
+
 ---
 
 ## Processing Modes
@@ -83,37 +84,38 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 ### Real-time Mode
 - **Zero latency** minimum-phase IIR processing
 - Perfect for live performance, tracking, and real-time monitoring
-- Harmonic processing available with optional oversampling (adds latency)
+- Harmonic processing runs inside the single quality-driven oversampling path
 
 ### Natural Phase Mode
 - Short linear-phase FIR with adaptive tap length
 - Mixed-phase blend for transient preservation
-- Harmonic oversampling available (2X, 4X, 8X, 16X)
 
 ### Linear Phase Mode
 - Long linear-phase FIR with adaptive taps
 - Maximum phase accuracy for mastering applications
-- Harmonic oversampling available (2X, 4X, 8X, 16X)
 
 ---
 
-## Recent Updates (v4.5 beta)
+## Recent Updates (v4.9 beta)
 
 ### Harmonic Processing Layer
 - **New Layer 2** with independent odd and even harmonic generation per band
 - Per-band controls: Odd harmonic amount (-24 to +24 dB), Mix Odd (0-100%), Even harmonic amount (-24 to +24 dB), Mix Even (0-100%)
 - Per-band harmonic bypass (independent for each of 12 bands, **default bypassed**)
-- Global harmonic layer oversampling (NONE, 2X, 4X, 8X, 16X) - applies uniformly to all bands
-- Oversampling only available in Natural Phase and Linear Phase modes (disabled in Real-time)
+- Removed harmonic-layer oversampling controls to keep a single quality-driven oversampling path
 - Layer-based UI navigation with EQ (Layer 1) and Harmonic (Layer 2) toggles
 - Sample-accurate dry/wet mixing with latency compensation for oversampled processing
 - Non-linear waveshaping: Cubic distortion for odd harmonics, quadratic for even harmonics
 
 ### Red Analyzer Curve
 - **Third analyzer curve** displaying harmonic-only content in bright red
-- Only visible when harmonics are active on at least one band
+- Keeps updating even when harmonics are bypassed, preventing freeze behavior
 - Respects all analyzer settings: range, speed, freeze
 - Provides real-time visual feedback for harmonic processing impact
+
+### DSP Reliability
+- Auto-gain now matches input RMS reliably (no runaway boosts)
+- Harmonic generation clamps non-finite values to avoid unexpected spikes
 
 ### UI Organization
 - Improved header layout with layer toggles on left, band number on right
@@ -176,7 +178,6 @@ cmake --build build --config Release
 - Odd and even harmonic generation per band
 - Independent mix controls for each harmonic type
 - Per-band harmonic bypass
-- Global oversampling controls
 - Non-linear waveshaping for musical character
 
 ### Analyzer Section
@@ -193,7 +194,7 @@ cmake --build build --config Release
 
 ### Control Section
 - Phase mode selection (Real-time, Natural, Linear)
-- Quality settings for linear modes
+- Quality settings drive oversampling depth (single global path)
 - Global mix, output trim, auto-gain
 - Preset management and snapshots
 

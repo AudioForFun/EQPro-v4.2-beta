@@ -786,7 +786,8 @@ void BandControlsPanel::paint(juce::Graphics& g)
         g.drawEllipse(chip, 1.0f);
     }
 
-    // Removed residual lines under band toggles, solo toggles, and dropdown menus as requested.
+    // v4.2: Removed residual lines under band toggles, solo toggles, and dropdown menus.
+    // These lines were visual artifacts that cluttered the UI and were not part of the intended design.
 
     if (detectorMeterBounds.getWidth() > 1.0f && detectorMeterBounds.getHeight() > 1.0f)
     {
@@ -944,7 +945,12 @@ void BandControlsPanel::timerCallback()
         const float onAlpha = (bypassed ? 0.32f : 0.55f) + selected * 0.2f;
         button.setColour(juce::TextButton::buttonColourId, baseColour.withAlpha(baseAlpha));
         button.setColour(juce::TextButton::buttonOnColourId, baseColour.withAlpha(onAlpha));
+        
+        // v4.2: Improved band number visibility for better contrast.
         // Make band numbers more visible: use brighter/lighter text color for better contrast.
+        // - Selected bands: white text for maximum visibility against colored background.
+        // - Non-selected bands: brighter band color (brighter 0.4) with high alpha (0.95) for clear visibility.
+        // - Bypassed bands: slightly dimmed but still visible (0.6 alpha) to indicate inactive state.
         if (bypassed)
         {
             button.setColour(juce::TextButton::textColourOffId, baseColour.withAlpha(0.6f));
@@ -1429,6 +1435,7 @@ void BandControlsPanel::updateComboBoxWidths()
         msLabels.add(msBox.getItemText(i + 1));
     int currentMsWidth = computeWidth(msLabels, font);
     
+    // v4.2: Adapt channel selection dropdown width for immersive formats.
     // Also check against longest possible immersive format channel names to ensure dropdown is wide enough.
     // Longest possible channel names from immersive formats (9.1.6, 7.1.4, etc.):
     // Note: MS dropdown can have labels like "STEREO TOP FRONT", "STEREO TOP REAR", "STEREO TOP MIDDLE"

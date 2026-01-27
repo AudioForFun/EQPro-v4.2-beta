@@ -1189,6 +1189,7 @@ void EQProAudioProcessorEditor::refreshChannelLayout()
     const auto pairLabels = buildPairLabels();
     channelSelector.clear(juce::dontSendNotification);
     
+    // v4.2: Adapt channel selector width for immersive formats.
     // Find the longest possible channel label to size the dropdown appropriately.
     // Check all possible immersive format channel names (longest would be like "TML (TML/TMR)").
     const float uiScale = 1.0f;

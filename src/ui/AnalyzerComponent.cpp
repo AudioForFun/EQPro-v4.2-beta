@@ -118,6 +118,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     const float scale = uiScale;
     const float cornerRadius = 8.0f * scale;
     
+    // v4.2: Modernized FFT analyzer display for better GUI harmony.
     // Modern background with subtle gradient for depth.
     juce::ColourGradient bgGradient(theme.analyzerBg.brighter(0.02f), plotArea.toFloat().getTopLeft(),
                                     theme.analyzerBg.darker(0.03f), plotArea.toFloat().getBottomLeft(), false);
@@ -128,7 +129,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     g.setColour(theme.accent.withAlpha(0.03f));
     g.fillRoundedRectangle(plotArea.toFloat().reduced(2.0f), cornerRadius - 2.0f);
 
-    // Modern border with layered outlines.
+    // Modern border with layered outlines for depth and polish.
     g.setColour(theme.panelOutline.withAlpha(0.8f));
     g.drawRoundedRectangle(plotArea.toFloat(), cornerRadius, 1.2f);
     g.setColour(theme.panelOutline.withAlpha(0.4f));

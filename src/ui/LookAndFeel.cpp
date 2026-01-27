@@ -147,7 +147,8 @@ void EQProLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b
     g.setColour(bgColour);
     g.fillRoundedRectangle(bounds.reduced(0.5f), 4.0f);
 
-    // Draw clear, well-defined borders for coherence with rest of GUI.
+    // v4.2: Clear, well-defined borders for solo toggles to match rest of GUI.
+    // Dual-layer border system ensures visibility even with shading/gradients behind.
     // Outer border for definition (always visible).
     auto outerBorderColour = theme.panelOutline;
     if (!isEnabled)

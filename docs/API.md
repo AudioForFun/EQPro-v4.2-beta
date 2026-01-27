@@ -470,6 +470,29 @@ format lists are:
 - EQ band section frame and divider lines now **follow the active band color**.
 - Rotary knobs render **band-colored inner LED ring** to match the main LED row.
 
+## v4.2 Beta Updates (UI Improvements)
+- **FFT Analyzer Modernization**:
+  - Analyzer background uses subtle gradient for depth
+  - Spectrum curves use theme accent colors (cyan for pre, purple for post) with gradient fills
+  - Grid lines use theme colors with improved visual hierarchy (major: 0.2 alpha, minor: 0.08 alpha)
+  - 0 dB reference line enhanced with accent color and subtle glow
+  - Legend modernized with gradient background and enhanced styling
+  - Layered borders for modern appearance
+- **Solo Toggle Styling**:
+  - Dual-layer border system (outer 1.2px, inner 0.8px) for clear definition
+  - Borders use full opacity `panelOutline` or `accent` color when on/hover
+  - Ensures visibility even with shading/gradients behind
+- **Band Number Visibility**:
+  - Text color algorithm improved for better contrast
+  - Selected bands use white text, non-selected use brighter band color (brighter 0.4, alpha 0.95)
+  - Bypassed bands use dimmed color (alpha 0.6) but remain visible
+- **Channel Selection Dropdown**:
+  - Width calculation includes all immersive format channel names
+  - Tests against longest possible labels: "STEREO TOP MIDDLE" (17 chars), "TML (TML/TMR)" (15 chars)
+  - Automatically accommodates 9.1.6, 7.1.4, and other immersive formats
+- **UI Cleanup**:
+  - Removed residual divider lines under band toggles, solo toggles, and dropdown menus
+
 ## Call Flow (Simplified)
 1. UI updates APVTS parameters.
 2. `timerCallback` builds `ParamSnapshot` and swaps it.

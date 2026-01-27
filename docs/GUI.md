@@ -363,5 +363,29 @@ The routing dropdown exposes only the targets that match the active plugin forma
 - Correlation meter includes -1/0/+1 ticks with a framed bar.
 - Rotary knobs include a smaller inner LED ring that matches band color.
 
+## Visual Updates (v4.2 beta)
+- **FFT Analyzer Modernization**: 
+  - Modern gradient background with subtle depth
+  - Theme-based color scheme using accent colors (cyan/purple) for spectrum curves
+  - Gradient fills under spectrum curves for modern appearance
+  - Enhanced grid using theme colors with better visual hierarchy
+  - Improved 0 dB reference line with accent color and subtle glow
+  - Modernized legend with gradient background and enhanced swatches
+  - Layered borders for depth and polish
+- **Solo Toggle Borders**: 
+  - Clear, well-defined dual-layer borders (outer + inner) for better visibility
+  - Borders remain visible even with shading/gradients behind
+  - State-aware styling (normal/on/hover/disabled) for visual feedback
+- **Band Number Visibility**: 
+  - Selected bands: white text for maximum contrast
+  - Non-selected bands: brighter band color (brighter 0.4) with high alpha (0.95) for clear visibility
+  - Bypassed bands: slightly dimmed but still visible (0.6 alpha)
+- **Channel Selection Dropdown**: 
+  - Width automatically adapts to longest possible channel names
+  - Supports immersive formats (9.1.6, 7.1.4, etc.) with longest labels like "STEREO TOP MIDDLE"
+  - Accommodates all channel types including top channels (TFL, TFR, TML, TMR, TRL, TRR), bottom channels (Bfl, Bfr), wide channels (Lw, Rw), and LFE2
+- **UI Cleanup**: 
+  - Removed residual lines under band toggles, solo toggles, and dropdown menus for cleaner appearance
+
 
 

@@ -786,23 +786,7 @@ void BandControlsPanel::paint(juce::Graphics& g)
         g.drawEllipse(chip, 1.0f);
     }
 
-    g.setColour(bandColour.withAlpha(0.35f));
-    g.drawLine(static_cast<float>(bandRowArea.getX()),
-               static_cast<float>(bandRowArea.getBottom() + 1),
-               static_cast<float>(bandRowArea.getRight()),
-               static_cast<float>(bandRowArea.getBottom() + 1), 1.0f);
-    g.drawLine(static_cast<float>(soloRowArea.getX()),
-               static_cast<float>(soloRowArea.getBottom() + 1),
-               static_cast<float>(soloRowArea.getRight()),
-               static_cast<float>(soloRowArea.getBottom() + 1), 1.0f);
-    g.drawLine(static_cast<float>(knobsArea.getX()),
-               static_cast<float>(knobsArea.getBottom() + 1),
-               static_cast<float>(knobsArea.getRight()),
-               static_cast<float>(knobsArea.getBottom() + 1), 1.0f);
-    g.drawLine(static_cast<float>(comboRowArea.getX()),
-               static_cast<float>(comboRowArea.getBottom() + 1),
-               static_cast<float>(comboRowArea.getRight()),
-               static_cast<float>(comboRowArea.getBottom() + 1), 1.0f);
+    // Removed residual lines under band toggles, solo toggles, and dropdown menus as requested.
 
     if (detectorMeterBounds.getWidth() > 1.0f && detectorMeterBounds.getHeight() > 1.0f)
     {
@@ -960,7 +944,21 @@ void BandControlsPanel::timerCallback()
         const float onAlpha = (bypassed ? 0.32f : 0.55f) + selected * 0.2f;
         button.setColour(juce::TextButton::buttonColourId, baseColour.withAlpha(baseAlpha));
         button.setColour(juce::TextButton::buttonOnColourId, baseColour.withAlpha(onAlpha));
-        button.setColour(juce::TextButton::textColourOffId, baseColour.withAlpha(bypassed ? 0.45f : 0.9f));
+        // Make band numbers more visible: use brighter/lighter text color for better contrast.
+        if (bypassed)
+        {
+            button.setColour(juce::TextButton::textColourOffId, baseColour.withAlpha(0.6f));
+        }
+        else if (isSelected)
+        {
+            // Selected band: white text for maximum visibility.
+            button.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
+        }
+        else
+        {
+            // Non-selected bands: use brighter version of band color for better visibility.
+            button.setColour(juce::TextButton::textColourOffId, baseColour.brighter(0.4f).withAlpha(0.95f));
+        }
         button.setColour(juce::TextButton::textColourOnId, bypassed ? theme.textMuted : juce::Colours::white);
 
         auto& soloButton = bandSoloButtons[static_cast<size_t>(i)];

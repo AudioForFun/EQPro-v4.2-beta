@@ -99,7 +99,7 @@ private:
         }
     };
     
-    // v4.4 beta: Separate LookAndFeel for slope dropdown with larger font
+    // v4.5 beta: Separate LookAndFeel for slope dropdown with larger font
     struct SlopeComboLookAndFeel final : public juce::LookAndFeel_V4
     {
         juce::Font getComboBoxFont(juce::ComboBox&) override
@@ -113,14 +113,14 @@ private:
         }
     };
 
-    // v4.4 beta: Harmonic layer system
+    // v4.5 beta: Harmonic layer system
     enum class LayerType { EQ, Harmonic };
     
     void updateAttachments();
     void syncUiFromParams();
     void updateTypeUi();
-    void setLayer(LayerType layer);  // v4.4 beta: Switch between EQ and Harmonic layers
-    void updateLayerVisibility();  // v4.4 beta: Update visibility based on current layer
+    void setLayer(LayerType layer);  // v4.5 beta: Switch between EQ and Harmonic layers
+    void updateLayerVisibility();  // v4.5 beta: Update visibility based on current layer
     int getCurrentTypeIndex() const;
     void copyBandState();
     void pasteBandState();
@@ -158,12 +158,12 @@ private:
         float dynRelease = 200.0f;
         float dynAuto = 1.0f;
         float dynExternal = 0.0f;
-        // v4.4 beta: Harmonic layer parameters
+        // v4.5 beta: Harmonic layer parameters
         float odd = 0.0f;
         float mixOdd = 100.0f;
         float even = 0.0f;
         float mixEven = 100.0f;
-        float harmonicBypass = 0.0f;  // v4.4 beta: Bypass for harmonic layer (per band)
+        float harmonicBypass = 0.0f;  // v4.5 beta: Bypass for harmonic layer (per-band, independent)
     };
 
     EQProAudioProcessor& processor;
@@ -194,7 +194,7 @@ private:
     juce::Label mixLabel;
     BandKnob mixSlider;
     
-    // v4.4 beta: Harmonic layer controls
+    // v4.5 beta: Harmonic layer controls
     LayerType currentLayer { LayerType::EQ };
     juce::ToggleButton eqLayerToggle;
     juce::ToggleButton harmonicLayerToggle;
@@ -207,7 +207,7 @@ private:
     BandKnob evenHarmonicSlider;
     juce::Label mixEvenLabel;
     BandKnob mixEvenSlider;
-    juce::ToggleButton harmonicBypassToggle;  // v4.4 beta: Bypass for harmonic layer
+    juce::ToggleButton harmonicBypassToggle;  // v4.5 beta: Bypass for harmonic layer (per-band, independent)
     
     juce::TextButton copyButton;
     juce::TextButton pasteButton;
@@ -236,7 +236,7 @@ private:
     std::unique_ptr<SliderAttachment> mixOddAttachment;
     std::unique_ptr<SliderAttachment> evenHarmonicAttachment;
     std::unique_ptr<SliderAttachment> mixEvenAttachment;
-    std::unique_ptr<ButtonAttachment> harmonicBypassAttachment;  // v4.4 beta: Harmonic bypass attachment
+    std::unique_ptr<ButtonAttachment> harmonicBypassAttachment;  // v4.5 beta: Harmonic bypass attachment (per-band)
     std::unique_ptr<ButtonAttachment> dynEnableAttachment;
     std::unique_ptr<ComboBoxAttachment> dynModeAttachment;
     std::unique_ptr<SliderAttachment> dynThresholdAttachment;

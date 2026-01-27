@@ -42,6 +42,7 @@ public:
 private:
     double sampleRateHz = 48000.0;
     int numChannels = 0;
+    int maxBlockSize = 512;  // v4.4 beta: Store max block size for oversampler initialization
     static constexpr int kMaxStages = 8;
     std::array<std::array<std::array<Biquad, kMaxStages>, ParamIDs::kBandsPerChannel>,
                ParamIDs::kMaxChannels>
@@ -85,8 +86,34 @@ private:
     bool smartSoloEnabled = false;
     int qMode = 0;
     float qModeAmount = 50.0f;
+    
+    // v4.4 beta: Per-band harmonic oversampling infrastructure
+    // Oversamplers for each band (per-channel) - only created when needed
+    std::array<std::array<std::unique_ptr<juce::dsp::Oversampling<float>>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        harmonicOversamplers {};
+    std::array<std::array<juce::AudioBuffer<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        harmonicOversampledBuffers {};
+    std::array<std::array<juce::AudioBuffer<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        harmonicDryBuffers {};  // For latency compensation - stores dry samples before harmonic processing
+    std::array<std::array<juce::AudioBuffer<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        harmonicDryDelayBuffers {};  // Delay buffers for sample-accurate mixing
+    std::array<std::array<juce::AudioBuffer<float>, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        harmonicProcessBuffers {};  // Buffers to collect samples for block processing
+    std::array<std::array<int, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        harmonicOversamplingFactors {};  // Current oversampling factor per band (0=NONE, 1=2x, 2=4x, 3=8x, 4=16x)
+    std::array<std::array<int, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        harmonicLatencySamples {};  // Latency in samples for each band's oversampling
+    std::array<std::array<int, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        harmonicDryDelayWritePos {};  // Write position for dry delay buffers
+    std::array<std::array<int, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels>
+        harmonicBufferWritePos {};  // Write position for harmonic process buffers
 
     // Applies Q mode scaling (constant/proportional).
     float applyQMode(const BandParams& params) const;
+    // v4.4 beta: Process harmonics with oversampling and latency compensation (block-based)
+    void processHarmonicsBlock(int ch, int band, const BandParams& params, 
+                               juce::AudioBuffer<float>& harmonicBuffer, 
+                               const juce::AudioBuffer<float>& dryBuffer,
+                               int numSamples);
 };
 } // namespace eqdsp

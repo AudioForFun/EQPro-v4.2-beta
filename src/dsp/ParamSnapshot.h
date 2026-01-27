@@ -25,12 +25,13 @@ struct BandSnapshot
     float dynReleaseMs = 200.0f;
     bool dynAuto = true;
     bool dynExternal = false;
-    // v4.4 beta: Harmonic layer parameters
+    // v4.5 beta: Harmonic layer parameters (per-band, independent for each of 12 bands)
+    // Each band can have its own odd/even harmonic settings and bypass state
     float oddHarmonicDb = 0.0f;
     float mixOdd = 1.0f;
     float evenHarmonicDb = 0.0f;
     float mixEven = 1.0f;
-    bool harmonicBypassed = false;  // v4.4 beta: Bypass for harmonic layer (per-band)
+    bool harmonicBypassed = false;  // v4.5 beta: Bypass for harmonic layer (per-band, independent for each of 12 bands)
 };
 
 // Full parameter snapshot used by the audio thread.
@@ -43,6 +44,9 @@ struct ParamSnapshot
     int linearQuality = 1;
     int linearWindow = 0;
     int oversampling = 0;
+    int harmonicLayerOversampling = 0;  // v4.5 beta: Global harmonic layer oversampling (applies to all bands uniformly)
+    // When this value changes, all bands' harmonic processing uses the same oversampling factor
+    // Only available in Natural Phase and Linear Phase modes (disabled in Real-time)
     float outputTrimDb = 0.0f;
     int characterMode = 0;
     bool smartSolo = false;

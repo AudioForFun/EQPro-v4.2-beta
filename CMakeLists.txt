@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(EQPro VERSION 4.4.0)
+project(EQPro VERSION 4.5.0)
 
 # Generate a Windows version resource with the project version.
 set(EQPRO_VERSION_RC "${CMAKE_CURRENT_BINARY_DIR}/EQProVersion.rc")

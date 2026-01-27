@@ -6,7 +6,7 @@
 
 namespace
 {
-// v4.4 beta: All labels in uppercase for graphical consistency
+// v4.5 beta: All labels in uppercase for graphical consistency
 const juce::StringArray kFilterTypeChoices {
     "BELL",
     "LOW SHELF",
@@ -20,7 +20,7 @@ const juce::StringArray kFilterTypeChoices {
     "FLAT TILT"
 };
 
-// v4.4 beta: All labels in uppercase for graphical consistency
+// v4.5 beta: All labels in uppercase for graphical consistency
 const juce::StringArray kMsChoices {
     "ALL",
     "STEREO FRONT",
@@ -133,11 +133,11 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     : processor(processorIn),
       parameters(processorIn.getParameters())
 {
-    // v4.4 beta: Defer timer start to avoid expensive repaints before components are laid out.
+    // v4.5 beta: Defer timer start to avoid expensive repaints before components are laid out.
     // Timer will start after first resize to ensure proper initialization.
     // This prevents UI blocking operations during component construction
     hasBeenResized = false;
-    // v4.4 beta: Use buffered rendering for better performance on initial load
+    // v4.5 beta: Use buffered rendering for better performance on initial load
     // Reduces repaint overhead and ensures controls appear immediately
     setBufferedToImage(true);
     channelNames = processor.getCurrentChannelNames();
@@ -157,8 +157,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         fade.setCurrentAndTargetValue(1.0f);
     }
 
-    // v4.4 beta: Remove "BAND" label, keep only number to save space
-    // v4.4 beta: Display only the current band number (e.g., "1" instead of "1 / 12")
+    // v4.5 beta: Remove "BAND" label, keep only number to save space
+    // v4.5 beta: Display only the current band number (e.g., "1" instead of "1 / 12")
     titleLabel.setText("1", juce::dontSendNotification);
     titleLabel.setJustificationType(juce::Justification::centred);
     titleLabel.setColour(juce::Label::textColourId, theme.text);
@@ -171,7 +171,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     addAndMakeVisible(eqSectionLabel);
     eqSectionLabel.setVisible(false);
 
-    // v4.4 beta: All button text in uppercase for graphical consistency
+    // v4.5 beta: All button text in uppercase for graphical consistency
     copyButton.setButtonText("COPY");
     copyButton.setTooltip("Copy this band's settings");
     copyButton.onClick = [this] { copyBandState(); };
@@ -216,7 +216,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     };
     addAndMakeVisible(nextBandButton);
     
-    // v4.4 beta: Layer toggle buttons (EQ/Harmonic) next to band navigator
+    // v4.5 beta: Layer toggle buttons (EQ/Harmonic) next to band navigator
     eqLayerToggle.setButtonText("EQ");
     eqLayerToggle.setClickingTogglesState(true);
     eqLayerToggle.setToggleState(true, juce::dontSendNotification);  // EQ is default
@@ -321,7 +321,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         addAndMakeVisible(label);
     };
 
-    // v4.4 beta: All labels in uppercase for graphical consistency
+    // v4.5 beta: All labels in uppercase for graphical consistency
     initLabel(freqLabel, "FREQ");
     initLabel(gainLabel, "GAIN");
     initLabel(qLabel, "Q");
@@ -443,13 +443,13 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     for (int i = 0; i < 16; ++i)
     {
         const int slopeValue = 6 * (i + 1);
-        // v4.4 beta: Uppercase for consistency
+        // v4.5 beta: Uppercase for consistency
         slopeBox.addItem(juce::String(slopeValue) + " DB", i + 1);
     }
     slopeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     slopeBox.setColour(juce::ComboBox::textColourId, theme.text);
     slopeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    // v4.4 beta: Use separate LookAndFeel with larger font for slope dropdown
+    // v4.5 beta: Use separate LookAndFeel with larger font for slope dropdown
     slopeBox.setLookAndFeel(&slopeComboLookAndFeel);
     slopeBox.setTooltip("Slope");
     slopeBox.onChange = [this]
@@ -486,7 +486,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         cacheBandFromUi(selectedChannel, selectedBand);
     };
     
-    // v4.4 beta: Initialize harmonic controls (same style as EQ controls)
+    // v4.5 beta: Initialize harmonic controls (same style as EQ controls)
     oddHarmonicSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     oddHarmonicSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     oddHarmonicSlider.setTextBoxIsEditable(true);
@@ -734,7 +734,7 @@ void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
     selectedChannel = juce::jlimit(0, ParamIDs::kMaxChannels - 1, channelIndex);
     selectedBand = juce::jlimit(0, ParamIDs::kBandsPerChannel - 1, bandIndex);
 
-    // v4.4 beta: Display only the current band number (e.g., "1" instead of "1 / 12")
+        // v4.5 beta: Display only the current band number (e.g., "1" instead of "1 / 12")
     titleLabel.setText(juce::String(selectedBand + 1),
                        juce::dontSendNotification);
     for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
@@ -931,6 +931,11 @@ void BandControlsPanel::updateLayerVisibility()
     evenHarmonicSlider.setVisible(!isEQLayer);
     mixEvenSlider.setVisible(!isEQLayer);
     harmonicBypassToggle.setVisible(!isEQLayer);  // v4.4 beta: Show bypass only on Harmonic layer
+    if (auto* phaseModeParam = parameters.getParameter(ParamIDs::phaseMode))
+    {
+        const int phaseMode = static_cast<int>(phaseModeParam->convertFrom0to1(phaseModeParam->getValue()));
+        isRealtimeMode = (phaseMode == 0);  // 0 = min-phase (realtime), 1 = linear phase
+    }
     
     // v4.4 beta: Ensure harmonic controls are added to component tree and enabled
     if (!isEQLayer)
@@ -1589,12 +1594,31 @@ void BandControlsPanel::resized()
         const int slopeWidth = juce::jmin(slopeCol.getWidth(), comboWidthSlope);
         slopeBox.setBounds(slopeCol.withHeight(kComboHeight).withSizeKeepingCentre(slopeWidth, kComboHeight));
     }
-    else  // Harmonic layer: show bypass toggle
+    else  // Harmonic layer: show bypass toggle and oversampling toggles
     {
-        auto bypassRow = left.removeFromTop(kRowHeight);
+        auto controlsRow = left.removeFromTop(kRowHeight);
         const int bypassToggleW = 80;
-        harmonicBypassToggle.setBounds(bypassRow.removeFromLeft(bypassToggleW)
+        harmonicBypassToggle.setBounds(controlsRow.removeFromLeft(bypassToggleW)
                                           .withSizeKeepingCentre(bypassToggleW, kRowHeight));
+        
+        controlsRow.removeFromLeft(4);  // Gap after bypass
+        
+        // v4.4 beta: Oversampling toggles (NONE, 2X, 4X, 8X, 16X) - optimized sizes
+        const int osToggleW = 50;  // Width for each oversampling toggle
+        harmonicOversamplingNoneToggle.setBounds(controlsRow.removeFromLeft(osToggleW)
+                                                    .withSizeKeepingCentre(osToggleW, kRowHeight));
+        controlsRow.removeFromLeft(2);  // Small gap
+        harmonicOversampling2xToggle.setBounds(controlsRow.removeFromLeft(osToggleW)
+                                                   .withSizeKeepingCentre(osToggleW, kRowHeight));
+        controlsRow.removeFromLeft(2);
+        harmonicOversampling4xToggle.setBounds(controlsRow.removeFromLeft(osToggleW)
+                                                   .withSizeKeepingCentre(osToggleW, kRowHeight));
+        controlsRow.removeFromLeft(2);
+        harmonicOversampling8xToggle.setBounds(controlsRow.removeFromLeft(osToggleW)
+                                                   .withSizeKeepingCentre(osToggleW, kRowHeight));
+        controlsRow.removeFromLeft(2);
+        harmonicOversampling16xToggle.setBounds(controlsRow.removeFromLeft(osToggleW)
+                                                    .withSizeKeepingCentre(osToggleW, kRowHeight));
     }
 
     left.removeFromTop(2);
@@ -1749,6 +1773,17 @@ void BandControlsPanel::syncUiFromParams()
         
         // v4.4 beta: Harmonic bypass toggle (per-band, independent for each of 12 bands)
         setToggleFromParam(harmonicBypassToggle, "harmonicBypass");
+        
+        // v4.4 beta: Harmonic oversampling toggles - sync from parameter
+        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "harmonicOversampling")))
+        {
+            const int osValue = static_cast<int>(param->convertFrom0to1(param->getValue()));
+            harmonicOversamplingNoneToggle.setToggleState(osValue == 0, juce::dontSendNotification);
+            harmonicOversampling2xToggle.setToggleState(osValue == 1, juce::dontSendNotification);
+            harmonicOversampling4xToggle.setToggleState(osValue == 2, juce::dontSendNotification);
+            harmonicOversampling8xToggle.setToggleState(osValue == 3, juce::dontSendNotification);
+            harmonicOversampling16xToggle.setToggleState(osValue == 4, juce::dontSendNotification);
+        }
     }
     
     setSliderFromParam(thresholdSlider, "dynThresh");

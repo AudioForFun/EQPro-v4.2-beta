@@ -24,7 +24,7 @@ constexpr const char* kParamOddSuffix = "odd";
 constexpr const char* kParamMixOddSuffix = "mixOdd";
 constexpr const char* kParamEvenSuffix = "even";
 constexpr const char* kParamMixEvenSuffix = "mixEven";
-constexpr const char* kParamHarmonicBypassSuffix = "harmonicBypass";  // v4.4 beta: Harmonic bypass per band
+constexpr const char* kParamHarmonicBypassSuffix = "harmonicBypass";  // v4.4 beta: Harmonic bypass per band (independent for each of 12 bands)
 constexpr const char* kParamDynEnableSuffix = "dynEnable";
 constexpr const char* kParamDynModeSuffix = "dynMode";
 constexpr const char* kParamDynThreshSuffix = "dynThresh";
@@ -886,6 +886,7 @@ void EQProAudioProcessor::initializeParamPointers()
     linearQualityParam = parameters.getRawParameterValue(ParamIDs::linearQuality);
     linearWindowParam = parameters.getRawParameterValue(ParamIDs::linearWindow);
     oversamplingParam = parameters.getRawParameterValue(ParamIDs::oversampling);
+    harmonicLayerOversamplingParam = parameters.getRawParameterValue(ParamIDs::harmonicLayerOversampling);  // v4.5 beta: Global harmonic layer oversampling (applies to all bands uniformly)
     outputTrimParam = parameters.getRawParameterValue(ParamIDs::outputTrim);
     spectralEnableParam = parameters.getRawParameterValue(ParamIDs::spectralEnable);
     spectralThresholdParam = parameters.getRawParameterValue(ParamIDs::spectralThreshold);
@@ -935,7 +936,7 @@ void EQProAudioProcessor::initializeParamPointers()
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamEvenSuffix));
             bandParamPointers[ch][band].mixEven =
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamMixEvenSuffix));
-            // v4.4 beta: Harmonic bypass pointer (per-band, independent for each of 12 bands)
+            // v4.5 beta: Harmonic bypass pointer (per-band, independent for each of 12 bands)
             bandParamPointers[ch][band].harmonicBypass =
                 parameters.getRawParameterValue(ParamIDs::bandParamId(ch, band, kParamHarmonicBypassSuffix));
             bandParamPointers[ch][band].dynEnable =
@@ -977,9 +978,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         ParamIDs::linearWindow, "Linear Window",
         kLinearWindowChoices, 0));
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(
-        ParamIDs::oversampling, "Oversampling",
-        kOversamplingChoices, 0));
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(
+            ParamIDs::oversampling, "Oversampling",
+            kOversamplingChoices, 0));
+        
+        // v4.5 beta: Global Harmonic layer oversampling parameter (applies to all bands uniformly)
+        // This is a global parameter - when changed, all bands' harmonic processing uses the same oversampling factor
+        // Only available in Natural Phase and Linear Phase modes (disabled in Real-time)
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(
+            ParamIDs::harmonicLayerOversampling, "Harmonic Layer Oversampling",
+            juce::StringArray("NONE", "2X", "4X", "8X", "16X"),
+            0));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         ParamIDs::outputTrim, "Output Trim",
         juce::NormalisableRange<float>(-100.0f, 24.0f, 0.01f),
@@ -1147,7 +1156,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
                 juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
                 100.0f));
             
-            // v4.4 beta: Harmonic bypass parameter (per-band, independent for each of 12 bands)
+            // v4.5 beta: Harmonic bypass parameter (per-band, independent for each of 12 bands)
             params.push_back(std::make_unique<juce::AudioParameterBool>(
                 ParamIDs::bandParamId(ch, band, kParamHarmonicBypassSuffix),
                 ParamIDs::bandParamName(ch, band, "Harmonic Bypass"),
@@ -1670,6 +1679,7 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
     snapshot.linearQuality = (snapshot.phaseMode == 2) ? rawQuality : 4;
     snapshot.linearWindow = linearWindowParam != nullptr ? static_cast<int>(linearWindowParam->load()) : 0;
     snapshot.oversampling = oversamplingParam != nullptr ? static_cast<int>(oversamplingParam->load()) : 0;
+    snapshot.harmonicLayerOversampling = harmonicLayerOversamplingParam != nullptr ? static_cast<int>(harmonicLayerOversamplingParam->load()) : 0;  // v4.5 beta: Global harmonic layer oversampling (applies to all bands uniformly)
     snapshot.outputTrimDb = outputTrimParam != nullptr ? outputTrimParam->load() : 0.0f;
     snapshot.characterMode = characterModeParam != nullptr ? static_cast<int>(characterModeParam->load()) : 0;
     snapshot.smartSolo = smartSoloParam != nullptr && smartSoloParam->load() > 0.5f;

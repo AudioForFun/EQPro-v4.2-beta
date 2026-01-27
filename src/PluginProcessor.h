@@ -127,7 +127,7 @@ private:
         std::atomic<float>* mixOdd = nullptr;
         std::atomic<float>* even = nullptr;
         std::atomic<float>* mixEven = nullptr;
-        std::atomic<float>* harmonicBypass = nullptr;  // v4.4 beta: Bypass for harmonic layer (per-band)
+        std::atomic<float>* harmonicBypass = nullptr;  // v4.4 beta: Bypass for harmonic layer (per-band, independent)
         std::atomic<float>* bypass = nullptr;
         std::atomic<float>* msTarget = nullptr;
         std::atomic<float>* slope = nullptr;
@@ -164,6 +164,7 @@ private:
     std::atomic<float>* linearQualityParam = nullptr;
     std::atomic<float>* linearWindowParam = nullptr;
     std::atomic<float>* oversamplingParam = nullptr;
+    std::atomic<float>* harmonicLayerOversamplingParam = nullptr;  // v4.4 beta: Global harmonic layer oversampling
     std::atomic<float>* outputTrimParam = nullptr;
     std::atomic<float>* spectralEnableParam = nullptr;
     std::atomic<float>* spectralThresholdParam = nullptr;

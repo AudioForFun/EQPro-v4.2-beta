@@ -171,6 +171,45 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(linearQualityBox);
     linearQualityAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.getParameters(), ParamIDs::linearQuality, linearQualityBox);
+    
+    // v4.5 beta: Global Harmonic layer oversampling toggles (applies to all bands uniformly)
+    // Positioned next to "QUALITY" dropdown at the bottom to clearly indicate it's a global parameter
+    // Only available in Natural Phase and Linear Phase modes (disabled/greyed out in Real-time)
+    harmonicLayerOversamplingLabel.setText("HARMONIC LAYER OVERSAMPLING", juce::dontSendNotification);
+    harmonicLayerOversamplingLabel.setJustificationType(juce::Justification::centredLeft);
+    harmonicLayerOversamplingLabel.setFont(kLabelFontSize);
+    harmonicLayerOversamplingLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
+    addAndMakeVisible(harmonicLayerOversamplingLabel);
+    
+    auto initHarmonicOversamplingToggle = [this](juce::ToggleButton& toggle, const juce::String& text, int value)
+    {
+        toggle.setButtonText(text);
+        toggle.setClickingTogglesState(true);
+        toggle.setToggleState(false, juce::dontSendNotification);
+        toggle.setTooltip("Harmonic layer oversampling: " + text);
+        toggle.onClick = [this, value]
+        {
+            // Set all other toggles to false (exclusive group)
+            harmonicLayerOversamplingNoneToggle.setToggleState(value == 0, juce::dontSendNotification);
+            harmonicLayerOversampling2xToggle.setToggleState(value == 1, juce::dontSendNotification);
+            harmonicLayerOversampling4xToggle.setToggleState(value == 2, juce::dontSendNotification);
+            harmonicLayerOversampling8xToggle.setToggleState(value == 3, juce::dontSendNotification);
+            harmonicLayerOversampling16xToggle.setToggleState(value == 4, juce::dontSendNotification);
+            
+            // Set parameter value
+            if (auto* param = processorRef.getParameters().getParameter(ParamIDs::harmonicLayerOversampling))
+            {
+                param->setValueNotifyingHost(param->convertTo0to1(static_cast<float>(value)));
+            }
+        };
+        addAndMakeVisible(toggle);
+    };
+    
+    initHarmonicOversamplingToggle(harmonicLayerOversamplingNoneToggle, "NONE", 0);
+    initHarmonicOversamplingToggle(harmonicLayerOversampling2xToggle, "2X", 1);
+    initHarmonicOversamplingToggle(harmonicLayerOversampling4xToggle, "4X", 2);
+    initHarmonicOversamplingToggle(harmonicLayerOversampling8xToggle, "8X", 3);
+    initHarmonicOversamplingToggle(harmonicLayerOversampling16xToggle, "16X", 4);
 
     windowLabel.setText("WINDOW", juce::dontSendNotification);
     windowLabel.setJustificationType(juce::Justification::centredLeft);
@@ -381,12 +420,40 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         linearWindowBox.setEnabled(mode != 0);
         if (mode != 2)
             linearQualityBox.setSelectedItemIndex(4, juce::sendNotification);
+        
+        // v4.4 beta: Enable/disable harmonic layer oversampling toggles based on processing mode
+        // Only enabled for linear phase mode (mode == 2) and natural phase (mode == 1), disabled in realtime (mode == 0)
+        const bool oversamplingEnabled = (mode == 1 || mode == 2);  // Natural phase or Linear phase
+        harmonicLayerOversamplingNoneToggle.setEnabled(oversamplingEnabled);
+        harmonicLayerOversampling2xToggle.setEnabled(oversamplingEnabled);
+        harmonicLayerOversampling4xToggle.setEnabled(oversamplingEnabled);
+        harmonicLayerOversampling8xToggle.setEnabled(oversamplingEnabled);
+        harmonicLayerOversampling16xToggle.setEnabled(oversamplingEnabled);
+        
+        // Grey out when disabled
+        const float oversamplingAlpha = oversamplingEnabled ? 1.0f : 0.35f;
+        harmonicLayerOversamplingNoneToggle.setAlpha(oversamplingAlpha);
+        harmonicLayerOversampling2xToggle.setAlpha(oversamplingAlpha);
+        harmonicLayerOversampling4xToggle.setAlpha(oversamplingAlpha);
+        harmonicLayerOversampling8xToggle.setAlpha(oversamplingAlpha);
+        harmonicLayerOversampling16xToggle.setAlpha(oversamplingAlpha);
     };
     phaseModeBox.onChange = [updateQualityEnabled]
     {
         updateQualityEnabled();
     };
     updateQualityEnabled();
+    
+    // v4.5 beta: Sync harmonic layer oversampling toggle states from parameter
+    if (auto* param = processorRef.getParameters().getParameter(ParamIDs::harmonicLayerOversampling))
+    {
+        const int osValue = static_cast<int>(param->convertFrom0to1(param->getValue()));
+        harmonicLayerOversamplingNoneToggle.setToggleState(osValue == 0, juce::dontSendNotification);
+        harmonicLayerOversampling2xToggle.setToggleState(osValue == 1, juce::dontSendNotification);
+        harmonicLayerOversampling4xToggle.setToggleState(osValue == 2, juce::dontSendNotification);
+        harmonicLayerOversampling8xToggle.setToggleState(osValue == 3, juce::dontSendNotification);
+        harmonicLayerOversampling16xToggle.setToggleState(osValue == 4, juce::dontSendNotification);
+    }
 
 
     auto initSectionLabel = [this](juce::Label& label, const juce::String& text)
@@ -1441,6 +1508,23 @@ void EQProAudioProcessorEditor::resized()
         qualityLabel.getFont().getStringWidthFloat(qualityLabel.getText()) + 10 * uiScale);
     qualityLabel.setBounds(processingRow.removeFromLeft(qualityLabelWidth));
     linearQualityBox.setBounds(processingRow.removeFromLeft(static_cast<int>(120 * uiScale)));
+    
+    // v4.4 beta: Global Harmonic layer oversampling toggles (next to quality)
+    processingRow.removeFromLeft(static_cast<int>(8 * uiScale));  // Gap
+    const int harmonicOversamplingLabelWidth = static_cast<int>(
+        harmonicLayerOversamplingLabel.getFont().getStringWidthFloat(harmonicLayerOversamplingLabel.getText()) + 10 * uiScale);
+    harmonicLayerOversamplingLabel.setBounds(processingRow.removeFromLeft(harmonicOversamplingLabelWidth));
+    const int toggleWidth = static_cast<int>(50 * uiScale);
+    const int toggleGap = static_cast<int>(4 * uiScale);
+    harmonicLayerOversamplingNoneToggle.setBounds(processingRow.removeFromLeft(toggleWidth));
+    processingRow.removeFromLeft(toggleGap);
+    harmonicLayerOversampling2xToggle.setBounds(processingRow.removeFromLeft(toggleWidth));
+    processingRow.removeFromLeft(toggleGap);
+    harmonicLayerOversampling4xToggle.setBounds(processingRow.removeFromLeft(toggleWidth));
+    processingRow.removeFromLeft(toggleGap);
+    harmonicLayerOversampling8xToggle.setBounds(processingRow.removeFromLeft(toggleWidth));
+    processingRow.removeFromLeft(toggleGap);
+    harmonicLayerOversampling16xToggle.setBounds(processingRow.removeFromLeft(toggleWidth));
     const auto bandArea = controlsArea.reduced(static_cast<int>(6 * uiScale), 0);
     bandBounds = bandArea;
     bandControls.setBounds(bandArea);

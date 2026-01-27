@@ -1447,8 +1447,19 @@ void BandControlsPanel::resized()
     auto right = bounds;
 
     auto headerRow = left.removeFromTop(kRowHeight);
-    // v4.4 beta: Reduced width from 100 to 60 since "BAND" label removed, saving space
-    titleLabel.setBounds(headerRow.removeFromLeft(60));
+    
+    // v4.4 beta: Layer toggle buttons on the LEFT, optimized sizes based on text length
+    // EQ toggle: smaller (short text "EQ")
+    const int eqToggleW = 45;  // Optimized for "EQ" text
+    eqLayerToggle.setBounds(headerRow.removeFromLeft(eqToggleW));
+    headerRow.removeFromLeft(2);  // Small gap between toggles
+    // Harmonic toggle: larger (longer text "HARMONIC")
+    const int harmonicToggleW = 95;  // Optimized for "HARMONIC" text
+    harmonicLayerToggle.setBounds(headerRow.removeFromLeft(harmonicToggleW));
+    
+    headerRow.removeFromLeft(4);  // Gap after toggles
+    
+    // Action buttons in the middle
     const int btnW = 58;
     const int resetW = 86;
     copyButton.setBounds(headerRow.removeFromLeft(btnW));
@@ -1459,12 +1470,9 @@ void BandControlsPanel::resized()
     prevBandButton.setBounds(headerRow.removeFromLeft(navW));
     nextBandButton.setBounds(headerRow.removeFromLeft(navW));
     
-    // v4.4 beta: Layer toggle buttons next to band navigator
-    headerRow.removeFromLeft(4);  // Small gap
-    const int layerToggleW = 70;
-    eqLayerToggle.setBounds(headerRow.removeFromLeft(layerToggleW));
-    headerRow.removeFromLeft(2);  // Small gap between toggles
-    harmonicLayerToggle.setBounds(headerRow.removeFromLeft(layerToggleW));
+    // v4.4 beta: Band number on the RIGHT
+    // Reduced width from 100 to 60 since "BAND" label removed, saving space
+    titleLabel.setBounds(headerRow.removeFromRight(60));
     
     eqSectionLabel.setBounds({0, 0, 0, 0});
 

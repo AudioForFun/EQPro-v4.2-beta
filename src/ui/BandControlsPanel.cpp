@@ -1429,7 +1429,35 @@ void BandControlsPanel::updateComboBoxWidths()
     juce::StringArray msLabels;
     for (int i = 0; i < msBox.getNumItems(); ++i)
         msLabels.add(msBox.getItemText(i + 1));
-    comboWidthMs = computeWidth(msLabels, font) + padding;
+    int currentMsWidth = computeWidth(msLabels, font);
+    
+    // Also check against longest possible immersive format channel names to ensure dropdown is wide enough.
+    // Longest possible channel names from immersive formats (9.1.6, 7.1.4, etc.):
+    // Note: MS dropdown can have labels like "STEREO TOP FRONT", "STEREO TOP REAR", "STEREO TOP MIDDLE"
+    const juce::StringArray immersiveTestNames = {
+        "TML",                  // Top Middle Left (longest 3-char name)
+        "TMR",                  // Top Middle Right
+        "TFL",                  // Top Front Left
+        "TFR",                  // Top Front Right
+        "TRL",                  // Top Rear Left
+        "TRR",                  // Top Rear Right
+        "Bfl",                  // Bottom Front Left
+        "Bfr",                  // Bottom Front Right
+        "LFE2",                 // Longest single name (4 chars)
+        "Lrs",                  // Left Rear Surround
+        "Rrs",                  // Right Rear Surround
+        "Lw",                   // Wide Left
+        "Rw",                   // Wide Right
+        "Stereo Front",         // From kMsChoices
+        "STEREO TOP FRONT",     // Longest MS label from immersive formats
+        "STEREO TOP REAR",      // Long MS label
+        "STEREO TOP MIDDLE",    // Longest MS label (17 chars)
+        "All"                   // From kMsChoices
+    };
+    int immersiveWidth = computeWidth(immersiveTestNames, font);
+    
+    // Use the maximum of current items and longest possible immersive names.
+    comboWidthMs = juce::jmax(currentMsWidth, immersiveWidth) + padding;
 
     juce::StringArray slopeLabels;
     for (int i = 0; i < slopeBox.getNumItems(); ++i)

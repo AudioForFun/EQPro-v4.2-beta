@@ -1188,13 +1188,47 @@ void EQProAudioProcessorEditor::refreshChannelLayout()
     const int previousSelection = selectedChannel;
     const auto pairLabels = buildPairLabels();
     channelSelector.clear(juce::dontSendNotification);
+    
+    // Find the longest possible channel label to size the dropdown appropriately.
+    // Check all possible immersive format channel names (longest would be like "TML (TML/TMR)").
+    const float uiScale = 1.0f;
+    int maxLabelWidth = 0;
+    juce::Font labelFont = channelSelector.getLookAndFeel().getComboBoxFont(channelSelector);
+    
     for (int i = 0; i < static_cast<int>(channelNames.size()); ++i)
     {
         const auto& name = channelNames[static_cast<size_t>(i)];
         const auto& pair = pairLabels[static_cast<size_t>(i)];
         const juce::String label = pair.isNotEmpty() ? (name + " (" + pair + ")") : name;
         channelSelector.addItem(label, i + 1);
+        
+        // Calculate width needed for this label.
+        const int labelWidth = static_cast<int>(labelFont.getStringWidthFloat(label));
+        maxLabelWidth = juce::jmax(maxLabelWidth, labelWidth);
     }
+    
+    // Also check potential longest names from immersive formats that might not be in current layout.
+    // Longest possible: "TML (TML/TMR)" = 15 chars, "Bfl (Bfl/Bfr)" = 13 chars, "Lrs (Lrs/Rrs)" = 12 chars
+    const juce::StringArray testLabels = {
+        "TML (TML/TMR)",  // Longest from immersive formats
+        "TMR (TML/TMR)",
+        "Bfl (Bfl/Bfr)",
+        "Bfr (Bfl/Bfr)",
+        "Lrs (Lrs/Rrs)",
+        "Rrs (Lrs/Rrs)",
+        "TFL (TFL/TFR)",
+        "TRL (TRL/TRR)",
+        "Lw (Lw/Rw)",
+        "LFE2"  // Longest single name
+    };
+    for (const auto& testLabel : testLabels)
+    {
+        const int testWidth = static_cast<int>(labelFont.getStringWidthFloat(testLabel));
+        maxLabelWidth = juce::jmax(maxLabelWidth, testWidth);
+    }
+    
+    // Store the maximum width for use in layout (add padding for dropdown arrow and margins).
+    channelSelectorMaxWidth = maxLabelWidth + static_cast<int>(40 * uiScale);
 
     const int maxIndex = juce::jmax(0, static_cast<int>(channelNames.size()) - 1);
     selectedChannel = juce::jlimit(0, maxIndex, previousSelection);
@@ -1409,8 +1443,18 @@ void EQProAudioProcessorEditor::resized()
     qModeBox.setBounds({0, 0, 0, 0});
     qAmountLabel.setBounds({0, 0, 0, 0});
     qAmountSlider.setBounds({0, 0, 0, 0});
+    // Channel selector: use calculated max width to accommodate longest channel names (immersive formats).
+    // If max width hasn't been calculated yet, use a reasonable default.
+    const int channelSelectorWidth = channelSelectorMaxWidth > 0 
+        ? channelSelectorMaxWidth 
+        : static_cast<int>(180 * uiScale);  // Default fallback width
+    const int channelLabelWidth = static_cast<int>(
+        channelLabel.getFont().getStringWidthFloat(channelLabel.getText()) + 8 * uiScale);
+    
+    // Position channel selector in top bar if there's space, otherwise keep it hidden for now.
+    // For now, keep it hidden but with proper width calculation for when it's displayed.
     channelLabel.setBounds({0, 0, 0, 0});
-    channelSelector.setBounds({0, 0, 0, 0});
+    channelSelector.setBounds({0, 0, channelSelectorWidth, static_cast<int>(24 * uiScale)});
     msViewToggle.setBounds({0, 0, 0, 0});
     gainScaleSlider.setBounds({0, 0, 0, 0});
     phaseInvertToggle.setBounds({0, 0, 0, 0});

@@ -148,6 +148,7 @@ private:
     int selectedChannel = 0;
     std::vector<juce::String> cachedChannelNames;
     juce::String cachedLayoutDescription;
+    int channelSelectorMaxWidth = 0;  // Maximum width needed for longest channel name
 
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::unique_ptr<ButtonAttachment> globalBypassAttachment;

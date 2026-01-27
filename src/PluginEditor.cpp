@@ -421,22 +421,26 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         if (mode != 2)
             linearQualityBox.setSelectedItemIndex(4, juce::sendNotification);
         
-        // v4.4 beta: Enable/disable harmonic layer oversampling toggles based on processing mode
-        // Only enabled for linear phase mode (mode == 2) and natural phase (mode == 1), disabled in realtime (mode == 0)
-        const bool oversamplingEnabled = (mode == 1 || mode == 2);  // Natural phase or Linear phase
+        // v4.5 beta: Enable/disable harmonic layer oversampling toggles based on processing mode
+        // Enabled for Natural Phase (mode == 1) and Linear Phase (mode == 2), disabled in Real-time (mode == 0)
+        // Works with all quality settings in Natural and Linear modes
+        const bool oversamplingEnabled = (mode == 1 || mode == 2);  // Natural phase (1) or Linear phase (2)
         harmonicLayerOversamplingNoneToggle.setEnabled(oversamplingEnabled);
         harmonicLayerOversampling2xToggle.setEnabled(oversamplingEnabled);
         harmonicLayerOversampling4xToggle.setEnabled(oversamplingEnabled);
         harmonicLayerOversampling8xToggle.setEnabled(oversamplingEnabled);
         harmonicLayerOversampling16xToggle.setEnabled(oversamplingEnabled);
         
-        // Grey out when disabled
+        // Grey out when disabled (Real-time mode)
         const float oversamplingAlpha = oversamplingEnabled ? 1.0f : 0.35f;
         harmonicLayerOversamplingNoneToggle.setAlpha(oversamplingAlpha);
         harmonicLayerOversampling2xToggle.setAlpha(oversamplingAlpha);
         harmonicLayerOversampling4xToggle.setAlpha(oversamplingAlpha);
         harmonicLayerOversampling8xToggle.setAlpha(oversamplingAlpha);
         harmonicLayerOversampling16xToggle.setAlpha(oversamplingAlpha);
+        
+        // Also update label visibility/alpha
+        harmonicLayerOversamplingLabel.setAlpha(oversamplingAlpha);
     };
     phaseModeBox.onChange = [updateQualityEnabled]
     {
@@ -1212,6 +1216,29 @@ void EQProAudioProcessorEditor::timerCallback()
             }
         }
     }
+    
+    // v4.5 beta: Periodically update oversampling toggle enable/disable state based on phase mode
+    // This ensures the toggles are correctly enabled when switching to Natural or Linear phase
+    static int updateCounter = 0;
+    if (++updateCounter >= 10)  // Update every 5 seconds (2Hz timer, 10 ticks = 5 seconds)
+    {
+        updateCounter = 0;
+        const int mode = phaseModeBox.getSelectedItemIndex();
+        const bool oversamplingEnabled = (mode == 1 || mode == 2);  // Natural (1) or Linear (2) phase
+        harmonicLayerOversamplingNoneToggle.setEnabled(oversamplingEnabled);
+        harmonicLayerOversampling2xToggle.setEnabled(oversamplingEnabled);
+        harmonicLayerOversampling4xToggle.setEnabled(oversamplingEnabled);
+        harmonicLayerOversampling8xToggle.setEnabled(oversamplingEnabled);
+        harmonicLayerOversampling16xToggle.setEnabled(oversamplingEnabled);
+        const float oversamplingAlpha = oversamplingEnabled ? 1.0f : 0.35f;
+        harmonicLayerOversamplingNoneToggle.setAlpha(oversamplingAlpha);
+        harmonicLayerOversampling2xToggle.setAlpha(oversamplingAlpha);
+        harmonicLayerOversampling4xToggle.setAlpha(oversamplingAlpha);
+        harmonicLayerOversampling8xToggle.setAlpha(oversamplingAlpha);
+        harmonicLayerOversampling16xToggle.setAlpha(oversamplingAlpha);
+        harmonicLayerOversamplingLabel.setAlpha(oversamplingAlpha);
+    }
+    
     refreshChannelLayout();
 }
 
@@ -1509,8 +1536,9 @@ void EQProAudioProcessorEditor::resized()
     qualityLabel.setBounds(processingRow.removeFromLeft(qualityLabelWidth));
     linearQualityBox.setBounds(processingRow.removeFromLeft(static_cast<int>(120 * uiScale)));
     
-    // v4.4 beta: Global Harmonic layer oversampling toggles (next to quality)
-    processingRow.removeFromLeft(static_cast<int>(8 * uiScale));  // Gap
+    // v4.5 beta: Global Harmonic layer oversampling toggles (next to quality at the bottom)
+    // These are always visible and positioned next to the quality dropdown
+    processingRow.removeFromLeft(static_cast<int>(8 * uiScale));  // Gap after quality
     const int harmonicOversamplingLabelWidth = static_cast<int>(
         harmonicLayerOversamplingLabel.getFont().getStringWidthFloat(harmonicLayerOversamplingLabel.getText()) + 10 * uiScale);
     harmonicLayerOversamplingLabel.setBounds(processingRow.removeFromLeft(harmonicOversamplingLabelWidth));

@@ -1594,31 +1594,12 @@ void BandControlsPanel::resized()
         const int slopeWidth = juce::jmin(slopeCol.getWidth(), comboWidthSlope);
         slopeBox.setBounds(slopeCol.withHeight(kComboHeight).withSizeKeepingCentre(slopeWidth, kComboHeight));
     }
-    else  // Harmonic layer: show bypass toggle and oversampling toggles
+    else  // Harmonic layer: show bypass toggle only (oversampling is global, shown in PluginEditor)
     {
         auto controlsRow = left.removeFromTop(kRowHeight);
         const int bypassToggleW = 80;
         harmonicBypassToggle.setBounds(controlsRow.removeFromLeft(bypassToggleW)
                                           .withSizeKeepingCentre(bypassToggleW, kRowHeight));
-        
-        controlsRow.removeFromLeft(4);  // Gap after bypass
-        
-        // v4.4 beta: Oversampling toggles (NONE, 2X, 4X, 8X, 16X) - optimized sizes
-        const int osToggleW = 50;  // Width for each oversampling toggle
-        harmonicOversamplingNoneToggle.setBounds(controlsRow.removeFromLeft(osToggleW)
-                                                    .withSizeKeepingCentre(osToggleW, kRowHeight));
-        controlsRow.removeFromLeft(2);  // Small gap
-        harmonicOversampling2xToggle.setBounds(controlsRow.removeFromLeft(osToggleW)
-                                                   .withSizeKeepingCentre(osToggleW, kRowHeight));
-        controlsRow.removeFromLeft(2);
-        harmonicOversampling4xToggle.setBounds(controlsRow.removeFromLeft(osToggleW)
-                                                   .withSizeKeepingCentre(osToggleW, kRowHeight));
-        controlsRow.removeFromLeft(2);
-        harmonicOversampling8xToggle.setBounds(controlsRow.removeFromLeft(osToggleW)
-                                                   .withSizeKeepingCentre(osToggleW, kRowHeight));
-        controlsRow.removeFromLeft(2);
-        harmonicOversampling16xToggle.setBounds(controlsRow.removeFromLeft(osToggleW)
-                                                    .withSizeKeepingCentre(osToggleW, kRowHeight));
     }
 
     left.removeFromTop(2);
@@ -1771,19 +1752,9 @@ void BandControlsPanel::syncUiFromParams()
         setSliderFromParam(evenHarmonicSlider, "even");
         setSliderFromParam(mixEvenSlider, "mixEven");
         
-        // v4.4 beta: Harmonic bypass toggle (per-band, independent for each of 12 bands)
+        // v4.5 beta: Harmonic bypass toggle (per-band, independent for each of 12 bands)
         setToggleFromParam(harmonicBypassToggle, "harmonicBypass");
-        
-        // v4.4 beta: Harmonic oversampling toggles - sync from parameter
-        if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "harmonicOversampling")))
-        {
-            const int osValue = static_cast<int>(param->convertFrom0to1(param->getValue()));
-            harmonicOversamplingNoneToggle.setToggleState(osValue == 0, juce::dontSendNotification);
-            harmonicOversampling2xToggle.setToggleState(osValue == 1, juce::dontSendNotification);
-            harmonicOversampling4xToggle.setToggleState(osValue == 2, juce::dontSendNotification);
-            harmonicOversampling8xToggle.setToggleState(osValue == 3, juce::dontSendNotification);
-            harmonicOversampling16xToggle.setToggleState(osValue == 4, juce::dontSendNotification);
-        }
+        // Note: Oversampling is global and controlled in PluginEditor, not here
     }
     
     setSliderFromParam(thresholdSlider, "dynThresh");

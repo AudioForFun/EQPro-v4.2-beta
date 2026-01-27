@@ -255,10 +255,10 @@ private:
 
     ThemeColors theme = makeDarkTheme();
     CompactComboLookAndFeel compactComboLookAndFeel;
-    SlopeComboLookAndFeel slopeComboLookAndFeel;  // v4.4 beta: Larger font for slope dropdown
+    SlopeComboLookAndFeel slopeComboLookAndFeel;  // v4.5 beta: Larger font for slope dropdown
     bool msEnabled = true;
     bool suppressParamCallbacks = false;
-    bool hasBeenResized = false;  // v4.4 beta: Defer timer start until after first resize
+    bool hasBeenResized = false;  // v4.5 beta: Defer timer start until after first resize
     std::optional<BandState> clipboard;
     float detectorDb = -60.0f;
     // Lightweight hover/selection fades for the band strip.

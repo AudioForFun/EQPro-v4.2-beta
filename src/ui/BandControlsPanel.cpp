@@ -329,7 +329,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     initLabel(msLabel, "CHANNEL");
     initLabel(slopeLabel, "SLOPE");
     initLabel(mixLabel, "BAND MIX");
-    // v4.4 beta: Harmonic layer labels
+    // v4.5 beta: Harmonic layer labels
     initLabel(oddLabel, "ODD");
     initLabel(mixOddLabel, "MIX ODD");
     initLabel(evenLabel, "EVEN");
@@ -825,7 +825,7 @@ void BandControlsPanel::setTheme(const ThemeColors& newTheme)
     msLabel.setColour(juce::Label::textColourId, theme.textMuted);
     slopeLabel.setColour(juce::Label::textColourId, theme.textMuted);
     mixLabel.setColour(juce::Label::textColourId, theme.textMuted);
-    // v4.4 beta: Harmonic layer labels
+    // v4.5 beta: Harmonic layer labels
     oddLabel.setColour(juce::Label::textColourId, theme.textMuted);
     mixOddLabel.setColour(juce::Label::textColourId, theme.textMuted);
     evenLabel.setColour(juce::Label::textColourId, theme.textMuted);

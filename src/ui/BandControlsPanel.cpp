@@ -6,59 +6,61 @@
 
 namespace
 {
+// v4.4 beta: All labels in uppercase for graphical consistency
 const juce::StringArray kFilterTypeChoices {
-    "Bell",
-    "Low Shelf",
-    "High Shelf",
-    "Low Pass",
-    "High Pass",
-    "Notch",
-    "Band Pass",
-    "All Pass",
-    "Tilt",
-    "Flat Tilt"
+    "BELL",
+    "LOW SHELF",
+    "HIGH SHELF",
+    "LOW PASS",
+    "HIGH PASS",
+    "NOTCH",
+    "BAND PASS",
+    "ALL PASS",
+    "TILT",
+    "FLAT TILT"
 };
 
+// v4.4 beta: All labels in uppercase for graphical consistency
 const juce::StringArray kMsChoices {
-    "All",
-    "Stereo Front",
+    "ALL",
+    "STEREO FRONT",
     "L",
     "R",
-    "Mid Front",
-    "Side Front",
+    "MID FRONT",
+    "SIDE FRONT",
     "C",
     "LFE",
-    "Stereo Rear",
-    "Ls",
-    "Rs",
-    "Mid Rear",
-    "Side Rear",
-    "Stereo Lateral",
-    "Lrs",
-    "Rrs",
-    "Mid Lateral",
-    "Side Lateral",
-    "Cs",
-    "Stereo Front Wide",
-    "Lw",
-    "Rw",
-    "Mid Front Wide",
-    "Side Front Wide",
-    "Stereo Top Front",
+    "STEREO REAR",
+    "LS",
+    "RS",
+    "MID REAR",
+    "SIDE REAR",
+    "STEREO LATERAL",
+    "LRS",
+    "RRS",
+    "MID LATERAL",
+    "SIDE LATERAL",
+    "CS",
+    "STEREO FRONT WIDE",
+    "LW",
+    "RW",
+    "MID FRONT WIDE",
+    "SIDE FRONT WIDE",
+    "STEREO TOP FRONT",
     "TFL",
     "TFR",
-    "Mid Top Front",
-    "Side Top Front",
-    "Stereo Top Rear",
+    "MID TOP FRONT",
+    "SIDE TOP FRONT",
+    "STEREO TOP REAR",
     "TRL",
     "TRR",
-    "Mid Top Rear",
-    "Side Top Rear",
-    "Stereo Top Middle",
+    "MID TOP REAR",
+    "SIDE TOP REAR",
+    "STEREO TOP MIDDLE",
     "TML",
     "TMR",
-    "Mid Top Middle",
-    "Side Top Middle"
+    "MID TOP MIDDLE",
+    "SIDE TOP MIDDLE"
 };
 
 enum MsChoiceIndex
@@ -155,37 +157,38 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         fade.setCurrentAndTargetValue(1.0f);
     }
 
-    titleLabel.setText("Band 1 / " + juce::String(ParamIDs::kBandsPerChannel), juce::dontSendNotification);
+    titleLabel.setText("BAND 1 / " + juce::String(ParamIDs::kBandsPerChannel), juce::dontSendNotification);
     titleLabel.setJustificationType(juce::Justification::centred);
     titleLabel.setColour(juce::Label::textColourId, theme.text);
     addAndMakeVisible(titleLabel);
 
-    eqSectionLabel.setText("EQ Parameters", juce::dontSendNotification);
+    eqSectionLabel.setText("EQ PARAMETERS", juce::dontSendNotification);
     eqSectionLabel.setJustificationType(juce::Justification::centredLeft);
     eqSectionLabel.setFont(juce::Font(12.0f, juce::Font::bold));
     eqSectionLabel.setColour(juce::Label::textColourId, theme.accent);
     addAndMakeVisible(eqSectionLabel);
     eqSectionLabel.setVisible(false);
 
-    copyButton.setButtonText("Copy");
+    // v4.4 beta: All button text in uppercase for graphical consistency
+    copyButton.setButtonText("COPY");
     copyButton.setTooltip("Copy this band's settings");
     copyButton.onClick = [this] { copyBandState(); };
     addAndMakeVisible(copyButton);
     copyButton.setVisible(true);
 
-    pasteButton.setButtonText("Paste");
+    pasteButton.setButtonText("PASTE");
     pasteButton.setTooltip("Paste copied band settings");
     pasteButton.onClick = [this] { pasteBandState(); };
     addAndMakeVisible(pasteButton);
     pasteButton.setVisible(true);
 
-    defaultButton.setButtonText("Reset Band");
+    defaultButton.setButtonText("RESET BAND");
     defaultButton.setTooltip("Reset current band");
     defaultButton.onClick = [this] { resetSelectedBand(); };
     addAndMakeVisible(defaultButton);
     defaultButton.setVisible(true);
 
-    resetAllButton.setButtonText("Reset All");
+    resetAllButton.setButtonText("RESET ALL");
     resetAllButton.setTooltip("Reset all bands");
     resetAllButton.onClick = [this] { resetAllBands(); };
     addAndMakeVisible(resetAllButton);
@@ -279,16 +282,17 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         addAndMakeVisible(label);
     };
 
-    initLabel(freqLabel, "Freq");
-    initLabel(gainLabel, "Gain");
+    // v4.4 beta: All labels in uppercase for graphical consistency
+    initLabel(freqLabel, "FREQ");
+    initLabel(gainLabel, "GAIN");
     initLabel(qLabel, "Q");
-    initLabel(typeLabel, "Type");
-    initLabel(msLabel, "Channel");
-    initLabel(slopeLabel, "Slope");
-    initLabel(mixLabel, "Band Mix");
-    initLabel(thresholdLabel, "Thresh");
-    initLabel(attackLabel, "Attack");
-    initLabel(releaseLabel, "Release");
+    initLabel(typeLabel, "TYPE");
+    initLabel(msLabel, "CHANNEL");
+    initLabel(slopeLabel, "SLOPE");
+    initLabel(mixLabel, "BAND MIX");
+    initLabel(thresholdLabel, "THRESH");
+    initLabel(attackLabel, "ATTACK");
+    initLabel(releaseLabel, "RELEASE");
 
     freqSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     const int knobTextW = 68;
@@ -395,7 +399,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     for (int i = 0; i < 16; ++i)
     {
         const int slopeValue = 6 * (i + 1);
-        slopeBox.addItem(juce::String(slopeValue) + " dB", i + 1);
+        // v4.4 beta: Uppercase for consistency
+        slopeBox.addItem(juce::String(slopeValue) + " DB", i + 1);
     }
     slopeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     slopeBox.setColour(juce::ComboBox::textColourId, theme.text);
@@ -436,7 +441,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         cacheBandFromUi(selectedChannel, selectedBand);
     };
 
-    dynEnableToggle.setButtonText("Dynamic");
+    dynEnableToggle.setButtonText("DYNAMIC");
     dynEnableToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     addAndMakeVisible(dynEnableToggle);
     dynEnableToggle.onClick = [this]
@@ -470,7 +475,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     addAndMakeVisible(dynUpButton);
     addAndMakeVisible(dynDownButton);
 
-    dynExternalToggle.setButtonText("Ext SC");
+    dynExternalToggle.setButtonText("EXT SC");
     dynExternalToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     addAndMakeVisible(dynExternalToggle);
     dynExternalToggle.onClick = [this]
@@ -533,7 +538,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
         cacheBandFromUi(selectedChannel, selectedBand);
     };
 
-    autoScaleToggle.setButtonText("Auto Scale");
+    autoScaleToggle.setButtonText("AUTO SCALE");
     autoScaleToggle.setColour(juce::ToggleButton::textColourId, theme.textMuted);
     addAndMakeVisible(autoScaleToggle);
     autoScaleToggle.onClick = [this]
@@ -578,7 +583,8 @@ void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
     selectedChannel = juce::jlimit(0, ParamIDs::kMaxChannels - 1, channelIndex);
     selectedBand = juce::jlimit(0, ParamIDs::kBandsPerChannel - 1, bandIndex);
 
-    titleLabel.setText("Band " + juce::String(selectedBand + 1)
+    // v4.4 beta: Uppercase for consistency
+    titleLabel.setText("BAND " + juce::String(selectedBand + 1)
                            + " / " + juce::String(ParamIDs::kBandsPerChannel),
                        juce::dontSendNotification);
     for (int i = 0; i < static_cast<int>(bandSelectButtons.size()); ++i)
@@ -1676,8 +1682,8 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsLeft, "L");
             addChoice(kMsRight, "R");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
             addChoice(kMsMidFront, "MID FRONT");
             addChoice(kMsMidRear, "MID REAR");
             addChoice(kMsSideFront, "SIDE FRONT");
@@ -1690,8 +1696,8 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsRight, "R");
             addChoice(kMsLfe, "LFE");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
             addChoice(kMsMidFront, "MID FRONT");
             addChoice(kMsMidRear, "MID REAR");
             addChoice(kMsSideFront, "SIDE FRONT");
@@ -1704,8 +1710,8 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsRight, "R");
             addChoice(kMsCentre, "C");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
             addChoice(kMsMidFront, "MID FRONT");
             addChoice(kMsMidRear, "MID REAR");
             break;
@@ -1715,8 +1721,8 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsLeft, "L");
             addChoice(kMsRight, "R");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
             addChoice(kMsCentre, "C");
             addChoice(kMsMidFront, "MID FRONT");
             addChoice(kMsMidRear, "MID REAR");
@@ -1731,8 +1737,8 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsCentre, "C");
             addChoice(kMsLfe, "LFE");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
             addChoice(kMsMidFront, "MID FRONT");
             addChoice(kMsMidRear, "MID REAR");
             addChoice(kMsSideFront, "SIDE FRONT");
@@ -1744,8 +1750,8 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsLeft, "L");
             addChoice(kMsRight, "R");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
             addChoice(kMsCentre, "C");
             addChoice(kMsLfe, "LFE");
             addChoice(kMsMidFront, "MID FRONT");
@@ -1760,9 +1766,9 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsRight, "R");
             addChoice(kMsCentre, "C");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
-            addChoice(kMsCs, "Cs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
+            addChoice(kMsCs, "CS");
             addChoice(kMsMidFront, "MID FRONT");
             addChoice(kMsMidRear, "MID REAR");
             addChoice(kMsSideFront, "SIDE FRONT");
@@ -1776,9 +1782,9 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsCentre, "C");
             addChoice(kMsLfe, "LFE");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
-            addChoice(kMsCs, "Cs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
+            addChoice(kMsCs, "CS");
             addChoice(kMsMidFront, "MID FRONT");
             addChoice(kMsMidRear, "MID REAR");
             addChoice(kMsSideFront, "SIDE FRONT");
@@ -1791,11 +1797,11 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsRight, "R");
             addChoice(kMsCentre, "C");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
             addChoice(kMsStereoLateral, "STEREO LATERAL");
-            addChoice(kMsLrs, "Lrs");
-            addChoice(kMsRrs, "Rrs");
+            addChoice(kMsLrs, "LRS");
+            addChoice(kMsRrs, "RRS");
             addChoice(kMsMidFront, "MID FRONT");
             addChoice(kMsMidRear, "MID REAR");
             addChoice(kMsMidLateral, "MID LATERAL");
@@ -1811,11 +1817,11 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsCentre, "C");
             addChoice(kMsLfe, "LFE");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
             addChoice(kMsStereoLateral, "STEREO LATERAL");
-            addChoice(kMsLrs, "Lrs");
-            addChoice(kMsRrs, "Rrs");
+            addChoice(kMsLrs, "LRS");
+            addChoice(kMsRrs, "RRS");
             addChoice(kMsMidFront, "MID FRONT");
             addChoice(kMsMidRear, "MID REAR");
             addChoice(kMsMidLateral, "MID LATERAL");
@@ -1826,13 +1832,13 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsLeft, "L");
             addChoice(kMsRight, "R");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
             addChoice(kMsCentre, "C");
             addChoice(kMsLfe, "LFE");
             addChoice(kMsStereoLateral, "STEREO LATERAL");
-            addChoice(kMsLrs, "Lrs");
-            addChoice(kMsRrs, "Rrs");
+            addChoice(kMsLrs, "LRS");
+            addChoice(kMsRrs, "RRS");
             addChoice(kMsMidFront, "MID FRONT");
             addChoice(kMsMidRear, "MID REAR");
             addChoice(kMsMidLateral, "MID LATERAL");
@@ -1848,14 +1854,14 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsCentre, "C");
             addChoice(kMsLfe, "LFE");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
             addChoice(kMsStereoLateral, "STEREO LATERAL");
-            addChoice(kMsLrs, "Lrs");
-            addChoice(kMsRrs, "Rrs");
+            addChoice(kMsLrs, "LRS");
+            addChoice(kMsRrs, "RRS");
             addChoice(kMsStereoTopFront, "STEREO TOP FRONT");
-            addChoice(kMsTfl, "Top Front Left (TFL)");
-            addChoice(kMsTfr, "Top Front Right (TFR)");
+            addChoice(kMsTfl, "TOP FRONT LEFT (TFL)");
+            addChoice(kMsTfr, "TOP FRONT RIGHT (TFR)");
             addChoice(kMsMidFront, "MID FRONT");
             addChoice(kMsMidRear, "MID REAR");
             addChoice(kMsMidLateral, "MID LATERAL");
@@ -1873,17 +1879,17 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsCentre, "C");
             addChoice(kMsLfe, "LFE");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
             addChoice(kMsStereoLateral, "STEREO LATERAL");
-            addChoice(kMsLrs, "Lrs");
-            addChoice(kMsRrs, "Rrs");
+            addChoice(kMsLrs, "LRS");
+            addChoice(kMsRrs, "RRS");
             addChoice(kMsStereoTopFront, "STEREO TOP FRONT");
-            addChoice(kMsTfl, "Top Front Left (TFL)");
-            addChoice(kMsTfr, "Top Front Right (TFR)");
+            addChoice(kMsTfl, "TOP FRONT LEFT (TFL)");
+            addChoice(kMsTfr, "TOP FRONT RIGHT (TFR)");
             addChoice(kMsStereoTopRear, "STEREO TOP REAR");
-            addChoice(kMsTrl, "Top Rear Left (TRL)");
-            addChoice(kMsTrr, "Top Rear Right (TRR)");
+            addChoice(kMsTrl, "TOP REAR LEFT (TRL)");
+            addChoice(kMsTrr, "TOP REAR RIGHT (TRR)");
             addChoice(kMsMidFront, "MID FRONT");
             addChoice(kMsMidRear, "MID REAR");
             addChoice(kMsMidLateral, "MID LATERAL");
@@ -1902,23 +1908,23 @@ void BandControlsPanel::updateMsChoices()
             addChoice(kMsCentre, "C");
             addChoice(kMsLfe, "LFE");
             addChoice(kMsStereoRear, "STEREO REAR");
-            addChoice(kMsLs, "Ls");
-            addChoice(kMsRs, "Rs");
+            addChoice(kMsLs, "LS");
+            addChoice(kMsRs, "RS");
             addChoice(kMsStereoLateral, "STEREO LATERAL");
-            addChoice(kMsLrs, "Lrs");
-            addChoice(kMsRrs, "Rrs");
+            addChoice(kMsLrs, "LRS");
+            addChoice(kMsRrs, "RRS");
             addChoice(kMsStereoFrontWide, "STEREO FRONT WIDE");
-            addChoice(kMsLw, "Front Wide Left (Lw)");
-            addChoice(kMsRw, "Front Wide Right (Rw)");
+            addChoice(kMsLw, "FRONT WIDE LEFT (LW)");
+            addChoice(kMsRw, "FRONT WIDE RIGHT (RW)");
             addChoice(kMsStereoTopFront, "STEREO TOP FRONT");
-            addChoice(kMsTfl, "Top Front Left");
-            addChoice(kMsTfr, "Top Front Right");
+            addChoice(kMsTfl, "TOP FRONT LEFT");
+            addChoice(kMsTfr, "TOP FRONT RIGHT");
             addChoice(kMsStereoTopMiddle, "STEREO TOP MIDDLE");
-            addChoice(kMsTml, "Top Middle Left");
-            addChoice(kMsTmr, "Top Middle Right");
+            addChoice(kMsTml, "TOP MIDDLE LEFT");
+            addChoice(kMsTmr, "TOP MIDDLE RIGHT");
             addChoice(kMsStereoTopRear, "STEREO TOP REAR");
-            addChoice(kMsTrl, "Top Rear Left");
-            addChoice(kMsTrr, "Top Rear Right");
+            addChoice(kMsTrl, "TOP REAR LEFT");
+            addChoice(kMsTrr, "TOP REAR RIGHT");
             addChoice(kMsMidFront, "MID FRONT");
             addChoice(kMsMidRear, "MID REAR");
             addChoice(kMsMidLateral, "MID LATERAL");
@@ -1957,13 +1963,13 @@ void BandControlsPanel::updateMsChoices()
             addIfPresent(kMsRight, "R");
             addIfPresent(kMsCentre, "C");
             addIfPresent(kMsLfe, "LFE");
-            addIfPresent(kMsLs, "Ls");
-            addIfPresent(kMsRs, "Rs");
-            addIfPresent(kMsLrs, "Lrs");
-            addIfPresent(kMsRrs, "Rrs");
-            addIfPresent(kMsCs, "Cs");
-            addIfPresent(kMsLw, "Lw");
-            addIfPresent(kMsRw, "Rw");
+            addIfPresent(kMsLs, "LS");
+            addIfPresent(kMsRs, "RS");
+            addIfPresent(kMsLrs, "LRS");
+            addIfPresent(kMsRrs, "RRS");
+            addIfPresent(kMsCs, "CS");
+            addIfPresent(kMsLw, "LW");
+            addIfPresent(kMsRw, "RW");
             addIfPresent(kMsTfl, "TFL");
             addIfPresent(kMsTfr, "TFR");
             addIfPresent(kMsTrl, "TRL");

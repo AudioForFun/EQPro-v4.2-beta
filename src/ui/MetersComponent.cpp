@@ -154,14 +154,15 @@ void MetersComponent::paint(juce::Graphics& g)
                                                  meterBounds.getWidth(),
                                                  meterBounds.getBottom() - mainY);
         
-        // v4.4 beta: Color-coded meter bars based on level (green/yellow/red)
+        // v4.4 beta: Subtle, professional color-coded meter bars based on level
+        // Using theme colors with subtle tints instead of flashy bright colors
         juce::Colour meterColour;
         if (mainDb >= -3.0f)
-            meterColour = juce::Colour(0xffff4444);  // Red: near clipping (0 to -3 dB)
+            meterColour = theme.accent.withSaturation(0.7f).withBrightness(0.65f);  // Subtle red tint: near clipping
         else if (mainDb >= -12.0f)
-            meterColour = juce::Colour(0xffffaa44);  // Yellow/Orange: moderate level (-3 to -12 dB)
+            meterColour = theme.accentAlt.withSaturation(0.5f).withBrightness(0.6f);  // Subtle yellow tint: moderate level
         else
-            meterColour = juce::Colour(0xff44ff44);  // Green: safe level (below -12 dB)
+            meterColour = theme.meterFill;  // Use theme meter fill color: safe level
         
         // Gradient fill with color based on level
         juce::ColourGradient fillGrad(meterColour.brighter(0.2f), fill.getTopLeft(),

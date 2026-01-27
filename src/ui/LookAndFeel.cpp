@@ -19,20 +19,20 @@ void EQProLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int wid
     const auto angle = rotaryStartAngle
         + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
 
-    // Hover and focus indicators (subtle outer glow)
+    // Get per-band color (or default accent color) - must get before hover indicators
+    const auto tint = slider.findColour(juce::Slider::trackColourId);
+    
+    // v4.4 beta: Hover and focus indicators use selected band color, not default blue
     if (slider.isMouseOverOrDragging())
     {
-        g.setColour(theme.accent.withAlpha(0.2f));
+        g.setColour(tint.withAlpha(0.25f));  // Use band color for hover circle
         g.drawEllipse(bounds.expanded(3.0f), 2.0f);
     }
     if (slider.hasKeyboardFocus(true))
     {
-        g.setColour(theme.accent.withAlpha(0.4f));
+        g.setColour(tint.withAlpha(0.45f));  // Use band color for focus circle
         g.drawEllipse(bounds.expanded(4.0f), 2.0f);
     }
-
-    // Get per-band color (or default accent color)
-    const auto tint = slider.findColour(juce::Slider::trackColourId);
     const bool isEnabled = slider.isEnabled();
 
     // v4.4 beta: Fast flat rendering for rotary knobs - performance optimized

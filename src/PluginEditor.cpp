@@ -85,7 +85,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     versionLabel.setColour(juce::Label::textColourId, juce::Colour(0xff94a3b8));
     addAndMakeVisible(versionLabel);
 
-    globalBypassButton.setButtonText("Global Bypass");
+    globalBypassButton.setButtonText("GLOBAL BYPASS");
     globalBypassButton.setColour(juce::ToggleButton::textColourId,
                                  juce::Colour(0xffcbd5e1));
     globalBypassButton.setTooltip("Toggle global bypass");
@@ -94,7 +94,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         std::make_unique<ButtonAttachment>(processorRef.getParameters(), ParamIDs::globalBypass,
                                            globalBypassButton);
 
-    globalMixLabel.setText("Global Mix", juce::dontSendNotification);
+    globalMixLabel.setText("GLOBAL MIX", juce::dontSendNotification);
     globalMixLabel.setJustificationType(juce::Justification::centredLeft);
     globalMixLabel.setFont(kLabelFontSize);
     globalMixLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
@@ -118,7 +118,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     addAndMakeVisible(rmsToggle);
 
     peakToggle.setLookAndFeel(&lookAndFeel);
-    peakToggle.setButtonText("Peak");
+    peakToggle.setButtonText("PEAK");
     peakToggle.setClickingTogglesState(true);
     peakToggle.setToggleState(false, juce::dontSendNotification);
     peakToggle.setTooltip("Meter fill follows Peak");
@@ -141,13 +141,13 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     globalMixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.getParameters(), ParamIDs::globalMix, globalMixSlider);
 
-    phaseLabel.setText("Processing Mode", juce::dontSendNotification);
+    phaseLabel.setText("PROCESSING MODE", juce::dontSendNotification);
     phaseLabel.setJustificationType(juce::Justification::centredLeft);
     phaseLabel.setFont(kLabelFontSize);
     phaseLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(phaseLabel);
 
-    phaseModeBox.addItemList(juce::StringArray("Real-time", "Natural", "Linear"), 1);
+    phaseModeBox.addItemList(juce::StringArray("REAL-TIME", "NATURAL", "LINEAR"), 1);
     phaseModeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     phaseModeBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     phaseModeBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
@@ -155,14 +155,14 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     phaseModeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.getParameters(), ParamIDs::phaseMode, phaseModeBox);
 
-    qualityLabel.setText("Quality", juce::dontSendNotification);
+    qualityLabel.setText("QUALITY", juce::dontSendNotification);
     qualityLabel.setJustificationType(juce::Justification::centredLeft);
     qualityLabel.setFont(kLabelFontSize);
     qualityLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(qualityLabel);
 
     linearQualityBox.addItemList(
-        juce::StringArray("Low", "Medium", "High", "Very High", "Intensive"), 1);
+        juce::StringArray("LOW", "MEDIUM", "HIGH", "VERY HIGH", "INTENSIVE"), 1);
     linearQualityBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     linearQualityBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     linearQualityBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
@@ -170,13 +170,13 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     linearQualityAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.getParameters(), ParamIDs::linearQuality, linearQualityBox);
 
-    windowLabel.setText("Window", juce::dontSendNotification);
+    windowLabel.setText("WINDOW", juce::dontSendNotification);
     windowLabel.setJustificationType(juce::Justification::centredLeft);
     windowLabel.setFont(kLabelFontSize);
     windowLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(windowLabel);
 
-    linearWindowBox.addItemList(juce::StringArray("Hann", "Blackman", "Kaiser"), 1);
+    linearWindowBox.addItemList(juce::StringArray("HANN", "BLACKMAN", "KAISER"), 1);
     linearWindowBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     linearWindowBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     linearWindowBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
@@ -192,7 +192,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     oversamplingLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(oversamplingLabel);
 
-    oversamplingBox.addItemList(juce::StringArray("Off", "2x", "4x"), 1);
+    oversamplingBox.addItemList(juce::StringArray("OFF", "2X", "4X"), 1);
     oversamplingBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     oversamplingBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     oversamplingBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
@@ -202,13 +202,13 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     oversamplingLabel.setVisible(false);
     oversamplingBox.setVisible(false);
 
-    characterLabel.setText("Character", juce::dontSendNotification);
+    characterLabel.setText("CHARACTER", juce::dontSendNotification);
     characterLabel.setJustificationType(juce::Justification::centredLeft);
     characterLabel.setFont(kLabelFontSize);
     characterLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(characterLabel);
 
-    characterBox.addItemList(juce::StringArray("Off", "Gentle", "Warm"), 1);
+    characterBox.addItemList(juce::StringArray("OFF", "GENTLE", "WARM"), 1);
     characterBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     characterBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     characterBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
@@ -222,7 +222,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     qModeLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(qModeLabel);
 
-    qModeBox.addItemList(juce::StringArray("Constant", "Proportional"), 1);
+    qModeBox.addItemList(juce::StringArray("CONSTANT", "PROPORTIONAL"), 1);
     qModeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     qModeBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     qModeBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
@@ -230,7 +230,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     qModeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.getParameters(), ParamIDs::qMode, qModeBox);
 
-    qAmountLabel.setText("Q Amt", juce::dontSendNotification);
+    qAmountLabel.setText("Q AMT", juce::dontSendNotification);
     qAmountLabel.setJustificationType(juce::Justification::centredLeft);
     qAmountLabel.setFont(kLabelFontSize);
     qAmountLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
@@ -244,13 +244,13 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     qAmountAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.getParameters(), ParamIDs::qModeAmount, qAmountSlider);
 
-    autoGainLabel.setText("Auto Gain", juce::dontSendNotification);
+    autoGainLabel.setText("AUTO GAIN", juce::dontSendNotification);
     autoGainLabel.setJustificationType(juce::Justification::centred);
     autoGainLabel.setFont(kLabelFontSize);
     autoGainLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(autoGainLabel);
 
-    autoGainToggle.setButtonText("Enable");
+    autoGainToggle.setButtonText("ENABLE");
     autoGainToggle.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(autoGainToggle);
     autoGainAttachment = std::make_unique<ButtonAttachment>(
@@ -264,19 +264,19 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     gainScaleAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.getParameters(), ParamIDs::gainScale, gainScaleSlider);
 
-    phaseInvertToggle.setButtonText("Phase Invert");
+    phaseInvertToggle.setButtonText("PHASE INVERT");
     phaseInvertToggle.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(phaseInvertToggle);
     phaseInvertAttachment = std::make_unique<ButtonAttachment>(
         processorRef.getParameters(), ParamIDs::phaseInvert, phaseInvertToggle);
 
-    analyzerRangeLabel.setText("Range", juce::dontSendNotification);
+    analyzerRangeLabel.setText("RANGE", juce::dontSendNotification);
     analyzerRangeLabel.setJustificationType(juce::Justification::centredLeft);
     analyzerRangeLabel.setFont(kLabelFontSize);
     analyzerRangeLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(analyzerRangeLabel);
 
-    analyzerRangeBox.addItemList(juce::StringArray("3 dB", "6 dB", "12 dB", "30 dB"), 1);
+    analyzerRangeBox.addItemList(juce::StringArray("3 DB", "6 DB", "12 DB", "30 DB"), 1);
     analyzerRangeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     analyzerRangeBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     analyzerRangeBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
@@ -284,13 +284,13 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     analyzerRangeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.getParameters(), ParamIDs::analyzerRange, analyzerRangeBox);
 
-    analyzerSpeedLabel.setText("Speed", juce::dontSendNotification);
+    analyzerSpeedLabel.setText("SPEED", juce::dontSendNotification);
     analyzerSpeedLabel.setJustificationType(juce::Justification::centredLeft);
     analyzerSpeedLabel.setFont(kLabelFontSize);
     analyzerSpeedLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(analyzerSpeedLabel);
 
-    analyzerSpeedBox.addItemList(juce::StringArray("Slow", "Normal", "Fast"), 1);
+    analyzerSpeedBox.addItemList(juce::StringArray("SLOW", "NORMAL", "FAST"), 1);
     analyzerSpeedBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     analyzerSpeedBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     analyzerSpeedBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
@@ -298,13 +298,13 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     analyzerSpeedAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.getParameters(), ParamIDs::analyzerSpeed, analyzerSpeedBox);
 
-    analyzerViewLabel.setText("View", juce::dontSendNotification);
+    analyzerViewLabel.setText("VIEW", juce::dontSendNotification);
     analyzerViewLabel.setJustificationType(juce::Justification::centredLeft);
     analyzerViewLabel.setFont(kLabelFontSize);
     analyzerViewLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(analyzerViewLabel);
 
-    analyzerViewBox.addItemList(juce::StringArray("Both", "Pre", "Post"), 1);
+    analyzerViewBox.addItemList(juce::StringArray("BOTH", "PRE", "POST"), 1);
     analyzerViewBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     analyzerViewBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     analyzerViewBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
@@ -312,25 +312,25 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     analyzerViewAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.getParameters(), ParamIDs::analyzerView, analyzerViewBox);
 
-    analyzerFreezeToggle.setButtonText("Freeze");
+    analyzerFreezeToggle.setButtonText("FREEZE");
     analyzerFreezeToggle.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(analyzerFreezeToggle);
     analyzerFreezeAttachment = std::make_unique<ButtonAttachment>(
         processorRef.getParameters(), ParamIDs::analyzerFreeze, analyzerFreezeToggle);
 
-    analyzerExternalToggle.setButtonText("External");
+    analyzerExternalToggle.setButtonText("EXTERNAL");
     analyzerExternalToggle.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(analyzerExternalToggle);
     analyzerExternalAttachment = std::make_unique<ButtonAttachment>(
         processorRef.getParameters(), ParamIDs::analyzerExternal, analyzerExternalToggle);
 
-    smartSoloToggle.setButtonText("Smart Solo");
+    smartSoloToggle.setButtonText("SMART SOLO");
     smartSoloToggle.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(smartSoloToggle);
     smartSoloAttachment = std::make_unique<ButtonAttachment>(
         processorRef.getParameters(), ParamIDs::smartSolo, smartSoloToggle);
 
-    showSpectralToggle.setButtonText("Spectral");
+    showSpectralToggle.setButtonText("SPECTRAL");
     showSpectralToggle.setToggleState(true, juce::dontSendNotification);
     showSpectralToggle.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(showSpectralToggle);
@@ -343,13 +343,13 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
 
     correlation.setVisible(true);
 
-    midiLearnToggle.setButtonText("Learn");
+    midiLearnToggle.setButtonText("LEARN");
     midiLearnToggle.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffcbd5e1));
     addAndMakeVisible(midiLearnToggle);
     midiLearnAttachment = std::make_unique<ButtonAttachment>(
         processorRef.getParameters(), ParamIDs::midiLearn, midiLearnToggle);
 
-    midiTargetBox.addItemList(juce::StringArray("Gain", "Freq", "Q"), 1);
+    midiTargetBox.addItemList(juce::StringArray("GAIN", "FREQ", "Q"), 1);
     midiTargetBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     midiTargetBox.setColour(juce::ComboBox::textColourId, juce::Colour(0xffe2e8f0));
     midiTargetBox.setColour(juce::ComboBox::outlineColourId, juce::Colour(0xff1f2937));
@@ -357,7 +357,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     midiTargetAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         processorRef.getParameters(), ParamIDs::midiTarget, midiTargetBox);
 
-    outputTrimLabel.setText("Output", juce::dontSendNotification);
+    outputTrimLabel.setText("OUTPUT", juce::dontSendNotification);
     outputTrimLabel.setJustificationType(juce::Justification::centred);
     outputTrimLabel.setFont(kLabelFontSize);
     outputTrimLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
@@ -403,12 +403,12 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     initSectionLabel(snapshotSectionLabel, "SNAPSHOTS");
     initSectionLabel(channelSectionLabel, "CHANNEL");
 
-    themeLabel.setText("Theme", juce::dontSendNotification);
+    themeLabel.setText("THEME", juce::dontSendNotification);
     themeLabel.setJustificationType(juce::Justification::centredLeft);
     themeLabel.setFont(kLabelFontSize);
     addAndMakeVisible(themeLabel);
 
-    themeBox.addItemList(juce::StringArray("Dark", "Light"), 1);
+    themeBox.addItemList(juce::StringArray("DARK", "LIGHT"), 1);
     themeBox.setSelectedItemIndex(processorRef.getThemeMode(), juce::dontSendNotification);
     addAndMakeVisible(themeBox);
     themeBox.onChange = [this]
@@ -537,7 +537,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         processorRef.setPresetApplyTarget(applyTargetBox.getSelectedItemIndex());
     };
 
-    presetDeltaToggle.setButtonText("Delta");
+    presetDeltaToggle.setButtonText("DELTA");
     presetDeltaToggle.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffcbd5e1));
     presetDeltaToggle.setTooltip("Apply presets as delta (non-destructive)");
     addAndMakeVisible(presetDeltaToggle);
@@ -654,7 +654,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
         }
     };
 
-    savePresetButton.setButtonText("Save");
+    savePresetButton.setButtonText("SAVE");
     savePresetButton.setTooltip("Save preset to file");
     savePresetButton.onClick = [this]
     {
@@ -677,7 +677,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     addAndMakeVisible(savePresetButton);
 
-    loadPresetButton.setButtonText("Load");
+    loadPresetButton.setButtonText("LOAD");
     loadPresetButton.setTooltip("Load preset from file");
     loadPresetButton.onClick = [this]
     {
@@ -700,7 +700,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     addAndMakeVisible(loadPresetButton);
 
-    presetPrevButton.setButtonText("Prev");
+    presetPrevButton.setButtonText("PREV");
     presetPrevButton.setTooltip("Previous preset");
     presetPrevButton.onClick = [this]
     {
@@ -715,7 +715,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     addAndMakeVisible(presetPrevButton);
 
-    presetNextButton.setButtonText("Next");
+    presetNextButton.setButtonText("NEXT");
     presetNextButton.setTooltip("Next preset");
     presetNextButton.onClick = [this]
     {
@@ -730,14 +730,14 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     addAndMakeVisible(presetNextButton);
 
-    copyInstanceButton.setButtonText("Copy");
+    copyInstanceButton.setButtonText("COPY");
     copyInstanceButton.onClick = [this]
     {
         processorRef.copyStateToClipboard();
     };
     addAndMakeVisible(copyInstanceButton);
 
-    pasteInstanceButton.setButtonText("Paste");
+    pasteInstanceButton.setButtonText("PASTE");
     pasteInstanceButton.onClick = [this]
     {
         processorRef.pasteStateFromClipboard();
@@ -751,9 +751,9 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
 
     presetBrowserBox.setTooltip("Preset list");
     addAndMakeVisible(presetBrowserBox);
-    favoriteToggle.setButtonText("Fav");
+    favoriteToggle.setButtonText("FAV");
     addAndMakeVisible(favoriteToggle);
-    refreshPresetsButton.setButtonText("Refresh");
+    refreshPresetsButton.setButtonText("REFRESH");
     addAndMakeVisible(refreshPresetsButton);
 
     auto refreshPresetBrowser = [this](bool keepSelection)
@@ -831,7 +831,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
 
     refreshPresetBrowser(false);
 
-    undoButton.setButtonText("Undo");
+    undoButton.setButtonText("UNDO");
     undoButton.setTooltip("Undo last change");
     undoButton.onClick = [this]
     {
@@ -840,7 +840,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     addAndMakeVisible(undoButton);
 
-    redoButton.setButtonText("Redo");
+    redoButton.setButtonText("REDO");
     redoButton.setTooltip("Redo last change");
     redoButton.onClick = [this]
     {
@@ -909,7 +909,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     snapshotMenu.setSelectedItemIndex(0, juce::dontSendNotification);
     addAndMakeVisible(snapshotMenu);
 
-    snapshotRecallButton.setButtonText("Recall");
+    snapshotRecallButton.setButtonText("RECALL");
     snapshotRecallButton.onClick = [this]
     {
         switch (snapshotMenu.getSelectedItemIndex())
@@ -937,7 +937,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     addAndMakeVisible(snapshotStoreButton);
 
-    correlationLabel.setText("Gonio", juce::dontSendNotification);
+    correlationLabel.setText("GONIO", juce::dontSendNotification);
     correlationLabel.setJustificationType(juce::Justification::centredLeft);
     correlationLabel.setFont(kLabelFontSize);
     addAndMakeVisible(correlationLabel);
@@ -951,7 +951,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     };
     addAndMakeVisible(correlationBox);
 
-    layoutLabel.setText("Layout", juce::dontSendNotification);
+    layoutLabel.setText("LAYOUT", juce::dontSendNotification);
     layoutLabel.setJustificationType(juce::Justification::centredLeft);
     layoutLabel.setFont(kLabelFontSize);
     addAndMakeVisible(layoutLabel);
@@ -967,7 +967,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     msViewToggle.onClick = [this] {};
     addAndMakeVisible(msViewToggle);
 
-    channelLabel.setText("Channel", juce::dontSendNotification);
+    channelLabel.setText("CHANNEL", juce::dontSendNotification);
     channelLabel.setJustificationType(juce::Justification::centredLeft);
     channelLabel.setFont(kLabelFontSize);
     channelLabel.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));

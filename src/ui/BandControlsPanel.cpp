@@ -405,7 +405,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     slopeBox.setColour(juce::ComboBox::backgroundColourId, theme.panel);
     slopeBox.setColour(juce::ComboBox::textColourId, theme.text);
     slopeBox.setColour(juce::ComboBox::outlineColourId, theme.panelOutline);
-    slopeBox.setLookAndFeel(&compactComboLookAndFeel);
+    // v4.4 beta: Use separate LookAndFeel with larger font for slope dropdown
+    slopeBox.setLookAndFeel(&slopeComboLookAndFeel);
     slopeBox.setTooltip("Slope");
     slopeBox.onChange = [this]
     {
@@ -1506,7 +1507,9 @@ void BandControlsPanel::updateComboBoxWidths()
     juce::StringArray slopeLabels;
     for (int i = 0; i < slopeBox.getNumItems(); ++i)
         slopeLabels.add(slopeBox.getItemText(i + 1));
-    comboWidthSlope = computeWidth(slopeLabels, font) + padding;
+    // v4.4 beta: Use slope dropdown's larger font for width calculation
+    const juce::Font slopeFont = slopeComboLookAndFeel.getComboBoxFont(slopeBox);
+    comboWidthSlope = computeWidth(slopeLabels, slopeFont) + padding;
 }
 
 void BandControlsPanel::updateTypeUi()

@@ -98,6 +98,20 @@ private:
             return juce::Font(11.0f);
         }
     };
+    
+    // v4.4 beta: Separate LookAndFeel for slope dropdown with larger font
+    struct SlopeComboLookAndFeel final : public juce::LookAndFeel_V4
+    {
+        juce::Font getComboBoxFont(juce::ComboBox&) override
+        {
+            return juce::Font(12.5f);  // Larger font for slope dropdown
+        }
+
+        juce::Font getPopupMenuFont() override
+        {
+            return juce::Font(12.5f);  // Larger font for slope dropdown popup
+        }
+    };
 
     void updateAttachments();
     void syncUiFromParams();
@@ -209,6 +223,7 @@ private:
 
     ThemeColors theme = makeDarkTheme();
     CompactComboLookAndFeel compactComboLookAndFeel;
+    SlopeComboLookAndFeel slopeComboLookAndFeel;  // v4.4 beta: Larger font for slope dropdown
     bool msEnabled = true;
     bool suppressParamCallbacks = false;
     bool hasBeenResized = false;  // v4.4 beta: Defer timer start until after first resize

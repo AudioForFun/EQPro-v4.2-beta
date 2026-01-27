@@ -1541,15 +1541,11 @@ void AnalyzerComponent::drawGridLines(juce::Graphics& g, const juce::Rectangle<i
         if (x + labelWidth <= area.getRight() && (x - lastLabelX) >= minLabelSpacing)
         {
             lastLabelX = x;
-            // Modern frequency label styling.
+            // Plain text frequency labels (no background boxes).
             const auto labelRect = juce::Rectangle<int>(static_cast<int>(x + 3.0f * scale),
                                                          static_cast<int>(area.getBottom() - bottomGutter),
                                                          labelWidth,
                                                          labelHeight);
-            g.setColour(theme.panel.withAlpha(0.85f));
-            g.fillRoundedRectangle(labelRect.toFloat(), 3.0f);
-            g.setColour(theme.panelOutline.withAlpha(0.5f));
-            g.drawRoundedRectangle(labelRect.toFloat(), 3.0f, 0.8f);
             g.setColour(theme.textMuted.withAlpha(0.9f));
             g.setFont(juce::Font(10.0f * scale, juce::Font::plain));
             const juce::String text = f >= 1000.0f

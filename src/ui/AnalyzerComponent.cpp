@@ -12,6 +12,7 @@
 
 namespace
 {
+// Lower bound so the curve renders across the full spectrum (no low-end gap).
 constexpr float kMinFreq = 5.0f;
 constexpr float kMaxDb = 60.0f;
 constexpr float kMinDb = -60.0f;

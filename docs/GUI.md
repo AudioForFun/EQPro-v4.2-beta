@@ -15,6 +15,7 @@
 - Per-band curves are overlaid with a highlighted selected band.
 - The plot shows a small legend for Pre/Post/Ext.
 - Dragging a band point shows a value pill (freq + gain).
+- Analyzer curve renders down to 5 Hz to avoid low-end gaps.
 
 ## Band Controls
 - Per-band: Frequency, Gain, Q, Mix, Filter Type (dropdown), Slope (dropdown).

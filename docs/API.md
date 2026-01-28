@@ -62,6 +62,7 @@ Role: Lock‑free FIFO bridge for analyzer data.
 Usage:
 - DSP calls `push()` from audio thread.
 - UI reads via `AudioFifo& getFifo()` on timer.
+- UI analyzer maps the frequency range down to 5 Hz to avoid a low-end gap.
 
 **v4.5 beta**: Added third analyzer tap for harmonic processing visualization:
 - `analyzerHarmonicTap`: Captures harmonic-only content (no dry signal) after harmonic processing

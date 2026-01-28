@@ -59,6 +59,9 @@ void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
     linearFadeSamplesRemaining = 0;
     linearFadeTotalSamples = 0;
     pendingLinearFadeSamples.store(0);
+    modeFadeSamplesRemaining = 0;
+    modeFadeTotalSamples = 0;
+    modeFadeBuffer.setSize(0, 0);
 }
 
 void EqEngine::reset()
@@ -77,6 +80,9 @@ void EqEngine::reset()
     linearFadeSamplesRemaining = 0;
     linearFadeTotalSamples = 0;
     pendingLinearFadeSamples.store(0);
+    modeFadeSamplesRemaining = 0;
+    modeFadeTotalSamples = 0;
+    modeFadeBuffer.setSize(0, 0);
 }
 
 void EqEngine::process(juce::AudioBuffer<float>& buffer,
@@ -821,15 +827,18 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
         meterSkipCounter = 0;
     }
 
-    if (modeFadeBuffer.getNumChannels() != buffer.getNumChannels()
-        || modeFadeBuffer.getNumSamples() < buffer.getNumSamples())
+    if (modeFadeSamplesRemaining <= 0)
     {
-        modeFadeBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples());
+        if (modeFadeBuffer.getNumChannels() != buffer.getNumChannels()
+            || modeFadeBuffer.getNumSamples() < buffer.getNumSamples())
+        {
+            modeFadeBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples());
+        }
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            juce::FloatVectorOperations::copy(modeFadeBuffer.getWritePointer(ch),
+                                              buffer.getReadPointer(ch),
+                                              buffer.getNumSamples());
     }
-    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-        juce::FloatVectorOperations::copy(modeFadeBuffer.getWritePointer(ch),
-                                          buffer.getReadPointer(ch),
-                                          buffer.getNumSamples());
 
     const int postSamples = buffer.getNumSamples();
     const int postChannels = juce::jmax(1, buffer.getNumChannels());
@@ -1006,7 +1015,7 @@ void EqEngine::updateLinearPhase(const ParamSnapshot& snapshot, double sampleRat
     const int headSize = 0;
 
     rebuildLinearPhase(snapshot, taps, headSize, sampleRate, quality);
-    pendingLinearFadeSamples.store(juce::jmin(512, maxPreparedBlockSize));
+    pendingLinearFadeSamples.store(juce::jmin(1024, maxPreparedBlockSize));
     juce::Logger::writeToLog("LinearPhase rebuild: mode=" + juce::String(snapshot.phaseMode)
                              + " quality=" + juce::String(quality)
                              + " offset=" + juce::String(adaptiveQualityOffset.load())

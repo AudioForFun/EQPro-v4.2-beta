@@ -164,11 +164,13 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     // Seed the curve at kMinFreq so the left edge always renders.
     const int firstBin = juce::jlimit(1, fftBins - 1,
                                       static_cast<int>(std::ceil((kMinFreq * fftSize) / lastSampleRate)));
+    const float seededPreDb = preMagnitudes[firstBin];
+    const float seededPostDb = postMagnitudes[firstBin];
     {
         const float startX = plotArea.getX()
             + FFTUtils::freqToNorm(kMinFreq, kMinFreq, maxFreq) * plotArea.getWidth();
-        const float preDb = preMagnitudes[firstBin];
-        const float postDb = postMagnitudes[firstBin];
+        const float preDb = seededPreDb;
+        const float postDb = seededPostDb;
         const float preY = juce::jmap(preDb, kAnalyzerMinDb, kAnalyzerMaxDb,
                                       static_cast<float>(magnitudeArea.getBottom()),
                                       static_cast<float>(magnitudeArea.getY()));

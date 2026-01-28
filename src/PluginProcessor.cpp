@@ -1117,7 +1117,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
         false));
 
     const juce::NormalisableRange<float> freqRange(20.0f, 20000.0f, 0.01f, 0.5f);
-    const std::array<float, ParamIDs::kBandsPerChannel> defaultFreqs {
+    static constexpr std::array<float, ParamIDs::kBandsPerChannel> kDefaultBandFreqs {
         20.0f, 50.0f, 100.0f, 200.0f, 400.0f, 800.0f,
         1600.0f, 3200.0f, 6400.0f, 10000.0f, 14000.0f, 18000.0f
     };
@@ -1132,7 +1132,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
                 ParamIDs::bandParamId(ch, band, kParamFreqSuffix),
                 ParamIDs::bandParamName(ch, band, "Freq"),
                 freqRange,
-                defaultFreqs[static_cast<size_t>(band)]));
+                kDefaultBandFreqs[static_cast<size_t>(band)]));
 
             params.push_back(std::make_unique<juce::AudioParameterFloat>(
                 ParamIDs::bandParamId(ch, band, kParamGainSuffix),
@@ -1799,6 +1799,24 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
             dst.evenHarmonicDb = ptrs.even != nullptr ? ptrs.even->load() : 0.0f;
             dst.mixEven = ptrs.mixEven != nullptr ? (ptrs.mixEven->load() / 100.0f) : 1.0f;
             dst.harmonicBypassed = ptrs.harmonicBypass != nullptr && ptrs.harmonicBypass->load() > 0.5f;
+
+            // Auto-activate a band if parameters deviate from defaults.
+            if (dst.bypassed)
+            {
+                constexpr float kEps = 1.0e-3f;
+                const float defaultFreq = kDefaultBandFreqs[static_cast<size_t>(band)];
+                const bool isDefault =
+                    std::abs(dst.frequencyHz - defaultFreq) < 0.01f
+                    && std::abs(dst.gainDb) < kEps
+                    && std::abs(dst.q - 0.707f) < kEps
+                    && dst.type == 0
+                    && std::abs(dst.slopeDb - 12.0f) < kEps
+                    && std::abs(dst.mix - 1.0f) < kEps
+                    && dst.msTarget == 0
+                    && !dst.solo;
+                if (! isDefault)
+                    dst.bypassed = false;
+            }
         }
     }
 

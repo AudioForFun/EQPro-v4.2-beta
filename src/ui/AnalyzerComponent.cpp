@@ -161,7 +161,30 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     float prevPreX = 0.0f, prevPreY = 0.0f;
     float prevPostX = 0.0f, prevPostY = 0.0f;
 
-    for (int bin = 1; bin < fftBins; ++bin)
+    // Seed the curve at kMinFreq so the left edge always renders.
+    const int firstBin = juce::jlimit(1, fftBins - 1,
+                                      static_cast<int>(std::ceil((kMinFreq * fftSize) / lastSampleRate)));
+    {
+        const float startX = plotArea.getX()
+            + FFTUtils::freqToNorm(kMinFreq, kMinFreq, maxFreq) * plotArea.getWidth();
+        const float preDb = preMagnitudes[firstBin];
+        const float postDb = postMagnitudes[firstBin];
+        const float preY = juce::jmap(preDb, kAnalyzerMinDb, kAnalyzerMaxDb,
+                                      static_cast<float>(magnitudeArea.getBottom()),
+                                      static_cast<float>(magnitudeArea.getY()));
+        const float postY = juce::jmap(postDb, kAnalyzerMinDb, kAnalyzerMaxDb,
+                                       static_cast<float>(magnitudeArea.getBottom()),
+                                       static_cast<float>(magnitudeArea.getY()));
+        prePath.startNewSubPath(startX, preY);
+        postPath.startNewSubPath(startX, postY);
+        prevPreX = startX;
+        prevPreY = preY;
+        prevPostX = startX;
+        prevPostY = postY;
+        started = true;
+    }
+
+    for (int bin = firstBin; bin < fftBins; ++bin)
     {
         const float freq = (lastSampleRate * bin) / static_cast<float>(fftSize);
         if (freq < kMinFreq || freq > maxFreq)
@@ -2020,6 +2043,15 @@ void AnalyzerComponent::setBandParameter(int bandIndex, const juce::String& suff
         return;
 
     param->setValueNotifyingHost(param->convertTo0to1(value));
+
+    // Ensure edits from the analyzer activate the band.
+    if (suffix != kParamBypassSuffix && suffix != kParamSoloSuffix)
+    {
+        auto* bypassParam = parameters.getParameter(
+            ParamIDs::bandParamId(selectedChannel, bandIndex, kParamBypassSuffix));
+        if (bypassParam != nullptr && bypassParam->getValue() > 0.5f)
+            bypassParam->setValueNotifyingHost(0.0f);
+    }
 }
 
 float AnalyzerComponent::getBandParameter(int bandIndex, const juce::String& suffix) const

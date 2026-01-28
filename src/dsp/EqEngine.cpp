@@ -89,7 +89,13 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
 {
     const int numChannels = juce::jmin(buffer.getNumChannels(), snapshot.numChannels);
     updateOversampling(snapshot, sampleRateHz, maxPreparedBlockSize, numChannels);
+    const int previousPhaseMode = lastPhaseMode;
     lastPhaseMode = snapshot.phaseMode;
+    if (previousPhaseMode != snapshot.phaseMode)
+    {
+        modeFadeSamplesRemaining = juce::jmin(maxPreparedBlockSize, 1024);
+        modeFadeTotalSamples = modeFadeSamplesRemaining;
+    }
     auto computeRms = [](const juce::AudioBuffer<float>& buf, int channels) -> double
     {
         const int n = buf.getNumSamples();
@@ -787,11 +793,43 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     }
     }
 
+    if (modeFadeSamplesRemaining > 0
+        && modeFadeBuffer.getNumChannels() == buffer.getNumChannels()
+        && modeFadeBuffer.getNumSamples() >= buffer.getNumSamples())
+    {
+        const int total = juce::jmax(1, modeFadeTotalSamples);
+        const int samples = buffer.getNumSamples();
+        for (int i = 0; i < samples; ++i)
+        {
+            if (modeFadeSamplesRemaining <= 0)
+                break;
+            const float t = 1.0f - static_cast<float>(modeFadeSamplesRemaining)
+                / static_cast<float>(total);
+            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            {
+                auto* wet = buffer.getWritePointer(ch);
+                const auto* prev = modeFadeBuffer.getReadPointer(ch);
+                wet[i] = wet[i] * t + prev[i] * (1.0f - t);
+            }
+            --modeFadeSamplesRemaining;
+        }
+    }
+
     if (++meterSkipCounter >= meterSkipFactor)
     {
         meterTap.process(buffer, numChannels);
         meterSkipCounter = 0;
     }
+
+    if (modeFadeBuffer.getNumChannels() != buffer.getNumChannels()
+        || modeFadeBuffer.getNumSamples() < buffer.getNumSamples())
+    {
+        modeFadeBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples());
+    }
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        juce::FloatVectorOperations::copy(modeFadeBuffer.getWritePointer(ch),
+                                          buffer.getReadPointer(ch),
+                                          buffer.getNumSamples());
 
     const int postSamples = buffer.getNumSamples();
     const int postChannels = juce::jmax(1, buffer.getNumChannels());

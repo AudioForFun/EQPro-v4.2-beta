@@ -113,6 +113,9 @@ private:
     juce::AudioBuffer<float> linearFadeBuffer;
     int linearFadeSamplesRemaining = 0;
     int linearFadeTotalSamples = 0;
+    juce::AudioBuffer<float> modeFadeBuffer;
+    int modeFadeSamplesRemaining = 0;
+    int modeFadeTotalSamples = 0;
 
     void updateDryDelay(int latencySamples, int maxBlockSize, int numChannels);
     void applyDryDelay(juce::AudioBuffer<float>& dry, int numSamples, int delaySamples);

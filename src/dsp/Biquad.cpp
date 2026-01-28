@@ -207,6 +207,22 @@ void Biquad::setCoefficients(const BandParams& params)
             a1d = -2.0 * cosW;
             a2d = 1.0 - alpha;
             break;
+        case FilterType::flatTilt:
+        {
+            // Flat tilt uses a fixed-Q shelf curve for symmetric tilt.
+            const double aTilt = std::pow(10.0, (params.gainDb * 0.5) / 40.0);
+            const double sqrtA = std::sqrt(aTilt);
+            constexpr double qFlat = 0.5;
+            const double shelfQ = std::clamp(qFlat / sqrtA, 0.1, 18.0);
+            const double beta = sqrtA / shelfQ;
+            b0d = aTilt * ((aTilt + 1.0) - (aTilt - 1.0) * cosW + beta * sinW);
+            b1d = 2.0 * aTilt * ((aTilt - 1.0) - (aTilt + 1.0) * cosW);
+            b2d = aTilt * ((aTilt + 1.0) - (aTilt - 1.0) * cosW - beta * sinW);
+            a0d = (aTilt + 1.0) + (aTilt - 1.0) * cosW + beta * sinW;
+            a1d = -2.0 * ((aTilt - 1.0) + (aTilt + 1.0) * cosW);
+            a2d = (aTilt + 1.0) + (aTilt - 1.0) * cosW - beta * sinW;
+            break;
+        }
         case FilterType::tilt:
         {
             const double aTilt = std::pow(10.0, (params.gainDb * 0.5) / 40.0);

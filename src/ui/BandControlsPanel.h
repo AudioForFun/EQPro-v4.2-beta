@@ -258,6 +258,7 @@ private:
     SlopeComboLookAndFeel slopeComboLookAndFeel;  // v4.5 beta: Larger font for slope dropdown
     bool msEnabled = true;
     bool suppressParamCallbacks = false;
+    bool resetInProgress = false;
     bool hasBeenResized = false;  // v4.5 beta: Defer timer start until after first resize
     std::optional<BandState> clipboard;
     float detectorDb = -60.0f;

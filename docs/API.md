@@ -545,6 +545,12 @@ format lists are:
 - **Per-band harmonic parameters**: Documented in ParamSnapshot and Parameter Summary (odd/even harmonic dB and mix, per-band harmonic bypass).
 - **Oversampling**: Single quality-driven oversampling path (ParamSnapshot `oversampling`); v4.9 doc alignment.
 
+## Realtime/DSP Fixes (v4.9.x)
+- **Flat Tilt in realtime**: `flatTilt` now has its own biquad coefficients; no more pass-through.
+- **Channel mask fallback**: Invalid/unknown channel labels now fall back to `maskAll` to avoid silent bands.
+- **MS target guard**: MS targets are disabled unless a valid stereo pair exists.
+- **Global mix smoothing**: Longer smoothing + dry-delay crossfade to reduce zipper artifacts.
+
 ## Call Flow (Simplified)
 1. UI updates APVTS parameters.
 2. `timerCallback` builds `ParamSnapshot` and swaps it.

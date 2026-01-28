@@ -541,7 +541,6 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 params.mix = smoothMix[group.left][band].getCurrentValue();
                 params.thresholdDb = smoothDynThresh[group.left][band].getCurrentValue();
                 params.q = applyQMode(params);
-                params.dynamicEnabled = false;
                 const float mix = juce::jlimit(0.0f, 1.0f, params.mix);
                 const float staticGainDb = params.gainDb;
 
@@ -711,7 +710,8 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
         for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
         {
             const int target = msTargets[band];
-            if ((target == 1 || target == 2)
+            // Only skip MS-targeted bands when MS processing is active.
+            if (useMs && (target == 1 || target == 2)
                 && (bandChannelMasks[band] & (1u << static_cast<uint32_t>(ch))) != 0)
             {
                 continue;
@@ -748,7 +748,6 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 params.q = smoothQ[paramSource][band].getCurrentValue();
             }
             params.q = applyQMode(params);
-            params.dynamicEnabled = false;
             const float mix = juce::jlimit(0.0f, 1.0f, params.mix);
             const float staticGainDb = params.gainDb;
             if (! params.dynamicEnabled && (isBell || isShelf || isTilt)

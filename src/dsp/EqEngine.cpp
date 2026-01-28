@@ -42,7 +42,8 @@ void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
     harmonicTapOversampledBuffer.setSize(numChannels, maxBlockSize * 16);
     harmonicTapOversampledBuffer.clear();
 
-    globalMixSmoothed.reset(sampleRate, 0.02);
+    // Slightly longer smoothing to avoid zipper artifacts on global mix moves.
+    globalMixSmoothed.reset(sampleRate, 0.05);
     globalMixSmoothed.setCurrentAndTargetValue(1.0f);
     outputTrimGainSmoothed.reset(sampleRate, 0.02);
     outputTrimGainSmoothed.setCurrentAndTargetValue(1.0f);
@@ -1409,7 +1410,8 @@ void EqEngine::updateDryDelay(int latencySamples, int maxBlockSize, int numChann
         mixDelaySamples = targetDelay;
         dryDelayBuffer.clear();
         dryDelayWritePos = 0;
-        mixDelayFadeSamplesRemaining = juce::jmin(512, maxBlockSize);
+        // Crossfade dry delay to avoid clicks when latency changes.
+        mixDelayFadeSamplesRemaining = juce::jmin(maxBlockSize, 2048);
         juce::Logger::writeToLog("GlobalMix dry-delay: latency=" + juce::String(mixDelaySamples)
                                  + " samples, maxBlock=" + juce::String(maxBlockSize)
                                  + ", channels=" + juce::String(numChannels));

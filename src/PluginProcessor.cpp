@@ -1833,7 +1833,7 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
     const int lIndex = findIndex("L");
     const int rIndex = findIndex("R");
     const uint32_t maskL = maskForIndex(lIndex >= 0 ? lIndex : 0);
-    const uint32_t maskR = maskForIndex(rIndex >= 0 ? rIndex : (numChannels > 1 ? 1 : -1));
+    const uint32_t maskR = maskForIndex(rIndex >= 0 ? rIndex : (numChannels > 1 ? 1 : 0));
     const uint32_t maskStereo = maskL | maskR;
 
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
@@ -1887,9 +1887,12 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
             default: mask = maskAll; break;
         }
 
-        snapshot.msTargets[band] = msTarget;
-        snapshot.bandChannelMasks[band] = mask;
-
+        // Guard against missing channel labels: fall back to full mask.
+        if (mask == 0u)
+        {
+            mask = maskAll;
+            msTarget = 0;
+        }
         const auto maskBitCount = [](uint32_t value)
         {
             int count = 0;
@@ -1900,6 +1903,13 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
             }
             return count;
         };
+        // Only allow MS targets when a stereo pair is present.
+        if (msTarget != 0 && maskBitCount(mask) < 2)
+            msTarget = 0;
+
+        snapshot.msTargets[band] = msTarget;
+        snapshot.bandChannelMasks[band] = mask;
+
         // For multi-channel selections, mirror the band parameters to the covered channels.
         if (maskBitCount(mask) > 1)
         {

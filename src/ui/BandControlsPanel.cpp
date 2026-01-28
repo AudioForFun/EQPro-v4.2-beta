@@ -711,6 +711,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
 
 void BandControlsPanel::ensureBandActiveFromEdit()
 {
+    if (suppressParamCallbacks || resetInProgress)
+        return;
     if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "bypass")))
     {
         if (bypassParam->getValue() > 0.5f)
@@ -1785,6 +1787,9 @@ void BandControlsPanel::resetSelectedBand()
             param->setValueNotifyingHost(param->getDefaultValue());
     };
 
+    // Prevent UI edits from auto-unbypassing during reset.
+    resetInProgress = true;
+    suppressParamCallbacks = true;
     resetParam("freq");
     resetParam("gain");
     resetParam("q");
@@ -1807,8 +1812,15 @@ void BandControlsPanel::resetSelectedBand()
     resetParam("harmonicBypass");
     resetParam("bypass");
     resetParam("solo");
+    if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(channel, band, "bypass")))
+        bypassParam->setValueNotifyingHost(1.0f);
+    if (auto* soloParam = parameters.getParameter(ParamIDs::bandParamId(channel, band, "solo")))
+        soloParam->setValueNotifyingHost(0.0f);
 
+    suppressParamCallbacks = false;
+    resetInProgress = false;
     cacheBandFromParams(channel, band);
+    syncUiFromParams();
 }
 
 void BandControlsPanel::resetAllBands()
@@ -1820,6 +1832,9 @@ void BandControlsPanel::resetAllBands()
             param->setValueNotifyingHost(param->getDefaultValue());
     };
 
+    // Prevent UI edits from auto-unbypassing during reset-all.
+    resetInProgress = true;
+    suppressParamCallbacks = true;
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
     {
         resetParam(band, "freq");
@@ -1844,9 +1859,16 @@ void BandControlsPanel::resetAllBands()
         resetParam(band, "harmonicBypass");
         resetParam(band, "bypass");
         resetParam(band, "solo");
+        if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(channel, band, "bypass")))
+            bypassParam->setValueNotifyingHost(1.0f);
+        if (auto* soloParam = parameters.getParameter(ParamIDs::bandParamId(channel, band, "solo")))
+            soloParam->setValueNotifyingHost(0.0f);
 
         cacheBandFromParams(channel, band);
     }
+    suppressParamCallbacks = false;
+    resetInProgress = false;
+    syncUiFromParams();
 }
 
 void BandControlsPanel::updateComboBoxWidths()

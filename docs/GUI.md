@@ -29,6 +29,7 @@
 - Any band edit automatically un-bypasses that band.
 - Dynamic EQ controls are currently hidden (reserved for a future release).
 - Copy/Paste band state and Reset actions.
+- Reset Band/Reset All keep bands bypassed by default (opt-in activation).
 - Band header strip shows active band color and navigation arrows.
 - EQ frame and row dividers follow the active band color.
 

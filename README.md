@@ -76,6 +76,7 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 
 ## Build Notes (Windows)
 - **ASIO support** requires the Steinberg ASIO SDK (not bundled). After installing it, set `EQPRO_ASIO_SDK_PATH` in CMake to the SDK folder to enable ASIO in the standalone app.
+- **Standalone buffer policy** targets 2048 samples at 1x sample rate, then scales with SR (2x→4096, 4x→8192, 8x→16384), selecting the largest available size under the target.
 
 ---
 

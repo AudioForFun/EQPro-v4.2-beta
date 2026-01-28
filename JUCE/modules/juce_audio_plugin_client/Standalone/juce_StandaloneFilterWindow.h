@@ -334,6 +334,50 @@ public:
                                  const String& preferredDefaultDeviceName,
                                  const AudioDeviceManager::AudioDeviceSetup* preferredSetupOptions)
     {
+        // Standalone buffer policy:
+        // target=2048 @ 1x SR, 4096 @ 2x, 8192 @ 4x, 16384 @ 8x.
+        // Choose the largest available buffer size <= target.
+        auto applyBufferPolicy = [this]()
+        {
+            if (auto* device = deviceManager.getCurrentAudioDevice())
+            {
+                const auto sampleRate = device->getCurrentSampleRate();
+                const auto bufferSizes = device->getAvailableBufferSizes();
+                String sizeList;
+                for (auto size : bufferSizes)
+                    sizeList << String (size) << " ";
+
+                int factor = 1;
+                if (sampleRate >= 352800.0)      factor = 8;
+                else if (sampleRate >= 176400.0) factor = 4;
+                else if (sampleRate >= 88200.0)  factor = 2;
+                const int target = 2048 * factor;
+
+                int chosen = device->getCurrentBufferSizeSamples();
+                int best = 0;
+                for (auto size : bufferSizes)
+                    if (size <= target && size > best)
+                        best = size;
+
+                if (best == 0 && bufferSizes.size() > 0)
+                    best = bufferSizes[0];
+
+                if (best > 0 && best != chosen)
+                {
+                    AudioDeviceManager::AudioDeviceSetup setup;
+                    deviceManager.getAudioDeviceSetup (setup);
+                    setup.bufferSize = best;
+                    deviceManager.setAudioDeviceSetup (setup, true);
+                    chosen = best;
+                }
+
+                Logger::writeToLog ("Audio buffers (available): " + sizeList.trimEnd());
+                Logger::writeToLog ("Audio buffers (target): " + String (target)
+                                    + " -> chosen " + String (chosen)
+                                    + " @ " + String (sampleRate, 0) + " Hz");
+            }
+        };
+
         std::unique_ptr<XmlElement> savedState;
 
         if (settings != nullptr)
@@ -376,6 +420,12 @@ public:
                                                                  preferredSetupOptions);
             if (fallbackError.isNotEmpty())
                 Logger::writeToLog ("Audio fallback init failed: " + fallbackError);
+            else
+                applyBufferPolicy();
+        }
+        else
+        {
+            applyBufferPolicy();
         }
     }
 

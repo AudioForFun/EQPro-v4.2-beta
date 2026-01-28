@@ -47,6 +47,7 @@ Notes:
 - No heap allocations in `process`.
 - Uses `ParamSnapshot` exclusively for parameters.
 - Global dry/wet mix uses an internal delay line to align dry with linear-phase latency.
+- Standalone buffer policy targets 2048 @ 1x SR, then scales with SR (2x→4096, 4x→8192, 8x→16384).
 - Startup diagnostics write a log to `%TEMP%\\EQPro_startup_*.log`.
 - Standalone state restore is disabled by default; set `EQPRO_LOAD_STATE=1` to enable.
 - Standalone audio device restore is disabled by default; set `EQPRO_LOAD_AUDIO_STATE=1` to enable.

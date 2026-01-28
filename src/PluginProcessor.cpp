@@ -88,6 +88,11 @@ const juce::StringArray kMsChoices {
     "Side Top Middle"
 };
 
+constexpr std::array<float, ParamIDs::kBandsPerChannel> kDefaultBandFreqs {
+    20.0f, 50.0f, 100.0f, 200.0f, 400.0f, 800.0f,
+    1600.0f, 3200.0f, 6400.0f, 10000.0f, 14000.0f, 18000.0f
+};
+
 enum MsChoiceIndex
 {
     kMsAll = 0,
@@ -686,6 +691,11 @@ bool EQProAudioProcessor::getShowPhasePreference() const
     return showPhasePreference;
 }
 
+int EQProAudioProcessor::getLastRmsPhaseMode() const
+{
+    return eqEngine.getLastRmsPhaseMode();
+}
+
 juce::UndoManager* EQProAudioProcessor::getUndoManager()
 {
     return &undoManager;
@@ -1117,10 +1127,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
         false));
 
     const juce::NormalisableRange<float> freqRange(20.0f, 20000.0f, 0.01f, 0.5f);
-    static constexpr std::array<float, ParamIDs::kBandsPerChannel> kDefaultBandFreqs {
-        20.0f, 50.0f, 100.0f, 200.0f, 400.0f, 800.0f,
-        1600.0f, 3200.0f, 6400.0f, 10000.0f, 14000.0f, 18000.0f
-    };
     const juce::NormalisableRange<float> gainRange(-48.0f, 48.0f, 0.01f);
     const juce::NormalisableRange<float> qRange(0.1f, 18.0f, 0.01f, 0.5f);
 

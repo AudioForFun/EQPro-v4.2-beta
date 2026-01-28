@@ -71,6 +71,8 @@ public:
     int getCorrelationPairIndex() const;
     void setShowPhasePreference(bool enabled);
     bool getShowPhasePreference() const;
+    // Last RMS-calculated phase mode (for analyzer throttling).
+    int getLastRmsPhaseMode() const;
     // Undo/redo manager for UI actions.
     juce::UndoManager* getUndoManager();
     // Preset browser helpers.

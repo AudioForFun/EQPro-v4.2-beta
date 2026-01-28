@@ -482,7 +482,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             }
 
             // Avoid audio-thread stalls: if FIR update is in progress, fall back to realtime.
-            const juce::SpinLock::ScopedTryLock linearLock(linearPhaseLock);
+            const juce::SpinLock::ScopedTryLockType linearLock(linearPhaseLock);
             const bool linearSafe = linearLock.isLocked();
             if (! linearSafe)
             {
@@ -1382,7 +1382,7 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int h
 
     const int latency = (taps - 1) / 2;
     {
-        const juce::SpinLock::ScopedLock lock(linearPhaseLock);
+        const juce::SpinLock::ScopedLockType lock(linearPhaseLock);
         linearPhaseEq.beginImpulseUpdate(headSize, snapshot.numChannels);
         linearPhaseMsEq.beginImpulseUpdate(headSize, snapshot.numChannels >= 2 ? 2 : 0);
         for (int ch = 0; ch < snapshot.numChannels; ++ch)

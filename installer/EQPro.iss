@@ -1,5 +1,5 @@
 #define MyAppName "EQ Pro"
-#define MyAppVersion "4.9.0-beta"
+#define MyAppVersion "5.0.0-beta"
 #define MyAppPublisher "DidAudio"
 #define MyAppURL "https://github.com/AudioForFun/EQPro"
 #define BuildDir "..\build\EQPro_artefacts\Release"

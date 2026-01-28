@@ -93,7 +93,10 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                        AnalyzerTap& harmonicTap,  // v4.5 beta: Tap for harmonic-only curve (red)
                        MeterTap& meterTap)
 {
-    const int numChannels = juce::jmin(buffer.getNumChannels(), snapshot.numChannels);
+    const int snapshotChannels = snapshot.numChannels;
+    const int bufferChannels = buffer.getNumChannels();
+    const int numChannels = juce::jmin(bufferChannels,
+                                       snapshotChannels > 0 ? snapshotChannels : bufferChannels);
     updateOversampling(snapshot, sampleRateHz, maxPreparedBlockSize, numChannels);
     const int previousPhaseMode = lastPhaseMode;
     lastPhaseMode = snapshot.phaseMode;

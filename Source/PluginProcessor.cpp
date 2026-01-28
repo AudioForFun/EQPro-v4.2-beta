@@ -311,7 +311,8 @@ void EQProAudioProcessor::shutdownLogging()
 
 void EQProAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    eqEngine.prepare(sampleRate, samplesPerBlock, getTotalNumInputChannels());
+    const int channelCount = juce::jmax(getTotalNumInputChannels(), getTotalNumOutputChannels());
+    eqEngine.prepare(sampleRate, samplesPerBlock, channelCount);
     meterTap.prepare(sampleRate);
     lastSampleRate = sampleRate;
     lastMaxBlockSize = samplesPerBlock;
@@ -1746,7 +1747,8 @@ void EQProAudioProcessor::updateOversampling()
 uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
 {
     // Critical path: copy current APVTS values into an atomic-safe snapshot.
-    const int numChannels = juce::jmin(getTotalNumInputChannels(), ParamIDs::kMaxChannels);
+    const int ioChannels = juce::jmax(getTotalNumInputChannels(), getTotalNumOutputChannels());
+    const int numChannels = juce::jmin(ioChannels, ParamIDs::kMaxChannels);
     snapshot.numChannels = numChannels;
     snapshot.globalBypass = globalBypassParam != nullptr && globalBypassParam->load() > 0.5f;
     snapshot.globalMix = globalMixParam != nullptr ? (globalMixParam->load() / 100.0f) : 1.0f;

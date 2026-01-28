@@ -3,6 +3,9 @@
 #include <cmath>
 #include <cstring>
 
+// EqEngine implementation: prepare/reset/process, linear-phase FIR, oversampling,
+// dry/wet alignment, and analyzer/meter taps (pre, post, harmonic).
+
 namespace eqdsp
 {
 void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
@@ -52,6 +55,9 @@ void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
     else if (sampleRateHz >= 192000.0)
         meterSkipFactor = 2;
     meterSkipCounter = 0;
+    linearFadeSamplesRemaining = 0;
+    linearFadeTotalSamples = 0;
+    pendingLinearFadeSamples.store(0);
 }
 
 void EqEngine::reset()
@@ -67,6 +73,9 @@ void EqEngine::reset()
     minPhaseDelayWritePos = 0;
     minPhaseDelaySamples = 0;
     autoGainSmoothed.setCurrentAndTargetValue(0.0f);
+    linearFadeSamplesRemaining = 0;
+    linearFadeTotalSamples = 0;
+    pendingLinearFadeSamples.store(0);
 }
 
 void EqEngine::process(juce::AudioBuffer<float>& buffer,
@@ -439,6 +448,36 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                 }
             }
 
+            // Crossfade after FIR swaps to prevent zipper artifacts.
+            const int pendingFade = pendingLinearFadeSamples.exchange(0);
+            if (pendingFade > 0)
+            {
+                linearFadeSamplesRemaining = pendingFade;
+                linearFadeTotalSamples = pendingFade;
+            }
+            const bool applyLinearFade = linearFadeSamplesRemaining > 0;
+            if (applyLinearFade)
+            {
+                if (linearFadeBuffer.getNumChannels() != numChannels
+                    || linearFadeBuffer.getNumSamples() < samples)
+                {
+                    linearFadeBuffer.setSize(numChannels, samples);
+                }
+                for (int ch = 0; ch < numChannels; ++ch)
+                    juce::FloatVectorOperations::copy(linearFadeBuffer.getWritePointer(ch),
+                                                      buffer.getReadPointer(ch), samples);
+            }
+
+            // Avoid audio-thread stalls: if FIR update is in progress, fall back to realtime.
+            const juce::SpinLock::ScopedTryLock linearLock(linearPhaseLock);
+            const bool linearSafe = linearLock.isLocked();
+            if (! linearSafe)
+            {
+                linearPhaseDropoutCounter.fetch_add(1);
+                eqDsp.process(buffer, detectorBuffer, nullptr);
+            }
+            else
+            {
             // Linear-phase M/S is only applied to the front L/R pair.
             bool useMs = false;
             if (numChannels >= 2)
@@ -487,15 +526,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             {
                 linearPhaseEq.process(buffer);
             }
-            
-            // v4.5 beta: Tap signal after harmonic processing for linear phase path
-            // Note: In linear phase mode, harmonics are processed in the reference pass (calibBuffer)
-            // but we want to tap the linear phase output which doesn't have harmonics directly
-            // Actually, harmonics are processed per-band in EQDSP, so they're in the linear phase output
-            // We need to create a buffer that has harmonics applied to the linear phase output
-            // For now, tap after linear phase processing - harmonics will be in the final mix
-            // TODO: This might need adjustment if harmonics are only in the reference path
-            
+
             if (mixedPhaseAmount > 0.0f)
             {
                 const float dryMix = 1.0f - mixedPhaseAmount;
@@ -508,6 +539,34 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                 }
             }
 
+            if (applyLinearFade)
+            {
+                const int total = juce::jmax(1, linearFadeTotalSamples);
+                for (int i = 0; i < samples; ++i)
+                {
+                    if (linearFadeSamplesRemaining <= 0)
+                        break;
+                    const float t = 1.0f - static_cast<float>(linearFadeSamplesRemaining)
+                        / static_cast<float>(total);
+                    for (int ch = 0; ch < numChannels; ++ch)
+                    {
+                        auto* wet = buffer.getWritePointer(ch);
+                        const auto* dry = linearFadeBuffer.getReadPointer(ch);
+                        wet[i] = wet[i] * t + dry[i] * (1.0f - t);
+                    }
+                    --linearFadeSamplesRemaining;
+                }
+            }
+            }
+
+            // v4.5 beta: Tap signal after harmonic processing for linear phase path
+            // Note: In linear phase mode, harmonics are processed in the reference pass (calibBuffer)
+            // but we want to tap the linear phase output which doesn't have harmonics directly
+            // Actually, harmonics are processed per-band in EQDSP, so they're in the linear phase output
+            // We need to create a buffer that has harmonics applied to the linear phase output
+            // For now, tap after linear phase processing - harmonics will be in the final mix
+            // TODO: This might need adjustment if harmonics are only in the reference path
+            
             // Realtime reference pass for post-mode RMS calibration.
             harmonicTapBuffer.setSize(numChannels, calibBuffer.getNumSamples(), false, false, true);
             harmonicTapBuffer.clear();
@@ -626,17 +685,27 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
         const float wetStep = (wetEnd - wetStart) / static_cast<float>(numSamples);
 
         float wet = wetStart;
+        int fadeRemaining = mixDelayFadeSamplesRemaining;
+        const int fadeSamples = mixDelayFadeSamplesRemaining;
         for (int i = 0; i < numSamples; ++i)
         {
-            const float dryGain = 1.0f - wet;
+            float wetApplied = wet;
+            if (fadeRemaining > 0)
+            {
+                const float t = 1.0f - static_cast<float>(fadeRemaining) / static_cast<float>(fadeSamples);
+                wetApplied *= t;
+                --fadeRemaining;
+            }
+            const float dryGain = 1.0f - wetApplied;
             for (int ch = 0; ch < mixChannels; ++ch)
             {
                 auto* data = buffer.getWritePointer(ch);
                 const float dry = dryBuffer.getReadPointer(ch)[i];
-                data[i] = dry * dryGain + data[i] * wet;
+                data[i] = dry * dryGain + data[i] * wetApplied;
             }
             wet += wetStep;
         }
+        mixDelayFadeSamplesRemaining = fadeRemaining;
     }
 
     if (snapshot.phaseInvert)
@@ -808,6 +877,11 @@ void EqEngine::setDebugToneFrequency(float frequencyHz)
     debugPhaseDelta = 2.0 * juce::MathConstants<double>::pi * freq / sampleRateHz;
 }
 
+void EqEngine::setAdaptiveQualityOffset(int offset)
+{
+    adaptiveQualityOffset.store(juce::jlimit(-2, 0, offset));
+}
+
 int EqEngine::getLatencySamples() const
 {
     if (lastPhaseMode == 0)
@@ -876,7 +950,8 @@ void EqEngine::updateLinearPhase(const ParamSnapshot& snapshot, double sampleRat
         lowFreqBoost = 3;
 
     // Natural uses shorter FIRs with mixed-phase blend, Linear uses longer FIRs for maximum phase accuracy.
-    const int quality = juce::jlimit(0, 4, snapshot.linearQuality);
+    const int quality = juce::jlimit(0, 4,
+                                     snapshot.linearQuality + adaptiveQualityOffset.load());
     const int index = juce::jmin(4, quality + complexityBoost + lowFreqBoost);
     const std::array<int, 5> naturalTaps { 256, 512, 1024, 2048, 4096 };
     const std::array<int, 5> linearTaps { 1024, 2048, 4096, 8192, 16384 };
@@ -891,9 +966,11 @@ void EqEngine::updateLinearPhase(const ParamSnapshot& snapshot, double sampleRat
     // Use uniform convolution for now to avoid dropouts in lower quality modes.
     const int headSize = 0;
 
-    rebuildLinearPhase(snapshot, taps, headSize, sampleRate);
+    rebuildLinearPhase(snapshot, taps, headSize, sampleRate, quality);
+    pendingLinearFadeSamples.store(juce::jmin(512, maxPreparedBlockSize));
     juce::Logger::writeToLog("LinearPhase rebuild: mode=" + juce::String(snapshot.phaseMode)
                              + " quality=" + juce::String(quality)
+                             + " offset=" + juce::String(adaptiveQualityOffset.load())
                              + " taps=" + juce::String(taps)
                              + " window=" + juce::String(snapshot.linearWindow));
     lastParamHash = hash;
@@ -933,10 +1010,9 @@ uint64_t EqEngine::computeParamsHash(const ParamSnapshot& snapshot) const
     return hash;
 }
 
-void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int headSize, double sampleRate)
+void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int headSize, double sampleRate,
+                                  int effectiveQuality)
 {
-    linearPhaseEq.beginImpulseUpdate(headSize, snapshot.numChannels);
-    linearPhaseMsEq.beginImpulseUpdate(headSize, snapshot.numChannels >= 2 ? 2 : 0);
     const int fftSize = juce::nextPowerOfTwo(taps * 2);
     const int fftOrder = static_cast<int>(std::log2(fftSize));
     if (fftSize != firFftSize || fftOrder != firFftOrder)
@@ -953,9 +1029,9 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int h
     int windowIndex = snapshot.linearWindow;
     if (windowIndex == 0)
     {
-        if (snapshot.linearQuality >= 4)
+        if (effectiveQuality >= 4)
             windowIndex = 2; // Kaiser for maximum stop-band attenuation.
-        else if (snapshot.linearQuality >= 2)
+        else if (effectiveQuality >= 2)
             windowIndex = 1; // Blackman for smoother bands.
         else
             windowIndex = 0; // Hann for lowest latency.
@@ -1217,6 +1293,8 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int h
         }
     };
 
+    std::vector<juce::AudioBuffer<float>> channelImpulses;
+    channelImpulses.reserve(static_cast<size_t>(snapshot.numChannels));
     for (int ch = 0; ch < snapshot.numChannels; ++ch)
     {
         auto impulse = buildImpulse(ch, [&](int band)
@@ -1229,9 +1307,11 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int h
             return ! isMs || ! isFrontPair;
         });
         ensureImpulseValid(impulse, "ch=" + juce::String(ch));
-        linearPhaseEq.loadImpulse(ch, std::move(impulse), sampleRate);
+        channelImpulses.emplace_back(std::move(impulse));
     }
 
+    juce::AudioBuffer<float> midImpulse;
+    juce::AudioBuffer<float> sideImpulse;
     if (snapshot.numChannels >= 2)
     {
         auto includeMid = [&](int band)
@@ -1246,18 +1326,28 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int h
         const bool isFrontPair = (snapshot.bandChannelMasks[band] & 0x3u) == 0x3u;
         return isFrontPair && target == 2;
         };
-        auto midImpulse = buildImpulse(0, includeMid);
-        auto sideImpulse = buildImpulse(0, includeSide);
+        midImpulse = buildImpulse(0, includeMid);
+        sideImpulse = buildImpulse(0, includeSide);
         ensureImpulseValid(midImpulse, "mid");
         ensureImpulseValid(sideImpulse, "side");
-        linearPhaseMsEq.loadImpulse(0, std::move(midImpulse), sampleRate);
-        linearPhaseMsEq.loadImpulse(1, std::move(sideImpulse), sampleRate);
     }
-    linearPhaseEq.endImpulseUpdate();
-    linearPhaseMsEq.endImpulseUpdate();
 
     const int latency = (taps - 1) / 2;
-    linearPhaseEq.setLatencySamples(latency);
+    {
+        const juce::SpinLock::ScopedLock lock(linearPhaseLock);
+        linearPhaseEq.beginImpulseUpdate(headSize, snapshot.numChannels);
+        linearPhaseMsEq.beginImpulseUpdate(headSize, snapshot.numChannels >= 2 ? 2 : 0);
+        for (int ch = 0; ch < snapshot.numChannels; ++ch)
+            linearPhaseEq.loadImpulse(ch, std::move(channelImpulses[static_cast<size_t>(ch)]), sampleRate);
+        if (snapshot.numChannels >= 2)
+        {
+            linearPhaseMsEq.loadImpulse(0, std::move(midImpulse), sampleRate);
+            linearPhaseMsEq.loadImpulse(1, std::move(sideImpulse), sampleRate);
+        }
+        linearPhaseEq.endImpulseUpdate();
+        linearPhaseMsEq.endImpulseUpdate();
+        linearPhaseEq.setLatencySamples(latency);
+    }
 }
 
 void EqEngine::updateOversampling(const ParamSnapshot& snapshot, double sampleRate, int maxBlockSize, int channels)
@@ -1319,6 +1409,10 @@ void EqEngine::updateDryDelay(int latencySamples, int maxBlockSize, int numChann
         mixDelaySamples = targetDelay;
         dryDelayBuffer.clear();
         dryDelayWritePos = 0;
+        mixDelayFadeSamplesRemaining = juce::jmin(512, maxBlockSize);
+        juce::Logger::writeToLog("GlobalMix dry-delay: latency=" + juce::String(mixDelaySamples)
+                                 + " samples, maxBlock=" + juce::String(maxBlockSize)
+                                 + ", channels=" + juce::String(numChannels));
     }
 }
 

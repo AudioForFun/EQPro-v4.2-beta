@@ -47,6 +47,8 @@ Notes:
 - No heap allocations in `process`.
 - Uses `ParamSnapshot` exclusively for parameters.
 - Global dry/wet mix uses an internal delay line to align dry with linear-phase latency.
+- Linear/Natural modes use a thread-safe FIR swap (try-lock) with a short crossfade to avoid artifacts.
+- Adaptive quality may temporarily reduce linear FIR depth under CPU pressure, then recover automatically.
 - Standalone buffer policy targets 2048 @ 1x SR, then scales with SR (2x→4096, 4x→8192, 8x→16384).
 - Startup diagnostics write a log to `%TEMP%\\EQPro_startup_*.log`.
 - Standalone state restore is disabled by default; set `EQPRO_LOAD_STATE=1` to enable.
@@ -81,6 +83,7 @@ Usage:
 - Taps must be lock‑free.
 - Prefer block ramps (`applyGainRamp`) over per‑sample smoothing loops.
 - Decimate analyzer/meter updates at high sample rates to reduce CPU load.
+- Analyzer FFT updates are throttled during linear/natural modes to protect realtime headroom.
 
 ## Processor ↔ UI Contract
 
@@ -88,7 +91,7 @@ Usage:
 - Own APVTS, `EqEngine`, snapshots, and taps.
 - Build snapshots in `timerCallback`.
 - Expose read‑only accessors:
-  - `getAnalyzerPreFifo()`, `getAnalyzerPostFifo()`, `getAnalyzerExternalFifo()`
+  - `getAnalyzerPreFifo()`, `getAnalyzerPostFifo()`, `getAnalyzerHarmonicFifo()`, `getAnalyzerExternalFifo()`
   - `getMeterState()`, `getCorrelation()`
 
 ### UI Responsibilities
@@ -536,6 +539,11 @@ format lists are:
     * Undo/Redo buttons
   - Harmonized visual language across entire GUI (knobs, toggles, and buttons) with flat colors
 
+## v4.5 / v4.9 Beta (Documentation)
+- **Harmonic analyzer tap**: Processor exposes `getAnalyzerHarmonicFifo()`; `EqEngine::process()` takes `harmonicTap` and pushes harmonic-only content for the red analyzer curve.
+- **Per-band harmonic parameters**: Documented in ParamSnapshot and Parameter Summary (odd/even harmonic dB and mix, per-band harmonic bypass).
+- **Oversampling**: Single quality-driven oversampling path (ParamSnapshot `oversampling`); v4.9 doc alignment.
+
 ## Call Flow (Simplified)
 1. UI updates APVTS parameters.
 2. `timerCallback` builds `ParamSnapshot` and swaps it.
@@ -551,9 +559,11 @@ flowchart LR
   PROC -->|process()| ENG[EqEngine]
   ENG -->|push()| PRE[AnalyzerTap (pre)]
   ENG -->|push()| POST[AnalyzerTap (post)]
+  ENG -->|push()| HARM[AnalyzerTap (harmonic)]
   ENG -->|process()| METER[MeterTap]
   PRE -->|read FIFO| UI
   POST -->|read FIFO| UI
+  HARM -->|read FIFO| UI
   METER -->|read state| UI
 ```
 
@@ -569,6 +579,7 @@ For larger architecture and threading diagrams, see `docs/DIAGRAMS.md`.
 | `timerCallback()` | message | Builds next snapshot and updates linear phase. |
 | `getAnalyzerPreFifo()` | UI | Read-only access to pre analyzer FIFO. |
 | `getAnalyzerPostFifo()` | UI | Read-only access to post analyzer FIFO. |
+| `getAnalyzerHarmonicFifo()` | UI | Read-only access to harmonic analyzer FIFO (red curve; v4.5 beta). |
 | `getMeterState()` | UI | Read-only access to meter state. |
 | `getCorrelation()` | UI | Read-only access to correlation. |
 
@@ -628,4 +639,5 @@ For larger architecture and threading diagrams, see `docs/DIAGRAMS.md`.
 - `slope`: Filter slope (dB/oct).
 - `solo`: Band solo.
 - `mix`: Band dry/wet mix (percentage).
+- **Harmonic layer (v4.5 beta)**: `oddHarmonicDb`, `mixOdd`, `evenHarmonicDb`, `mixEven`, `harmonicBypass` (per-band harmonic bypass, default on).
 

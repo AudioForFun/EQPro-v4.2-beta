@@ -42,6 +42,7 @@
 
 ## Analyzer (Milestone 2)
 - Pre/post analyzer taps into channel 1 via lock-free FIFO (`AnalyzerTap`).
+- **Harmonic tap (v4.5 beta)**: Third `AnalyzerTap` carries harmonic-only content for the red analyzer curve; accessed via `getAnalyzerHarmonicFifo()`.
 - FFT runs on a UI timer (30 Hz) and uses windowed FFT.
 - EQ curve is computed from current band parameters for display.
 - External analyzer input can be enabled for overlay visualization.

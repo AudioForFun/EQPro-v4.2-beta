@@ -220,13 +220,19 @@ private:
     int lastMaxBlockSize = 0;
     uint64_t lastSnapshotHash = 0;
     int snapshotTick = 0;
+    int lastParamChangeTick = 0;
     int lastLinearRebuildTick = -100;
     int lastLinearPhaseMode = 0;
     int lastLinearQuality = 0;
     int lastLinearWindow = 0;
+    bool pendingLinearRebuild = false;
     juce::ThreadPool linearPhasePool { 1 };
     std::atomic<bool> linearJobRunning { false };
     std::atomic<int> pendingLatencySamples { -1 };
+    std::atomic<int> adaptiveQualityOffset { 0 };
+    std::atomic<int> pendingAdaptiveQualityLog { 999 };
+    int cpuOverloadCounter = 0;
+    int cpuRecoverCounter = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EQProAudioProcessor)
 };

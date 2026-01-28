@@ -270,6 +270,7 @@ private:
     std::vector<int> msChoiceMap;
     std::array<std::array<BandState, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels> bandStateCache {};
     std::array<std::array<bool, ParamIDs::kBandsPerChannel>, ParamIDs::kMaxChannels> bandStateValid {};
+    std::array<bool, ParamIDs::kMaxChannels> bandStateDirty {};
 
     void resetSelectedBand();
     void resetAllBands();

@@ -17,17 +17,12 @@
   - Hann
   - Blackman
   - Kaiser
-- `oversampling` (choice, currently disabled)
-  - Off
-  - 2x
-  - 4x
-- `harmonicLayerOversampling` (choice, v4.5 beta) - Global harmonic layer oversampling (applies to all bands uniformly)
-  - NONE
-  - 2X
-  - 4X
-  - 8X
-  - 16X
-  - Note: Only available in Natural Phase and Linear Phase modes (disabled in Real-time)
+- `oversampling` (choice, v4.9 beta) - Single quality-driven oversampling for realtime EQ (and harmonic path)
+  - Low (none)
+  - Medium (2x)
+  - High (4x)
+  - Very High (8x)
+  - Intensive (16x)
 - `outputTrim` (float, dB, -inf..+24)
 - `spectralEnable` (bool)
 - `spectralThreshold` (float, dB, -60..0)

@@ -356,6 +356,7 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 {
     // Critical path: process audio on the realtime thread.
     juce::ScopedNoDenormals noDenormals;
+    const auto startTicks = juce::Time::getHighResolutionTicks();
 
     const auto numChannels = juce::jmin(buffer.getNumChannels(), ParamIDs::kMaxChannels);
 
@@ -410,6 +411,56 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     const int snapshotIndex = activeSnapshot.load();
     const auto& snapshot = snapshots[snapshotIndex];
     eqEngine.process(buffer, snapshot, detectorBuffer, analyzerPreTap, analyzerPostTap, analyzerHarmonicTap, meterTap);
+
+    if (snapshot.phaseMode != 0 && lastSampleRate > 0.0)
+    {
+        // Adaptive quality: reduce linear FIR load during CPU pressure, recover when stable.
+        const auto endTicks = juce::Time::getHighResolutionTicks();
+        const double elapsedSeconds = juce::Time::highResolutionTicksToSeconds(endTicks - startTicks);
+        const double blockSeconds = static_cast<double>(buffer.getNumSamples()) / lastSampleRate;
+        if (blockSeconds > 0.0)
+        {
+            const double ratio = elapsedSeconds / blockSeconds;
+            if (ratio > 0.90)
+            {
+                ++cpuOverloadCounter;
+                cpuRecoverCounter = 0;
+            }
+            else if (ratio < 0.60)
+            {
+                ++cpuRecoverCounter;
+                cpuOverloadCounter = 0;
+            }
+
+            int currentOffset = adaptiveQualityOffset.load();
+            if (cpuOverloadCounter >= 3 && currentOffset > -2)
+            {
+                currentOffset -= 1;
+                adaptiveQualityOffset.store(currentOffset);
+                pendingAdaptiveQualityLog.store(currentOffset);
+                cpuOverloadCounter = 0;
+            }
+            else if (cpuRecoverCounter >= 8 && currentOffset < 0)
+            {
+                currentOffset += 1;
+                adaptiveQualityOffset.store(currentOffset);
+                pendingAdaptiveQualityLog.store(currentOffset);
+                cpuRecoverCounter = 0;
+            }
+            eqEngine.setAdaptiveQualityOffset(currentOffset);
+        }
+    }
+    else
+    {
+        if (adaptiveQualityOffset.load() != 0)
+        {
+            adaptiveQualityOffset.store(0);
+            pendingAdaptiveQualityLog.store(0);
+            eqEngine.setAdaptiveQualityOffset(0);
+        }
+        cpuOverloadCounter = 0;
+        cpuRecoverCounter = 0;
+    }
 
     if (analyzerExternalParam != nullptr && analyzerExternalParam->load() > 0.5f && detectorBuffer != nullptr
         && detectorBuffer->getNumChannels() > 0)
@@ -1232,18 +1283,30 @@ void EQProAudioProcessor::timerCallback()
         pendingLatencySamples.store(-1);
     }
 
-    if (sampleRate > 0.0 && hash != lastSnapshotHash)
+    const bool paramChanged = hash != lastSnapshotHash;
+    if (paramChanged)
+    {
+        lastParamChangeTick = snapshotTick;
+        pendingLinearRebuild = true;
+    }
+
+    if (sampleRate > 0.0 && (paramChanged || pendingLinearRebuild))
     {
         const auto& snapshot = snapshots[nextIndex];
         const bool phaseConfigChanged = snapshot.phaseMode != lastLinearPhaseMode
             || snapshot.linearQuality != lastLinearQuality
             || snapshot.linearWindow != lastLinearWindow;
+        // Debounce FIR rebuilds while dragging to reduce linear-phase artifacts.
         const bool allowRebuild = phaseConfigChanged
-            || (snapshotTick - lastLinearRebuildTick) >= 2;
+            || (pendingLinearRebuild && (snapshotTick - lastParamChangeTick) >= 6);
 
         if (allowRebuild && ! linearJobRunning.load())
         {
             linearJobRunning.store(true);
+            juce::Logger::writeToLog("LinearPhase: scheduling FIR rebuild (mode="
+                                     + juce::String(snapshot.phaseMode)
+                                     + ", quality=" + juce::String(snapshot.linearQuality)
+                                     + ", window=" + juce::String(snapshot.linearWindow) + ")");
             linearPhasePool.addJob(new LinearPhaseJob(eqEngine, snapshot, sampleRate,
                                                       pendingLatencySamples, linearJobRunning),
                                    true);
@@ -1251,6 +1314,7 @@ void EQProAudioProcessor::timerCallback()
             lastLinearPhaseMode = snapshot.phaseMode;
             lastLinearQuality = snapshot.linearQuality;
             lastLinearWindow = snapshot.linearWindow;
+            pendingLinearRebuild = false;
         }
     }
 
@@ -1281,6 +1345,14 @@ void EQProAudioProcessor::timerCallback()
                        + " post=" + juce::String(postDb, 2) + " dB"
                        + " delta=" + juce::String(postDb - preDb, 2) + " dB");
         }
+    }
+
+    const int pendingQualityLog = pendingAdaptiveQualityLog.exchange(999);
+    if (pendingQualityLog != 999)
+    {
+        logStartup("Adaptive quality offset: " + juce::String(pendingQualityLog));
+        pendingLinearRebuild = true;
+        lastParamChangeTick = snapshotTick - 6;
     }
 }
 

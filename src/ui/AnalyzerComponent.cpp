@@ -12,7 +12,7 @@
 
 namespace
 {
-constexpr float kMinFreq = 10.0f;
+constexpr float kMinFreq = 5.0f;
 constexpr float kMaxDb = 60.0f;
 constexpr float kMinDb = -60.0f;
 constexpr float kAnalyzerMinDb = -60.0f;
@@ -1339,7 +1339,15 @@ void AnalyzerComponent::timerCallback()
 
     // v4.4 beta: More reactive - update FFT every frame for instant response
     bool didUpdate = false;
-    if (! freeze)
+    const int phaseMode = processorRef.getLastRmsPhaseMode();
+    // Throttle analyzer updates in linear/natural modes to protect audio CPU headroom.
+    const int throttleDiv = phaseMode != 0 ? 2 : 1;
+    if (throttleDiv == 1)
+        throttleCounter = 0;
+    bool shouldUpdateFft = ! freeze;
+    if (shouldUpdateFft && throttleDiv > 1)
+        shouldUpdateFft = (++throttleCounter % throttleDiv) == 0;
+    if (shouldUpdateFft)
     {
         updateFft();
         didUpdate = true;
@@ -1376,8 +1384,9 @@ void AnalyzerComponent::updateFft()
             sum += mags[i];
         const float avg = sum / static_cast<float>(lowBinLimit);
 
+        // Flatten the lowest bins to avoid a visual slope at the left edge.
         for (int i = 1; i <= lowBinLimit; ++i)
-            mags[i] = Smoothing::smooth(mags[i], avg, 0.15f);
+            mags[i] = avg;
     };
 
     const int viewIndex = parameters.getRawParameterValue(ParamIDs::analyzerView) != nullptr
@@ -1776,7 +1785,7 @@ void AnalyzerComponent::drawGridLines(juce::Graphics& g, const juce::Rectangle<i
     
     // Draw frequency grid lines and labels.
     const float maxFreq = getMaxFreq();
-    const float majorFreqs[] { 20.0f, 50.0f, 100.0f, 200.0f, 500.0f, 1000.0f, 2000.0f, 5000.0f, 10000.0f, 20000.0f };
+    const float majorFreqs[] { 5.0f, 10.0f, 20.0f, 50.0f, 100.0f, 200.0f, 500.0f, 1000.0f, 2000.0f, 5000.0f, 10000.0f, 20000.0f };
     const float minorFreqs[] { 31.5f, 40.0f, 63.0f, 80.0f, 125.0f, 160.0f, 250.0f, 315.0f, 400.0f,
                                630.0f, 800.0f, 1250.0f, 1600.0f, 2500.0f, 3150.0f, 4000.0f,
                                6300.0f, 8000.0f, 12500.0f, 16000.0f };

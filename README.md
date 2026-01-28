@@ -73,6 +73,9 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 - **Optimized performance** with deferred initialization and buffered rendering
 - **Professional DSP architecture** with clean separation between audio and UI threads
 - **Comprehensive parameter automation** support for all controls
+- **Adaptive linear quality** with safe fallback and recovery during CPU pressure
+- **Thread-safe FIR swaps** with short crossfades to prevent zipper artifacts
+- **Analyzer throttling** in linear/natural modes to preserve audio headroom
 
 ## Build Notes (Windows)
 - **ASIO support** requires the Steinberg ASIO SDK (not bundled). After installing it, set `EQPRO_ASIO_SDK_PATH` in CMake to the SDK folder to enable ASIO in the standalone app.
@@ -120,6 +123,7 @@ Built on JUCE with zero-compromise audio quality, EQ Pro features phase-accurate
 ### DSP Reliability
 - Auto-gain now matches input RMS reliably (no runaway boosts)
 - Harmonic generation clamps non-finite values to avoid unexpected spikes
+- Linear/Natural processing uses a non-blocking FIR swap to avoid stalls under load
 
 ### UI Organization
 - Improved header layout with layer toggles on left, band number on right

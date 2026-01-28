@@ -1297,6 +1297,7 @@ void BandControlsPanel::cacheBandFromUi(int channelIndex, int bandIndex)
     state.dynAuto = autoScaleToggle.getToggleState() ? 1.0f : 0.0f;
     state.dynExternal = dynExternalToggle.getToggleState() ? 1.0f : 0.0f;
     bandStateValid[static_cast<size_t>(channelIndex)][static_cast<size_t>(bandIndex)] = true;
+    bandStateDirty[static_cast<size_t>(channelIndex)] = true;
 }
 
 void BandControlsPanel::cacheBandFromParams(int channelIndex, int bandIndex)
@@ -1351,6 +1352,10 @@ void BandControlsPanel::applyCachedBandToParams(int channelIndex)
 {
     if (channelIndex < 0 || channelIndex >= ParamIDs::kMaxChannels)
         return;
+    if (! bandStateDirty[static_cast<size_t>(channelIndex)])
+        return;
+    juce::Logger::writeToLog("Band cache: applying cached band state for channel "
+                             + juce::String(channelIndex));
 
     auto setParamValue = [this, channelIndex](int band, const juce::String& suffix, float value)
     {
@@ -1389,6 +1394,7 @@ void BandControlsPanel::applyCachedBandToParams(int channelIndex)
         setParamValue(band, "dynAuto", state.dynAuto);
         setParamValue(band, "dynExternal", state.dynExternal);
     }
+    bandStateDirty[static_cast<size_t>(channelIndex)] = false;
 }
 
 void BandControlsPanel::restoreBandFromCache()
@@ -1794,11 +1800,13 @@ void BandControlsPanel::resetSelectedBand()
     resetParam("dynRelease");
     resetParam("dynAuto");
     resetParam("dynExternal");
-
-    if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(channel, band, "bypass")))
-        bypassParam->setValueNotifyingHost(0.0f);
-    if (auto* soloParam = parameters.getParameter(ParamIDs::bandParamId(channel, band, "solo")))
-        soloParam->setValueNotifyingHost(0.0f);
+    resetParam("odd");
+    resetParam("mixOdd");
+    resetParam("even");
+    resetParam("mixEven");
+    resetParam("harmonicBypass");
+    resetParam("bypass");
+    resetParam("solo");
 
     cacheBandFromParams(channel, band);
 }
@@ -1829,10 +1837,13 @@ void BandControlsPanel::resetAllBands()
         resetParam(band, "dynRelease");
         resetParam(band, "dynAuto");
         resetParam(band, "dynExternal");
-        if (auto* bypassParam = parameters.getParameter(ParamIDs::bandParamId(channel, band, "bypass")))
-            bypassParam->setValueNotifyingHost(0.0f);
-        if (auto* soloParam = parameters.getParameter(ParamIDs::bandParamId(channel, band, "solo")))
-            soloParam->setValueNotifyingHost(0.0f);
+        resetParam(band, "odd");
+        resetParam(band, "mixOdd");
+        resetParam(band, "even");
+        resetParam(band, "mixEven");
+        resetParam(band, "harmonicBypass");
+        resetParam(band, "bypass");
+        resetParam(band, "solo");
 
         cacheBandFromParams(channel, band);
     }

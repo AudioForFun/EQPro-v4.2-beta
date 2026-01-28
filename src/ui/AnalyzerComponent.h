@@ -138,6 +138,7 @@ private:
 
     float lastSampleRate = 48000.0f;
     int frameCounter = 0;
+    int throttleCounter = 0;
     float minDb = -60.0f;
     float maxDb = 60.0f;
     int analyzerSpeedIndex = -1;

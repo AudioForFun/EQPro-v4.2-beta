@@ -341,6 +341,7 @@ public:
         {
             if (auto* device = deviceManager.getCurrentAudioDevice())
             {
+                Logger::writeToLog ("Standalone buffer policy: 2048 @ 1x SR, scaled with SR.");
                 const auto sampleRate = device->getCurrentSampleRate();
                 const auto bufferSizes = device->getAvailableBufferSizes();
                 String sizeList;

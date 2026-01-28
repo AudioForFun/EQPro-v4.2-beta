@@ -1,7 +1,7 @@
 # EQ Pro Modules
 
 ## DSP
-- `EqEngine`: top-level DSP router; switches phase modes, builds FIRs, applies quality/oversampling, aligns dry/wet, and feeds analyzer/meter taps.
+- `EqEngine`: top-level DSP router; switches phase modes, builds FIRs, applies quality/oversampling, aligns dry/wet, and feeds analyzer/meter taps. Includes adaptive linear quality, thread-safe FIR swaps, and crossfades to avoid artifacts.
 - `EQDSP`: per-channel minimum-phase IIR engine (12 bands). Handles tilt/flat tilt, slopes, per-band channel targets (all/MS/L/R + immersive pairs), smart solo audition, per-band mix, dynamics, and harmonic generation.
 - `Biquad`: RBJ-style biquad core for IIR bands, sample-accurate processing.
 - `OnePole`: single-pole filter for fractional HP/LP slope contributions.
@@ -11,7 +11,7 @@
 
 ## UI
 - `PluginEditor`: main layout and global controls. Hosts analyzer (top), controls (mid), meters/correlation (right), and processing row (bottom). Handles resizing.
-- `AnalyzerComponent`: spectrum analyzer (pre/post/external), EQ curve, per-band curve overlay, band points, and spectrum grab.
+- `AnalyzerComponent`: spectrum analyzer (pre/post/external), EQ curve, per-band curve overlay, band points, and spectrum grab. Throttles FFT updates in linear/natural modes to reduce CPU spikes.
 - `BandControlsPanel`: per-band controls (freq/gain/Q/type/slope/channel target/mix, bypass/solo, copy/paste, reset/delete).
 - `MetersComponent`: multi-channel RMS/peak meters with peak readout and phase bar.
 - `CorrelationComponent`: correlation meter/graph.

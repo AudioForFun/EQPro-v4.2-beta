@@ -15,7 +15,7 @@
 - Per-band curves are overlaid with a highlighted selected band.
 - The plot shows a small legend for Pre/Post/Ext.
 - Dragging a band point shows a value pill (freq + gain).
-- Analyzer curve renders down to 5 Hz to avoid low-end gaps.
+- Analyzer curve renders down to 10 Hz to avoid low-end gaps.
 
 ## Band Controls
 - Per-band: Frequency, Gain, Q, Mix, Filter Type (dropdown), Slope (dropdown).
@@ -35,7 +35,7 @@
 
 ## Processing / Global
 - Phase mode: Real-time / Natural / Linear.
-- Linear quality selection.
+- Linear quality selection (linear phase only; drives linear oversampling).
 - Character modes: Gentle / Warm.
 - Auto Gain + Gain Scale.
 - Output Trim (smoothed).

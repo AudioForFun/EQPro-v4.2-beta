@@ -390,6 +390,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     outputTrimSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 68, 18);
     outputTrimSlider.setTextBoxIsEditable(true);
     outputTrimSlider.setTextValueSuffix(" dB");
+    // v5.4 beta: Match output trim range spec (-120 dB .. +36 dB).
     outputTrimSlider.setRange(-120.0, 36.0, 0.01);
     outputTrimSlider.setColour(juce::Slider::trackColourId, juce::Colour(0xff38bdf8));
     addAndMakeVisible(outputTrimSlider);

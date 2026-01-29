@@ -1,4 +1,4 @@
-# EQ Pro (JUCE) - 5.3 beta
+# EQ Pro (JUCE) - 5.4 beta
 
 Professional multi-channel EQ plugin with harmonic processing and advanced visual feedback.
 

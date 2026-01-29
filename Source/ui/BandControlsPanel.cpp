@@ -345,6 +345,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     freqSlider.setTextBoxIsEditable(true);
     freqSlider.setSkewFactorFromMidPoint(1000.0);
     freqSlider.setTextValueSuffix(" Hz");
+    // v5.4 beta: Match band frequency range spec (10 Hz .. 30 kHz).
     freqSlider.setRange(10.0, 30000.0, 0.01);
     freqSlider.setTooltip("Band frequency");
     freqSlider.onDoubleClick = [this]
@@ -366,6 +367,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     gainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     gainSlider.setTextBoxIsEditable(true);
     gainSlider.setTextValueSuffix(" dB");
+    // v5.4 beta: Match band gain range spec (-30 dB .. +30 dB).
     gainSlider.setRange(-30.0, 30.0, 0.01);
     gainSlider.setTooltip("Band gain");
     gainSlider.onDoubleClick = [this]
@@ -386,6 +388,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     qSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     qSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     qSlider.setTextBoxIsEditable(true);
+    // v5.4 beta: Match band Q range spec (0.025 .. 40).
     qSlider.setRange(0.025, 40.0, 0.001);
     qSlider.setTooltip("Band Q");
     qSlider.onDoubleClick = [this]

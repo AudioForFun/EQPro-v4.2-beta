@@ -13,7 +13,8 @@
 namespace
 {
 // Lower bound so the curve renders across the full spectrum (no low-end gap).
-constexpr float kMinFreq = 1.0f;
+// v5.4 beta: Analyzer axis starts at 10 Hz (lowest labeled tick).
+constexpr float kMinFreq = 10.0f;
 constexpr float kMaxDb = 60.0f;
 constexpr float kMinDb = -60.0f;
 constexpr float kAnalyzerMinDb = -60.0f;
@@ -470,12 +471,17 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         const int size = static_cast<int>(curve.size());
         if (size <= 0)
             return floorDb;
-        const int i0 = juce::jlimit(0, size - 1, index - 1);
-        const int i1 = juce::jlimit(0, size - 1, index);
-        const int i2 = juce::jlimit(0, size - 1, index + 1);
-        const float smoothed = 0.25f * curve[static_cast<size_t>(i0)]
-            + 0.5f * curve[static_cast<size_t>(i1)]
-            + 0.25f * curve[static_cast<size_t>(i2)];
+    const int i0 = juce::jlimit(0, size - 1, index - 2);
+    const int i1 = juce::jlimit(0, size - 1, index - 1);
+    const int i2 = juce::jlimit(0, size - 1, index);
+    const int i3 = juce::jlimit(0, size - 1, index + 1);
+    const int i4 = juce::jlimit(0, size - 1, index + 2);
+    // v5.4 beta: 5-point weighted smoothing to reduce pointy EQ curves.
+    const float smoothed = 0.1f * curve[static_cast<size_t>(i0)]
+        + 0.2f * curve[static_cast<size_t>(i1)]
+        + 0.4f * curve[static_cast<size_t>(i2)]
+        + 0.2f * curve[static_cast<size_t>(i3)]
+        + 0.1f * curve[static_cast<size_t>(i4)];
         return std::max(floorDb, smoothed);
     };
 

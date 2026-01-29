@@ -1830,10 +1830,10 @@ uint64_t EQProAudioProcessor::buildSnapshot(eqdsp::ParamSnapshot& snapshot)
     snapshot.phaseMode = phaseModeParam != nullptr ? static_cast<int>(phaseModeParam->load()) : 0;
     const int rawQuality =
         linearQualityParam != nullptr ? static_cast<int>(linearQualityParam->load()) : 1;
-    // v4.6 beta: Quality now applies across realtime/natural/linear modes.
+    // v4.6 beta: Quality is selectable in linear mode.
     snapshot.linearQuality = rawQuality;
     snapshot.linearWindow = linearWindowParam != nullptr ? static_cast<int>(linearWindowParam->load()) : 0;
-    // v4.6 beta: Oversampling is driven by the quality ladder (low->none ... intensive->16x).
+    // v4.6 beta: Oversampling follows quality, but only in linear mode.
     snapshot.oversampling = rawQuality;
     snapshot.outputTrimDb = outputTrimParam != nullptr ? outputTrimParam->load() : 0.0f;
     snapshot.characterMode = characterModeParam != nullptr ? static_cast<int>(characterModeParam->load()) : 0;

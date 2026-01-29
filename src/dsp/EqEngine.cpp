@@ -240,6 +240,9 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             eqDsp.updateBandParams(ch, band, params);
             if (ch == 0)
                 eqDsp.updateMsBandParams(band, params);
+            eqDspOversampled.updateBandParams(ch, band, params);
+            if (ch == 0)
+                eqDspOversampled.updateMsBandParams(band, params);
         }
     }
 
@@ -249,7 +252,8 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     eqDspOversampled.setBandChannelMasks(snapshot.bandChannelMasks);
 
     const int phaseMode = snapshot.phaseMode;
-    const bool useOversampling = (phaseMode == 0 && oversamplingIndex > 0 && oversampler != nullptr);
+    // v5.4 beta: Oversampling is linear-only (no realtime or natural oversampling).
+    const bool useOversampling = (phaseMode == 2 && oversamplingIndex > 0 && oversampler != nullptr);
     bool characterApplied = false;
     if (useOversampling)
     {
@@ -1411,10 +1415,10 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int h
 
 void EqEngine::updateOversampling(const ParamSnapshot& snapshot, double sampleRate, int maxBlockSize, int channels)
 {
-    // Quality ladder drives oversampling depth for realtime EQ:
+    // Quality ladder drives oversampling depth for linear phase only:
     // Low=none, Medium=2x, High=4x, Very High=8x, Intensive=16x.
     const int quality = juce::jlimit(0, 4, snapshot.linearQuality);
-    const int desiredIndex = (snapshot.phaseMode == 0) ? quality : 0;
+    const int desiredIndex = (snapshot.phaseMode == 2) ? quality : 0;
     const bool needsRebuild = desiredIndex != lastOversamplingIndex
         || sampleRate != lastOversamplingSampleRate
         || maxBlockSize != lastOversamplingBlockSize

@@ -7,7 +7,7 @@
   - Real-time
   - Natural
   - Linear
-- `linearQuality` (choice)
+- `linearQuality` (choice, linear mode only)
   - Low
   - Medium
   - High
@@ -17,13 +17,13 @@
   - Hann
   - Blackman
   - Kaiser
-- `oversampling` (choice, v4.9 beta) - Single quality-driven oversampling for realtime EQ (and harmonic path)
+- `oversampling` (choice, v5.4 beta) - Quality-driven oversampling for linear phase only
   - Low (none)
   - Medium (2x)
   - High (4x)
   - Very High (8x)
   - Intensive (16x)
-- `outputTrim` (float, dB, -inf..+24)
+- `outputTrim` (float, dB, -120..+36)
 - `spectralEnable` (bool)
 - `spectralThreshold` (float, dB, -60..0)
 - `spectralRatio` (float, 1..20)
@@ -61,9 +61,9 @@
 
 ## Per Channel / Band
 For channels 1..16 and bands 1..12:
-- `ch{C}_b{B}_freq` (float, Hz, 20..20000)
-- `ch{C}_b{B}_gain` (float, dB, -48..+48)
-- `ch{C}_b{B}_q` (float, 0.1..18)
+- `ch{C}_b{B}_freq` (float, Hz, 10..30000)
+- `ch{C}_b{B}_gain` (float, dB, -30..+30)
+- `ch{C}_b{B}_q` (float, 0.025..40)
 - `ch{C}_b{B}_type` (choice)
   - Bell
   - Low Shelf

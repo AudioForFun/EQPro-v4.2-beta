@@ -22,7 +22,7 @@ Usage:
 
 Key fields (non‑exhaustive):
 - `globalBypass`, `globalMix`, `phaseMode`, `linearQuality`, `linearWindow`
-- `oversampling` (v4.9 beta) - Quality-driven oversampling depth for realtime EQ (Low=none, Medium=2x, High=4x, Very High=8x, Intensive=16x)
+- `oversampling` (v5.4 beta) - Quality-driven oversampling depth for linear phase only (Low=none, Medium=2x, High=4x, Very High=8x, Intensive=16x)
 - `outputTrimDb`, `characterMode`, `smartSolo`
 - `autoGainEnabled`, `gainScale`, `phaseInvert`
 - `bands[ch][band]` with freq/gain/Q/type/bypass/slope/mix/dynamic parameters
@@ -62,7 +62,7 @@ Role: Lock‑free FIFO bridge for analyzer data.
 Usage:
 - DSP calls `push()` from audio thread.
 - UI reads via `AudioFifo& getFifo()` on timer.
-- UI analyzer maps the frequency range down to 5 Hz to avoid a low-end gap.
+- UI analyzer maps the frequency range down to 10 Hz to avoid a low-end gap.
 
 **v4.5 beta**: Added third analyzer tap for harmonic processing visualization:
 - `analyzerHarmonicTap`: Captures harmonic-only content (no dry signal) after harmonic processing
@@ -103,7 +103,7 @@ Usage:
 ## v3.0 Beta Updates (DSP/UI Boundary)
 - `BandControlsPanel` now maintains a **per-channel, per-band UI cache** for all band parameters.
   - Cache updates on UI edits and on timer-driven parameter reads.
-  - Cache is re-applied to APVTS on band switches so **all bands stay active** and the analyzer reflects every band.
+  - Cache refreshes on channel switches without pushing cached values back to APVTS (prevents band overwrites).
   - Cache access remains on the message thread; no audio-thread reads/writes.
 - Analyzer point hit-testing now requires a **tighter center hit** to avoid overlapping band selection.
 
@@ -126,7 +126,8 @@ Usage:
 ## v3.5 Beta Updates (DSP/UI Boundary)
 - Linear/Natural FIR build now uses **per-band mix-aware magnitude** and excludes MS-only bands
   from the full linear path to avoid double-processing.
-- Linear/Natural output is **RMS-calibrated to realtime** for consistent meter levels across modes/quality.
+- Linear/Natural output is **not auto-leveled to realtime RMS** (v5.4 beta) to keep analyzer pre/post aligned when no gain is applied.
+- Linear/Natural FIR builds are **reference-level normalized** (v5.5 beta) for consistent gain across modes/quality.
 - **Dynamic EQ UI and processing are disabled** (controls hidden; processing bypassed) until reintroduced.
 - Goniometer replaces the dynamic panel area and uses **soft-clipped scaling** for stable visualization.
 

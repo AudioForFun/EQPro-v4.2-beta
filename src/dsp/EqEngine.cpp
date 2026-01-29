@@ -49,6 +49,8 @@ void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
     outputTrimGainSmoothed.setCurrentAndTargetValue(1.0f);
     autoGainSmoothed.reset(sampleRate, 0.08);
     autoGainSmoothed.setCurrentAndTargetValue(0.0f);
+    forceTestGainSmoothed.reset(sampleRate, 0.02);
+    forceTestGainSmoothed.setCurrentAndTargetValue(1.0f);
 
     meterSkipFactor = 1;
     if (sampleRateHz >= 256000.0)
@@ -78,6 +80,7 @@ void EqEngine::reset()
     minPhaseDelayWritePos = 0;
     minPhaseDelaySamples = 0;
     autoGainSmoothed.setCurrentAndTargetValue(0.0f);
+    forceTestGainSmoothed.setCurrentAndTargetValue(1.0f);
     linearSwapSamplesRemaining = 0;
     linearSwapTotalSamples = 0;
     linearPrevBuffer.setSize(0, 0);
@@ -104,7 +107,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     lastPhaseMode = snapshot.phaseMode;
     if (previousPhaseMode != snapshot.phaseMode)
     {
-        modeFadeSamplesRemaining = juce::jmin(maxPreparedBlockSize, 8192);
+        modeFadeSamplesRemaining = juce::jmin(maxPreparedBlockSize, 2048);
         modeFadeTotalSamples = modeFadeSamplesRemaining;
     }
     auto computeRms = [](const juce::AudioBuffer<float>& buf, int channels) -> double
@@ -240,9 +243,6 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             eqDsp.updateBandParams(ch, band, params);
             if (ch == 0)
                 eqDsp.updateMsBandParams(band, params);
-            eqDspOversampled.updateBandParams(ch, band, params);
-            if (ch == 0)
-                eqDspOversampled.updateMsBandParams(band, params);
         }
     }
 
@@ -252,8 +252,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     eqDspOversampled.setBandChannelMasks(snapshot.bandChannelMasks);
 
     const int phaseMode = snapshot.phaseMode;
-    // v5.4 beta: Oversampling is linear-only (no realtime or natural oversampling).
-    const bool useOversampling = (phaseMode == 2 && oversamplingIndex > 0 && oversampler != nullptr);
+    const bool useOversampling = (phaseMode == 0 && oversamplingIndex > 0 && oversampler != nullptr);
     bool characterApplied = false;
     if (useOversampling)
     {
@@ -801,6 +800,34 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     }
     }
 
+    const float forceDb = (forceTestEnabled.load() && snapshot.phaseMode == 0) ? 6.0f : 0.0f;
+    const float forceGain = juce::Decibels::decibelsToGain(forceDb);
+    forceTestGainSmoothed.setTargetValue(forceGain);
+    if (forceTestGainSmoothed.isSmoothing()
+        || std::abs(forceGain - 1.0f) > 0.0001f)
+    {
+        const int numSamples = buffer.getNumSamples();
+        const float startGain = forceTestGainSmoothed.getCurrentValue();
+        forceTestGainSmoothed.skip(numSamples);
+        const float endGain = forceTestGainSmoothed.getCurrentValue();
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            buffer.applyGainRamp(ch, 0, numSamples, startGain, endGain);
+    }
+
+    const float forceDb = (forceTestEnabled.load() && snapshot.phaseMode == 0) ? 6.0f : 0.0f;
+    const float forceGain = juce::Decibels::decibelsToGain(forceDb);
+    forceTestGainSmoothed.setTargetValue(forceGain);
+    if (forceTestGainSmoothed.isSmoothing()
+        || std::abs(forceGain - 1.0f) > 0.0001f)
+    {
+        const int numSamples = buffer.getNumSamples();
+        const float startGain = forceTestGainSmoothed.getCurrentValue();
+        forceTestGainSmoothed.skip(numSamples);
+        const float endGain = forceTestGainSmoothed.getCurrentValue();
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            buffer.applyGainRamp(ch, 0, numSamples, startGain, endGain);
+    }
+
     if (modeFadeSamplesRemaining > 0
         && modeFadeBuffer.getNumChannels() == buffer.getNumChannels()
         && modeFadeBuffer.getNumSamples() >= buffer.getNumSamples())
@@ -945,6 +972,16 @@ void EqEngine::setAdaptiveQualityOffset(int offset)
     adaptiveQualityOffset.store(juce::jlimit(-2, 0, offset));
 }
 
+void EqEngine::setForceTestEnabled(bool enabled)
+{
+    forceTestEnabled.store(enabled);
+}
+
+void EqEngine::setForceTestEnabled(bool enabled)
+{
+    forceTestEnabled.store(enabled);
+}
+
 int EqEngine::getLatencySamples() const
 {
     if (lastPhaseMode == 0)
@@ -1030,7 +1067,7 @@ void EqEngine::updateLinearPhase(const ParamSnapshot& snapshot, double sampleRat
     const int headSize = 0;
 
     rebuildLinearPhase(snapshot, taps, headSize, sampleRate, quality);
-    pendingLinearFadeSamples.store(juce::jmin(8192, maxPreparedBlockSize));
+    pendingLinearFadeSamples.store(juce::jmin(2048, maxPreparedBlockSize));
     juce::Logger::writeToLog("LinearPhase rebuild: mode=" + juce::String(snapshot.phaseMode)
                              + " quality=" + juce::String(quality)
                              + " offset=" + juce::String(adaptiveQualityOffset.load())
@@ -1117,7 +1154,7 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int h
         const double nyquist = sampleRate * 0.5;
         std::vector<float> desiredMag;
         desiredMag.resize(static_cast<size_t>(fftSize / 2 + 1), 1.0f);
-
+        
         for (int bin = 0; bin <= fftSize / 2; ++bin)
         {
             const double freq = (sampleRate * bin) / static_cast<double>(fftSize);
@@ -1333,6 +1370,23 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int h
             for (int i = 0; i < taps; ++i)
                 firImpulse[static_cast<size_t>(i)] = static_cast<float>(firImpulse[static_cast<size_t>(i)] * scale);
         }
+        // v5.4 beta: Align overall gain to the target response at a reference bin.
+        const int refBin = juce::jlimit(0, fftSize / 2,
+                                        static_cast<int>(std::lround(1000.0 * fftSize / sampleRate)));
+        const double refRe = firData[static_cast<size_t>(refBin) * 2];
+        const double refIm = firData[static_cast<size_t>(refBin) * 2 + 1];
+        const double refMag = std::sqrt(refRe * refRe + refIm * refIm);
+        const double refTarget = desiredMag[static_cast<size_t>(refBin)];
+        if (refMag > 1.0e-9)
+        {
+            const double refScale = refTarget / refMag;
+            if (std::abs(refScale - 1.0) > 1.0e-6)
+            {
+                for (int i = 0; i < taps; ++i)
+                    firImpulse[static_cast<size_t>(i)] =
+                        static_cast<float>(firImpulse[static_cast<size_t>(i)] * refScale);
+            }
+        }
         juce::AudioBuffer<float> impulse(1, taps);
         impulse.copyFrom(0, 0, firImpulse.data(), taps);
         return impulse;
@@ -1415,10 +1469,10 @@ void EqEngine::rebuildLinearPhase(const ParamSnapshot& snapshot, int taps, int h
 
 void EqEngine::updateOversampling(const ParamSnapshot& snapshot, double sampleRate, int maxBlockSize, int channels)
 {
-    // Quality ladder drives oversampling depth for linear phase only:
+    // Quality ladder drives oversampling depth for realtime EQ:
     // Low=none, Medium=2x, High=4x, Very High=8x, Intensive=16x.
     const int quality = juce::jlimit(0, 4, snapshot.linearQuality);
-    const int desiredIndex = (snapshot.phaseMode == 2) ? quality : 0;
+    const int desiredIndex = (snapshot.phaseMode == 0) ? quality : 0;
     const bool needsRebuild = desiredIndex != lastOversamplingIndex
         || sampleRate != lastOversamplingSampleRate
         || maxBlockSize != lastOversamplingBlockSize

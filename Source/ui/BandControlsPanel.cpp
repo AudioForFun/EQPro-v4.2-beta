@@ -414,6 +414,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     typeBox.setTooltip("Filter type");
     typeBox.onChange = [this]
     {
+        if (suppressParamCallbacks)
+            return;
         ensureBandActiveFromEdit();
         const int index = typeBox.getSelectedItemIndex();
         if (auto* param = parameters.getParameter(ParamIDs::bandParamId(selectedChannel, selectedBand, "type")))
@@ -433,6 +435,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     addAndMakeVisible(msBox);
     msBox.onChange = [this]
     {
+        if (suppressParamCallbacks)
+            return;
         if (msChoiceMap.empty())
             return;
         ensureBandActiveFromEdit();
@@ -460,6 +464,8 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     slopeBox.setTooltip("Slope");
     slopeBox.onChange = [this]
     {
+        if (suppressParamCallbacks)
+            return;
         const int index = slopeBox.getSelectedItemIndex();
         if (index < 0)
             return;
@@ -735,10 +741,14 @@ BandControlsPanel::~BandControlsPanel()
 
 void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
 {
-    cacheBandFromUi(selectedChannel, selectedBand);
-    applyCachedBandToParams(selectedChannel);
-    if (selectedChannel != channelIndex || selectedBand != bandIndex)
-        pushUiStateToParams();
+    // v5.4 beta: Cache from APVTS before switching to avoid cross-band overwrites.
+    cacheBandFromParams(selectedChannel, selectedBand);
+    if (selectedChannel != channelIndex)
+    {
+        // v5.4 beta: Refresh cache from parameters when switching channels,
+        // without pushing cached values back to the host (prevents bands disappearing).
+        refreshCacheFromParams(channelIndex);
+    }
     selectedChannel = juce::jlimit(0, ParamIDs::kMaxChannels - 1, channelIndex);
     selectedBand = juce::jlimit(0, ParamIDs::kBandsPerChannel - 1, bandIndex);
 
@@ -766,7 +776,6 @@ void BandControlsPanel::setSelectedBand(int channelIndex, int bandIndex)
     syncUiFromParams();
     updateTypeUi();
     suppressParamCallbacks = false;
-    applyCachedBandToParams(selectedChannel);
     
     // Force repaint to ensure frame color updates for all 12 bands.
     repaint();

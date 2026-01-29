@@ -131,8 +131,18 @@ private:
     std::vector<float> selectedBandCurveDb;
     std::vector<std::vector<float>> perBandCurveDb;
     std::vector<bool> perBandActive;
-    std::vector<juce::Point<float>> bandPoints;
-    std::vector<juce::Rectangle<float>> bypassIcons;
+    struct BandPoint
+    {
+        int band = 0;
+        juce::Point<float> pos {};
+    };
+    struct BandBypassIcon
+    {
+        int band = 0;
+        juce::Rectangle<float> rect {};
+    };
+    std::vector<BandPoint> bandPoints;
+    std::vector<BandBypassIcon> bypassIcons;
     std::array<juce::Rectangle<float>, 2> qHandleRects {};
     bool hasQHandles = false;
 

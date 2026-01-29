@@ -677,20 +677,23 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         const bool bypassed = getBandBypassed(band);
         const float mix = getBandParameter(band, kParamMixSuffix) / 100.0f;
         const bool isActive = ! bypassed && mix > 0.0005f;
-        if (! isActive)
-            continue;
 
         const float x = frequencyToX(freq);
         const float y = gainToY(gain);
         const juce::Point<float> point(x, y);
-        bandPoints.push_back(point);
-
-        auto colour = ColorUtils::bandColour(band);
-        if (bypassed)
-            colour = colour.withAlpha(0.25f);
+        bandPoints.push_back({ band, point });
 
         const bool isSelected = std::find(selectedBands.begin(), selectedBands.end(), band)
             != selectedBands.end();
+        // v5.4 beta: Always draw the selected band point, even if bypassed/mix=0.
+        // v5.4 beta: Always draw the selected band point, even if bypassed/mix=0.
+        const bool shouldDraw = isActive || isSelected;
+        if (! shouldDraw)
+            continue;
+
+        auto colour = ColorUtils::bandColour(band);
+        if (bypassed)
+            colour = colour.withAlpha(isSelected ? 0.55f : 0.25f);
         const float radius = (isSelected ? kPointRadius + 2.5f : kPointRadius) * scale;
         g.setColour(colour.withAlpha(0.35f));
         g.fillEllipse(point.x - radius - 3.0f * scale, point.y - radius - 3.0f * scale,
@@ -717,7 +720,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
         const juce::Rectangle<float> iconRect(point.x - iconSize * 0.5f,
                                               point.y + radius + 4.0f * uiScale,
                                               iconSize, iconSize);
-        bypassIcons.push_back(iconRect);
+        bypassIcons.push_back({ band, iconRect });
         const auto iconColour = bypassed ? theme.textMuted.withAlpha(0.5f)
                                          : colour.withAlpha(0.9f);
         g.setColour(iconColour);
@@ -728,7 +731,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
                    iconRect.getCentreY(),
                    1.2f * uiScale);
 
-        if (band == selectedBand && ! bypassed)
+        if (band == selectedBand)
         {
             const int type = getBandType(band);
             const bool supportsQ = type == static_cast<int>(eqdsp::FilterType::bell)
@@ -939,13 +942,13 @@ void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
             const float maxHit = kPointRadius * 0.5f * uiScale;
             float closest = maxHit;
             int closestBand = -1;
-            for (int i = 0; i < static_cast<int>(bandPoints.size()); ++i)
+            for (const auto& bandPoint : bandPoints)
             {
-                const float distance = bandPoints[static_cast<size_t>(i)].getDistanceFrom(event.position);
+                const float distance = bandPoint.pos.getDistanceFrom(event.position);
                 if (distance < closest)
                 {
                     closest = distance;
-                    closestBand = i;
+                    closestBand = bandPoint.band;
                 }
             }
             if (closestBand >= 0 && closest <= maxHit)
@@ -976,15 +979,16 @@ void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
     if (! plotArea.contains(event.position))
         return;
 
-    for (int i = 0; i < static_cast<int>(bypassIcons.size()); ++i)
+    for (const auto& icon : bypassIcons)
     {
-        if (bypassIcons[static_cast<size_t>(i)].contains(event.position))
+        if (icon.rect.contains(event.position))
         {
-            const bool bypassed = getBandBypassed(i);
-            setBandParameter(i, kParamBypassSuffix, bypassed ? 0.0f : 1.0f);
-            setSelectedBand(i);
+            const int bandIndex = icon.band;
+            const bool bypassed = getBandBypassed(bandIndex);
+            setBandParameter(bandIndex, kParamBypassSuffix, bypassed ? 0.0f : 1.0f);
+            setSelectedBand(bandIndex);
             if (onBandSelected)
-                onBandSelected(i);
+                onBandSelected(bandIndex);
             repaint();
             return;
         }
@@ -993,13 +997,13 @@ void AnalyzerComponent::mouseDown(const juce::MouseEvent& event)
     const float maxHit = kPointRadius * 0.5f * uiScale;
     float closest = maxHit;
     int closestBand = -1;
-    for (int i = 0; i < static_cast<int>(bandPoints.size()); ++i)
+    for (const auto& bandPoint : bandPoints)
     {
-        const float distance = bandPoints[static_cast<size_t>(i)].getDistanceFrom(event.position);
+        const float distance = bandPoint.pos.getDistanceFrom(event.position);
         if (distance < closest)
         {
             closest = distance;
-            closestBand = i;
+            closestBand = bandPoint.band;
         }
     }
 
@@ -1203,13 +1207,13 @@ void AnalyzerComponent::mouseMove(const juce::MouseEvent& event)
     const float maxHit = kPointRadius * 0.5f * uiScale;
     float closest = maxHit;
     int closestBand = -1;
-    for (int i = 0; i < static_cast<int>(bandPoints.size()); ++i)
+    for (const auto& bandPoint : bandPoints)
     {
-        const float distance = bandPoints[static_cast<size_t>(i)].getDistanceFrom(event.position);
+        const float distance = bandPoint.pos.getDistanceFrom(event.position);
         if (distance < closest)
         {
             closest = distance;
-            closestBand = i;
+            closestBand = bandPoint.band;
         }
     }
     hoverBand = (closestBand >= 0 && closest <= maxHit) ? closestBand : -1;
@@ -1611,6 +1615,8 @@ void AnalyzerComponent::updateCurves()
         perBandCurveHash.assign(ParamIDs::kBandsPerChannel, 0);
     }
 
+    const int width = magnitudeArea.getWidth();
+
     uint64_t hash = 1469598103934665603ull;
     auto hashValue = [&hash](float value)
     {
@@ -1636,12 +1642,65 @@ void AnalyzerComponent::updateCurves()
     const bool paramsUnchanged = (hash == lastCurveHash
                                   && selectedChannel == lastCurveChannel
                                   && lastCurveWidth == magnitudeArea.getWidth());
-    if (paramsUnchanged && selectedBand != lastCurveBand
-        && selectedBand >= 0
-        && selectedBand < static_cast<int>(perBandCurveDb.size())
-        && ! perBandCurveDb[static_cast<size_t>(selectedBand)].empty())
+
+    const bool selectedValid = selectedBand >= 0 && selectedBand < ParamIDs::kBandsPerChannel;
+    float selectedMix = 0.0f;
+    float selectedGainDb = 0.0f;
+    int selectedType = 0;
+    bool selectedDynEnabled = false;
+    if (selectedValid)
     {
-        selectedBandCurveDb = perBandCurveDb[static_cast<size_t>(selectedBand)];
+        selectedMix = getBandParameter(selectedBand, kParamMixSuffix) / 100.0f;
+        selectedGainDb = getBandParameter(selectedBand, kParamGainSuffix);
+        selectedType = getBandType(selectedBand);
+        selectedDynEnabled = getBandParameter(selectedBand, kParamDynEnableSuffix) > 0.5f;
+    }
+    lastSelectedMix = selectedMix;
+
+    const float maxFreq = getMaxFreq();
+    const float globalMix = parameters.getRawParameterValue(ParamIDs::globalMix) != nullptr
+        ? juce::jlimit(0.0f, 1.0f,
+                       parameters.getRawParameterValue(ParamIDs::globalMix)->load() / 100.0f)
+        : 1.0f;
+    lastGlobalMix = globalMix;
+
+    auto updateSelectedBandCurve = [&](int curveWidth)
+    {
+        if (static_cast<int>(selectedBandCurveDb.size()) != curveWidth)
+            selectedBandCurveDb.assign(static_cast<size_t>(curveWidth), minDb);
+        else
+            std::fill(selectedBandCurveDb.begin(), selectedBandCurveDb.end(), minDb);
+
+        if (! selectedValid)
+            return;
+
+        for (int x = 0; x < curveWidth; ++x)
+        {
+            const float norm = static_cast<float>(x) / static_cast<float>(curveWidth);
+            const float freq = FFTUtils::normToFreq(norm, kMinFreq, maxFreq);
+            std::complex<double> selectedResponse = computeBandResponse(selectedBand, freq);
+            const float selectedDynamicDb = getBandDynamicGainDb(selectedBand);
+            if (std::abs(selectedDynamicDb) > 0.0001f)
+            {
+                const double deltaGain = juce::Decibels::decibelsToGain(selectedDynamicDb);
+                selectedResponse = std::complex<double>(1.0, 0.0)
+                    + (selectedResponse - std::complex<double>(1.0, 0.0)) * deltaGain;
+            }
+            const float mix = juce::jlimit(0.0f, 1.0f, selectedMix);
+            selectedResponse = std::complex<double>(1.0, 0.0)
+                + static_cast<double>(mix) * (selectedResponse - std::complex<double>(1.0, 0.0));
+            selectedResponse = std::complex<double>(1.0, 0.0)
+                + static_cast<double>(globalMix) * (selectedResponse - std::complex<double>(1.0, 0.0));
+            selectedBandCurveDb[static_cast<size_t>(x)] =
+                juce::Decibels::gainToDecibels(static_cast<float>(std::abs(selectedResponse)), minDb);
+        }
+    };
+
+    // v5.4 beta: Update the selected band preview on selection changes.
+    // v5.4 beta: Update the selected band preview on selection changes.
+    if (paramsUnchanged && selectedBand != lastCurveBand)
+    {
+        updateSelectedBandCurve(width);
         lastCurveBand = selectedBand;
         return;
     }
@@ -1653,13 +1712,10 @@ void AnalyzerComponent::updateCurves()
     lastCurveBand = selectedBand;
     lastCurveChannel = selectedChannel;
 
-    const int width = magnitudeArea.getWidth();
     eqCurveDb.assign(static_cast<size_t>(width), 0.0f);
     selectedBandCurveDb.assign(static_cast<size_t>(width), 0.0f);
     perBandActive.assign(ParamIDs::kBandsPerChannel, false);
     // Phase view removed.
-
-    const float maxFreq = getMaxFreq();
     std::array<bool, ParamIDs::kBandsPerChannel> bandActive {};
     for (int band = 0; band < ParamIDs::kBandsPerChannel; ++band)
     {
@@ -1703,36 +1759,7 @@ void AnalyzerComponent::updateCurves()
         perBandCurveHash[static_cast<size_t>(band)] = bandHash;
     }
 
-    const bool selectedValid = selectedBand >= 0 && selectedBand < ParamIDs::kBandsPerChannel;
-    float selectedMix = 0.0f;
-    float selectedGainDb = 0.0f;
-    int selectedType = 0;
-    bool selectedDynEnabled = false;
-    if (selectedValid)
-    {
-        selectedMix = getBandParameter(selectedBand, kParamMixSuffix) / 100.0f;
-        selectedGainDb = getBandParameter(selectedBand, kParamGainSuffix);
-        selectedType = getBandType(selectedBand);
-        selectedDynEnabled = getBandParameter(selectedBand, kParamDynEnableSuffix) > 0.5f;
-    }
-    lastSelectedMix = selectedMix;
-    const bool selectedIsBell = selectedType == static_cast<int>(eqdsp::FilterType::bell);
-    const bool selectedIsShelf = selectedType == static_cast<int>(eqdsp::FilterType::lowShelf)
-        || selectedType == static_cast<int>(eqdsp::FilterType::highShelf);
-    const bool selectedIsTilt = selectedType == static_cast<int>(eqdsp::FilterType::tilt)
-        || selectedType == static_cast<int>(eqdsp::FilterType::flatTilt);
-    const bool selectedSkipZeroGain = selectedValid && ! selectedDynEnabled
-        && (selectedIsBell || selectedIsShelf || selectedIsTilt)
-        && std::abs(selectedGainDb) < 0.0001f;
-    const bool selectedActive = selectedValid
-        && ! getBandBypassed(selectedBand)
-        && ! selectedSkipZeroGain;
-
-    const float globalMix = parameters.getRawParameterValue(ParamIDs::globalMix) != nullptr
-        ? juce::jlimit(0.0f, 1.0f,
-                       parameters.getRawParameterValue(ParamIDs::globalMix)->load() / 100.0f)
-        : 1.0f;
-    lastGlobalMix = globalMix;
+    const bool selectedPreview = selectedValid;
 
     for (int x = 0; x < width; ++x)
     {
@@ -1785,7 +1812,7 @@ void AnalyzerComponent::updateCurves()
         const double mag = std::abs(total);
         eqCurveDb[static_cast<size_t>(x)] =
             juce::Decibels::gainToDecibels(static_cast<float>(mag), minDb);
-        if (selectedActive)
+        if (selectedPreview)
         {
             std::complex<double> selectedResponse = computeBandResponse(selectedBand, freq);
             const float selectedDynamicDb = getBandDynamicGainDb(selectedBand);

@@ -87,6 +87,27 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     versionLabel.setColour(juce::Label::textColourId, juce::Colour(0xff94a3b8));
     addAndMakeVisible(versionLabel);
 
+    debugButton.setButtonText("DEBUG");
+    debugButton.setClickingTogglesState(true);
+    debugButton.onClick = [this]()
+    {
+        debugVisible = debugButton.getToggleState();
+        repaint();
+    };
+    addAndMakeVisible(debugButton);
+    if (juce::JUCEApplicationBase::isStandaloneApp())
+    {
+        debugVisible = true;
+        debugButton.setToggleState(true, juce::dontSendNotification);
+    }
+    debugCopyButton.setButtonText("COPY");
+    debugCopyButton.onClick = [this]()
+    {
+        processorRef.logStartup("Debug snapshot:\n" + getDebugText());
+    };
+    addAndMakeVisible(debugCopyButton);
+
+
     globalBypassButton.setButtonText("GLOBAL BYPASS");
     globalBypassButton.setColour(juce::ToggleButton::textColourId,
                                  juce::Colour(0xffcbd5e1));
@@ -369,6 +390,7 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
     outputTrimSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 68, 18);
     outputTrimSlider.setTextBoxIsEditable(true);
     outputTrimSlider.setTextValueSuffix(" dB");
+    outputTrimSlider.setRange(-120.0, 36.0, 0.01);
     outputTrimSlider.setColour(juce::Slider::trackColourId, juce::Colour(0xff38bdf8));
     addAndMakeVisible(outputTrimSlider);
     outputTrimAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
@@ -431,6 +453,15 @@ EQProAudioProcessorEditor::EQProAudioProcessorEditor(EQProAudioProcessor& p)
 
         headerLabel.setColour(juce::Label::textColourId, newTheme.text);
         versionLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
+        debugButton.setColour(juce::TextButton::textColourOffId, newTheme.textMuted);
+        debugButton.setColour(juce::TextButton::buttonColourId, newTheme.panel);
+        debugButton.setColour(juce::TextButton::buttonOnColourId, newTheme.panel.brighter(0.2f));
+        debugCopyButton.setColour(juce::TextButton::textColourOffId, newTheme.textMuted);
+        debugCopyButton.setColour(juce::TextButton::buttonColourId, newTheme.panel);
+        debugCopyButton.setColour(juce::TextButton::buttonOnColourId, newTheme.panel.brighter(0.2f));
+        debugButton.setColour(juce::TextButton::textColourOffId, newTheme.textMuted);
+        debugButton.setColour(juce::TextButton::buttonColourId, newTheme.panel);
+        debugButton.setColour(juce::TextButton::buttonOnColourId, newTheme.panel.brighter(0.2f));
         globalBypassButton.setColour(juce::ToggleButton::textColourId, newTheme.textMuted);
         globalMixLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
         themeLabel.setColour(juce::Label::textColourId, newTheme.textMuted);
@@ -1293,28 +1324,17 @@ void EQProAudioProcessorEditor::paint(juce::Graphics& g)
                    static_cast<float>(analyzerBounds.getRight()),
                    static_cast<float>(analyzerBounds.getBottom()), 1.0f);
 
-    if (debugVisible)
+    if (debugVisible && ! debugPanelBounds.isEmpty())
     {
-        auto area = getLocalBounds().removeFromBottom(90).removeFromLeft(280).reduced(12);
-        g.setColour(theme.panel.withAlpha(0.9f));
-        g.fillRoundedRectangle(area.toFloat(), 6.0f);
+        g.setColour(theme.panel.withAlpha(0.95f));
+        g.fillRoundedRectangle(debugPanelBounds.toFloat(), 6.0f);
         g.setColour(theme.panelOutline);
-        g.drawRoundedRectangle(area.toFloat(), 6.0f, 1.0f);
+        g.drawRoundedRectangle(debugPanelBounds.toFloat(), 6.0f, 1.0f);
 
-        const double sr = processorRef.getSampleRate();
-        const int latency = processorRef.getLatencySamples();
-        const auto phaseMode = processorRef.getParameters()
-                                   .getRawParameterValue(ParamIDs::phaseMode)
-                                   ->load();
-        const juce::String text = "Debug Panel\n"
-            "SR: " + juce::String(sr, 0) + " Hz\n"
-            "Latency: " + juce::String(latency) + " samples\n"
-            "Phase Mode: " + juce::String(static_cast<int>(phaseMode)) + "\n"
-            "Analyzer: " + juce::String(analyzer.getTimerHz()) + " Hz\n"
-            "OpenGL: " + juce::String(openGLContext.isAttached() ? "On" : "Off");
+        auto textArea = debugPanelBounds.reduced(8).withTrimmedTop(26);
         g.setColour(theme.text);
-        g.setFont(12.0f);
-        g.drawFittedText(text, area, juce::Justification::topLeft, 4);
+        g.setFont(13.0f);
+        g.drawFittedText(getDebugText(), textArea, juce::Justification::topLeft, 10);
     }
 
     juce::ignoreUnused(kOuterMargin);
@@ -1325,11 +1345,36 @@ bool EQProAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
     if (key == juce::KeyPress('d', juce::ModifierKeys::ctrlModifier, 0))
     {
         debugVisible = ! debugVisible;
-        processorRef.setDebugToneEnabled(debugVisible);
+        debugButton.setToggleState(debugVisible, juce::dontSendNotification);
         repaint();
         return true;
     }
     return false;
+}
+
+juce::String EQProAudioProcessorEditor::getDebugText() const
+{
+    const double sr = processorRef.getSampleRate();
+    const int latency = processorRef.getLatencySamples();
+    const auto phaseMode = processorRef.getParameters()
+                               .getRawParameterValue(ParamIDs::phaseMode)
+                               ->load();
+    return "Debug Panel\n"
+        "SR: " + juce::String(sr, 0) + " Hz\n"
+        "Latency: " + juce::String(latency) + " samples\n"
+        "Phase Mode (UI): " + juce::String(static_cast<int>(phaseMode)) + "\n"
+        "Phase Mode (DSP): " + juce::String(processorRef.getLastRmsPhaseMode()) + "\n"
+        "Quality (DSP): " + juce::String(processorRef.getLastRmsQuality()) + "\n"
+        "RMS: " + juce::String(processorRef.getLastPreRmsDb(), 1)
+            + " / " + juce::String(processorRef.getLastPostRmsDb(), 1) + " dB\n"
+        "RT: mode=" + juce::String(processorRef.getLastProcessPhaseMode())
+            + " ch=" + juce::String(processorRef.getLastProcessNumChannels())
+            + " mix=" + juce::String(processorRef.getLastProcessGlobalMix(), 2) + "\n"
+        "Band0: " + juce::String(processorRef.getLastProcessBand0FreqHz(), 1) + " Hz "
+            + juce::String(processorRef.getLastProcessBand0GainDb(), 2) + " dB "
+            + (processorRef.getLastProcessBand0Bypassed() ? "BYP" : "ON") + "\n"
+        "Analyzer: " + juce::String(analyzer.getTimerHz()) + " Hz\n"
+        "OpenGL: " + juce::String(openGLContext.isAttached() ? "On" : "Off");
 }
 
 void EQProAudioProcessorEditor::resized()
@@ -1339,12 +1384,31 @@ void EQProAudioProcessorEditor::resized()
     const int margin = static_cast<int>(kOuterMargin * uiScale);
     auto bounds = getLocalBounds().reduced(margin);
 
+    debugPanelBounds = {};
+    debugCopyButton.setVisible(debugVisible);
+    debugCopyButton.setVisible(debugVisible);
+    if (debugVisible)
+    {
+        const int debugHeight = static_cast<int>(130 * uiScale);
+        auto debugArea = bounds.removeFromBottom(debugHeight);
+        debugPanelBounds = debugArea.reduced(static_cast<int>(10 * uiScale));
+        auto debugRow = debugPanelBounds.reduced(8).removeFromTop(static_cast<int>(22 * uiScale));
+        const int copyW = static_cast<int>(58 * uiScale);
+        debugCopyButton.setBounds(debugRow.removeFromRight(copyW)
+                                     .withSizeKeepingCentre(copyW, static_cast<int>(20 * uiScale)));
+        debugRow.removeFromRight(static_cast<int>(8 * uiScale));
+    }
+
     const int headerHeight = static_cast<int>(26 * uiScale);
     auto headerRow = bounds.removeFromTop(headerHeight);
     headerBounds = headerRow;
     const int headerWidth = static_cast<int>(220 * uiScale);
     headerLabel.setBounds(headerRow.removeFromLeft(headerWidth));
-    versionLabel.setBounds(headerRow.removeFromRight(static_cast<int>(220 * uiScale)));
+    versionLabel.setBounds(headerRow.removeFromRight(static_cast<int>(240 * uiScale)));
+    const int debugWidth = static_cast<int>(64 * uiScale);
+    const int debugHeight = static_cast<int>(20 * uiScale);
+    debugButton.setBounds(headerRow.removeFromRight(debugWidth)
+                              .withSizeKeepingCentre(debugWidth, debugHeight));
 
     const int topBarHeight = static_cast<int>(32 * uiScale);
     auto topBar = bounds.removeFromTop(topBarHeight);

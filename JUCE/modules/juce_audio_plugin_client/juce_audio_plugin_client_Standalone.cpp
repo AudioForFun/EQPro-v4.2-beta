@@ -129,29 +129,24 @@ public:
     //==============================================================================
     void initialise (const String&) override
     {
-        Logger::writeToLog ("Standalone initialise begin");
         mainWindow = rawToUniquePtr (createWindow());
 
         if (mainWindow != nullptr)
         {
-            Logger::writeToLog ("Standalone window created");
            #if JUCE_STANDALONE_FILTER_WINDOW_USE_KIOSK_MODE
             Desktop::getInstance().setKioskModeComponent (mainWindow.get(), false);
            #endif
 
             mainWindow->setVisible (true);
-            Logger::writeToLog ("Standalone window set visible");
         }
         else
         {
-            Logger::writeToLog ("Standalone window not created");
             pluginHolder = createPluginHolder();
         }
     }
 
     void shutdown() override
     {
-        Logger::writeToLog ("Standalone shutdown");
         pluginHolder = nullptr;
         mainWindow = nullptr;
         appProperties.saveIfNeeded();
@@ -178,18 +173,6 @@ public:
         {
             quit();
         }
-    }
-
-    void unhandledException (const std::exception* e,
-                             const String& sourceFilename,
-                             int lineNumber) override
-    {
-        String message = "Unhandled exception";
-        if (e != nullptr)
-            message += ": " + String (e->what());
-        if (sourceFilename.isNotEmpty())
-            message += " at " + sourceFilename + ":" + String (lineNumber);
-        Logger::writeToLog (message);
     }
 
 protected:

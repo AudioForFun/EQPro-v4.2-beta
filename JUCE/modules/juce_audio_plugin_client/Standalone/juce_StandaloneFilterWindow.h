@@ -334,51 +334,6 @@ public:
                                  const String& preferredDefaultDeviceName,
                                  const AudioDeviceManager::AudioDeviceSetup* preferredSetupOptions)
     {
-        // Standalone buffer policy:
-        // target=2048 @ 1x SR, 4096 @ 2x, 8192 @ 4x, 16384 @ 8x.
-        // Choose the largest available buffer size <= target.
-        auto applyBufferPolicy = [this]()
-        {
-            if (auto* device = deviceManager.getCurrentAudioDevice())
-            {
-                Logger::writeToLog ("Standalone buffer policy: 2048 @ 1x SR, scaled with SR.");
-                const auto sampleRate = device->getCurrentSampleRate();
-                const auto bufferSizes = device->getAvailableBufferSizes();
-                String sizeList;
-                for (auto size : bufferSizes)
-                    sizeList << String (size) << " ";
-
-                int factor = 1;
-                if (sampleRate >= 352800.0)      factor = 8;
-                else if (sampleRate >= 176400.0) factor = 4;
-                else if (sampleRate >= 88200.0)  factor = 2;
-                const int target = 2048 * factor;
-
-                int chosen = device->getCurrentBufferSizeSamples();
-                int best = 0;
-                for (auto size : bufferSizes)
-                    if (size <= target && size > best)
-                        best = size;
-
-                if (best == 0 && bufferSizes.size() > 0)
-                    best = bufferSizes[0];
-
-                if (best > 0 && best != chosen)
-                {
-                    AudioDeviceManager::AudioDeviceSetup setup;
-                    deviceManager.getAudioDeviceSetup (setup);
-                    setup.bufferSize = best;
-                    deviceManager.setAudioDeviceSetup (setup, true);
-                    chosen = best;
-                }
-
-                Logger::writeToLog ("Audio buffers (available): " + sizeList.trimEnd());
-                Logger::writeToLog ("Audio buffers (target): " + String (target)
-                                    + " -> chosen " + String (chosen)
-                                    + " @ " + String (sampleRate, 0) + " Hz");
-            }
-        };
-
         std::unique_ptr<XmlElement> savedState;
 
         if (settings != nullptr)
@@ -390,11 +345,6 @@ public:
            #endif
         }
 
-        const bool loadAudioState =
-            SystemStats::getEnvironmentVariable ("EQPRO_LOAD_AUDIO_STATE", "0").getIntValue() != 0;
-        if (! loadAudioState)
-            savedState.reset();
-
         auto inputChannels  = getNumInputChannels();
         auto outputChannels = getNumOutputChannels();
 
@@ -404,30 +354,12 @@ public:
             outputChannels = 1;
         }
 
-        const auto initError = deviceManager.initialise (enableAudioInput ? inputChannels : 0,
-                                                         outputChannels,
-                                                         savedState.get(),
-                                                         true,
-                                                         preferredDefaultDeviceName,
-                                                         preferredSetupOptions);
-        if (initError.isNotEmpty())
-        {
-            Logger::writeToLog ("Audio init failed: " + initError);
-            const auto fallbackError = deviceManager.initialise (0,
-                                                                 outputChannels,
-                                                                 nullptr,
-                                                                 true,
-                                                                 preferredDefaultDeviceName,
-                                                                 preferredSetupOptions);
-            if (fallbackError.isNotEmpty())
-                Logger::writeToLog ("Audio fallback init failed: " + fallbackError);
-            else
-                applyBufferPolicy();
-        }
-        else
-        {
-            applyBufferPolicy();
-        }
+        deviceManager.initialise (enableAudioInput ? inputChannels : 0,
+                                  outputChannels,
+                                  savedState.get(),
+                                  true,
+                                  preferredDefaultDeviceName,
+                                  preferredSetupOptions);
     }
 
     //==============================================================================
@@ -722,7 +654,6 @@ public:
           pluginHolder (std::move (pluginHolderIn)),
           optionsButton ("Options")
     {
-        Logger::writeToLog ("StandaloneFilterWindow ctor");
         setConstrainer (&decoratorConstrainer);
 
        #if JUCE_IOS || JUCE_ANDROID
@@ -739,9 +670,7 @@ public:
         setFullScreen (true);
         updateContent();
        #else
-        Logger::writeToLog ("Standalone window updateContent begin");
         updateContent();
-        Logger::writeToLog ("Standalone window updateContent end");
 
         const auto windowScreenBounds = [this]() -> Rectangle<int>
         {
@@ -753,8 +682,7 @@ public:
             if (displays.displays.isEmpty())
                 return { width, height };
 
-            const bool loadWindowPos = SystemStats::getEnvironmentVariable ("EQPRO_LOAD_WINDOW_POS", "0").getIntValue() != 0;
-            if (loadWindowPos && (auto* props = pluginHolder->settings.get()))
+            if (auto* props = pluginHolder->settings.get())
             {
                 constexpr int defaultValue = -100;
 
@@ -763,13 +691,7 @@ public:
 
                 if (x != defaultValue && y != defaultValue)
                 {
-                    const auto* displayForRect = displays.getDisplayForRect ({ x, y, width, height });
-                    const auto* primaryDisplay = displays.getPrimaryDisplay();
-                    if (displayForRect == nullptr && primaryDisplay == nullptr)
-                        return { 0, 0, width, height };
-                    const auto screenLimits = displayForRect != nullptr
-                        ? displayForRect->userArea
-                        : primaryDisplay->userArea;
+                    const auto screenLimits = displays.getDisplayForRect ({ x, y, width, height })->userArea;
 
                     return { jlimit (screenLimits.getX(), jmax (screenLimits.getX(), screenLimits.getRight()  - width),  x),
                              jlimit (screenLimits.getY(), jmax (screenLimits.getY(), screenLimits.getBottom() - height), y),
@@ -777,36 +699,18 @@ public:
                 }
             }
 
-            if (const auto* primaryDisplay = displays.getPrimaryDisplay())
-            {
-                const auto displayArea = primaryDisplay->userArea;
+            const auto displayArea = displays.getPrimaryDisplay()->userArea;
 
-                return { displayArea.getCentreX() - width / 2,
-                         displayArea.getCentreY() - height / 2,
-                         width, height };
-            }
-
-            return { 0, 0, width, height };
+            return { displayArea.getCentreX() - width / 2,
+                     displayArea.getCentreY() - height / 2,
+                     width, height };
         }();
 
-        Logger::writeToLog ("Standalone window bounds computed");
         setBoundsConstrained (windowScreenBounds);
 
         if (auto* processor = getAudioProcessor())
             if (auto* editor = processor->getActiveEditor())
                 setResizable (editor->isResizable(), false);
-
-        setVisible (true);
-        Logger::writeToLog ("Standalone window visible");
-        setMinimised (false);
-        setAlwaysOnTop (true);
-        toFront (true);
-        Logger::writeToLog ("Standalone window shown");
-        Timer::callAfterDelay (1500, [safe = Component::SafePointer<StandaloneFilterWindow> (this)]()
-        {
-            if (safe != nullptr)
-                safe->setAlwaysOnTop (false);
-        });
        #endif
     }
 
@@ -842,7 +746,6 @@ public:
 
     ~StandaloneFilterWindow() override
     {
-        Logger::writeToLog ("StandaloneFilterWindow dtor begin");
        #if (! JUCE_IOS) && (! JUCE_ANDROID)
         if (auto* props = pluginHolder->settings.get())
         {
@@ -854,7 +757,6 @@ public:
         pluginHolder->stopPlaying();
         clearContentComponent();
         pluginHolder = nullptr;
-        Logger::writeToLog ("StandaloneFilterWindow dtor end");
     }
 
     //==============================================================================
@@ -879,7 +781,6 @@ public:
     //==============================================================================
     void closeButtonPressed() override
     {
-        Logger::writeToLog ("Standalone closeButtonPressed");
         pluginHolder->savePluginState();
 
         JUCEApplicationBase::quit();

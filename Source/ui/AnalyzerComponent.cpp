@@ -13,7 +13,7 @@
 namespace
 {
 // Lower bound so the curve renders across the full spectrum (no low-end gap).
-constexpr float kMinFreq = 5.0f;
+constexpr float kMinFreq = 1.0f;
 constexpr float kMaxDb = 60.0f;
 constexpr float kMinDb = -60.0f;
 constexpr float kAnalyzerMinDb = -60.0f;
@@ -158,33 +158,27 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     juce::Path prePath;
     juce::Path postPath;
     bool started = false;
+    int pointIndex = 0;
     float prevPreX = 0.0f, prevPreY = 0.0f;
     float prevPostX = 0.0f, prevPostY = 0.0f;
 
-    // Seed the curve at kMinFreq so the left edge always renders.
     const int firstBin = juce::jlimit(1, fftBins - 1,
                                       static_cast<int>(std::ceil((kMinFreq * fftSize) / lastSampleRate)));
-    const float seededPreDb = preMagnitudes[firstBin];
-    const float seededPostDb = postMagnitudes[firstBin];
-    {
-        const float startX = plotArea.getX()
-            + FFTUtils::freqToNorm(kMinFreq, kMinFreq, maxFreq) * plotArea.getWidth();
-        const float preDb = seededPreDb;
-        const float postDb = seededPostDb;
-        const float preY = juce::jmap(preDb, kAnalyzerMinDb, kAnalyzerMaxDb,
+
+    const float seedX = plotArea.getX();
+    const float seedPreY = juce::jmap(preMagnitudes[firstBin], kAnalyzerMinDb, kAnalyzerMaxDb,
                                       static_cast<float>(magnitudeArea.getBottom()),
                                       static_cast<float>(magnitudeArea.getY()));
-        const float postY = juce::jmap(postDb, kAnalyzerMinDb, kAnalyzerMaxDb,
+    const float seedPostY = juce::jmap(postMagnitudes[firstBin], kAnalyzerMinDb, kAnalyzerMaxDb,
                                        static_cast<float>(magnitudeArea.getBottom()),
                                        static_cast<float>(magnitudeArea.getY()));
-        prePath.startNewSubPath(startX, preY);
-        postPath.startNewSubPath(startX, postY);
-        prevPreX = startX;
-        prevPreY = preY;
-        prevPostX = startX;
-        prevPostY = postY;
-        started = true;
-    }
+    prePath.startNewSubPath(seedX, seedPreY);
+    postPath.startNewSubPath(seedX, seedPostY);
+    prevPreX = seedX;
+    prevPreY = seedPreY;
+    prevPostX = seedX;
+    prevPostY = seedPostY;
+    started = true;
 
     for (int bin = firstBin; bin < fftBins; ++bin)
     {
@@ -213,6 +207,15 @@ void AnalyzerComponent::paint(juce::Graphics& g)
             prevPostY = postY;
             started = true;
         }
+        else if (pointIndex < 3)
+        {
+            prePath.lineTo(x, preY);
+            postPath.lineTo(x, postY);
+            prevPreX = x;
+            prevPreY = preY;
+            prevPostX = x;
+            prevPostY = postY;
+        }
         else
         {
             // v4.4 beta: Use quadratic curves for smoother, more beautiful lines
@@ -226,6 +229,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
             prevPostX = x;
             prevPostY = postY;
         }
+        ++pointIndex;
     }
 
     const int viewIndex = parameters.getRawParameterValue(ParamIDs::analyzerView) != nullptr
@@ -461,31 +465,56 @@ void AnalyzerComponent::paint(juce::Graphics& g)
     g.restoreState();
     }
 
+    auto sampleCurveDb = [&](const std::vector<float>& curve, int index, float floorDb)
+    {
+        const int size = static_cast<int>(curve.size());
+        if (size <= 0)
+            return floorDb;
+        const int i0 = juce::jlimit(0, size - 1, index - 1);
+        const int i1 = juce::jlimit(0, size - 1, index);
+        const int i2 = juce::jlimit(0, size - 1, index + 1);
+        const float smoothed = 0.25f * curve[static_cast<size_t>(i0)]
+            + 0.5f * curve[static_cast<size_t>(i1)]
+            + 0.25f * curve[static_cast<size_t>(i2)];
+        return std::max(floorDb, smoothed);
+    };
+
     if (! eqCurveDb.empty())
     {
-        const float curveFloor = kAnalyzerMinDb + 2.0f;
+        const float curveFloor = kAnalyzerMinDb;
         auto buildCurvePath = [&](const std::vector<float>& curve, juce::Path& path)
         {
             bool started = false;
+            int pointIndex = 0;
+            float prevX = 0.0f;
+            float prevY = 0.0f;
             for (int x = 0; x < static_cast<int>(curve.size()); ++x)
             {
-                const float db = curve[static_cast<size_t>(x)];
-                if (db <= curveFloor)
-                {
-                    started = false;
-                    continue;
-                }
+                const float db = sampleCurveDb(curve, x, curveFloor);
                 const float px = plotArea.getX() + static_cast<float>(x);
                 const float py = gainToY(db);
                 if (! started)
                 {
                     path.startNewSubPath(px, py);
+                    prevX = px;
+                    prevY = py;
                     started = true;
+                }
+                else if (pointIndex < 3)
+                {
+                    path.lineTo(px, py);
+                    prevX = px;
+                    prevY = py;
                 }
                 else
                 {
-                    path.lineTo(px, py);
+                    const float midX = (prevX + px) * 0.5f;
+                    const float midY = (prevY + py) * 0.5f;
+                    path.quadraticTo(midX, midY, px, py);
+                    prevX = px;
+                    prevY = py;
                 }
+                ++pointIndex;
             }
         };
 
@@ -513,7 +542,7 @@ void AnalyzerComponent::paint(juce::Graphics& g)
             float lastX = plotArea.getX();
             for (int x = 0; x < static_cast<int>(curve.size()); ++x)
             {
-                const float db = std::max(curveFloor, curve[static_cast<size_t>(x)]);
+                const float db = sampleCurveDb(curve, x, curveFloor);
                 const float px = plotArea.getX() + static_cast<float>(x);
                 const float py = gainToY(db);
                 if (! fillStarted)
@@ -578,28 +607,39 @@ void AnalyzerComponent::paint(juce::Graphics& g)
 
     if (! selectedBandCurveDb.empty())
     {
-        const float curveFloor = kAnalyzerMinDb + 2.0f;
+        const float curveFloor = kAnalyzerMinDb;
         juce::Path bandPath;
         bool started = false;
+        int pointIndex = 0;
+        float prevX = 0.0f;
+        float prevY = 0.0f;
         for (int x = 0; x < static_cast<int>(selectedBandCurveDb.size()); ++x)
         {
-            const float db = selectedBandCurveDb[static_cast<size_t>(x)];
-            if (db <= curveFloor)
-            {
-                started = false;
-                continue;
-            }
+            const float db = sampleCurveDb(selectedBandCurveDb, x, curveFloor);
             const float px = plotArea.getX() + static_cast<float>(x);
             const float py = gainToY(db);
             if (! started)
             {
                 bandPath.startNewSubPath(px, py);
+                prevX = px;
+                prevY = py;
                 started = true;
+            }
+            else if (pointIndex < 3)
+            {
+                bandPath.lineTo(px, py);
+                prevX = px;
+                prevY = py;
             }
             else
             {
-                bandPath.lineTo(px, py);
+                const float midX = (prevX + px) * 0.5f;
+                const float midY = (prevY + py) * 0.5f;
+                bandPath.quadraticTo(midX, midY, px, py);
+                prevX = px;
+                prevY = py;
             }
+            ++pointIndex;
         }
 
         if (! bandPath.isEmpty())
@@ -1396,24 +1436,9 @@ void AnalyzerComponent::updateFft()
     if (lastSampleRate <= 0.0f)
         lastSampleRate = 48000.0f;
 
-    // Stabilize the very low-frequency bins (sub-20 Hz region) so the curve remains readable
-    // while still showing energy below 20 Hz.
-    const int lowBinLimit = juce::jlimit(1, fftBins - 1,
-                                         static_cast<int>((25.0f * fftSize) / lastSampleRate));
-    auto stabilizeLowBins = [lowBinLimit](std::array<float, fftBins>& mags)
-    {
-        if (lowBinLimit <= 1)
-            return;
-
-        float sum = 0.0f;
-        for (int i = 1; i <= lowBinLimit; ++i)
-            sum += mags[i];
-        const float avg = sum / static_cast<float>(lowBinLimit);
-
-        // Flatten the lowest bins to avoid a visual slope at the left edge.
-        for (int i = 1; i <= lowBinLimit; ++i)
-            mags[i] = avg;
-    };
+    // Use raw low-frequency bins so the curve reflects true sub-20 Hz content.
+    const int firstBin = juce::jlimit(1, fftBins - 1,
+                                      static_cast<int>(std::ceil((kMinFreq * fftSize) / lastSampleRate)));
 
     const int viewIndex = parameters.getRawParameterValue(ParamIDs::analyzerView) != nullptr
         ? static_cast<int>(parameters.getRawParameterValue(ParamIDs::analyzerView)->load())
@@ -1438,7 +1463,8 @@ void AnalyzerComponent::updateFft()
                                                             minDb);
             preMagnitudes[i] = Smoothing::smooth(preMagnitudes[i], mag, kSmoothingCoeff);
         }
-        stabilizeLowBins(preMagnitudes);
+        for (int i = 0; i < firstBin; ++i)
+            preMagnitudes[i] = preMagnitudes[static_cast<size_t>(firstBin)];
     }
     }
 
@@ -1459,7 +1485,8 @@ void AnalyzerComponent::updateFft()
                                                             minDb);
             postMagnitudes[i] = Smoothing::smooth(postMagnitudes[i], mag, kSmoothingCoeff);
         }
-        stabilizeLowBins(postMagnitudes);
+        for (int i = 0; i < firstBin; ++i)
+            postMagnitudes[i] = postMagnitudes[static_cast<size_t>(firstBin)];
     }
     }
 
@@ -1533,7 +1560,8 @@ void AnalyzerComponent::updateFft()
                                                                 minDb);
                 harmonicMagnitudes[i] = Smoothing::smooth(harmonicMagnitudes[i], mag, kSmoothingCoeff);
             }
-            stabilizeLowBins(harmonicMagnitudes);
+            for (int i = 0; i < firstBin; ++i)
+                harmonicMagnitudes[i] = harmonicMagnitudes[static_cast<size_t>(firstBin)];
         }
     }
     else
@@ -1558,7 +1586,8 @@ void AnalyzerComponent::updateFft()
                                                             minDb);
             externalMagnitudes[i] = Smoothing::smooth(externalMagnitudes[i], mag, kSmoothingCoeff);
         }
-        stabilizeLowBins(externalMagnitudes);
+        for (int i = 0; i < firstBin; ++i)
+            externalMagnitudes[i] = externalMagnitudes[static_cast<size_t>(firstBin)];
     }
 }
 
@@ -1742,7 +1771,7 @@ void AnalyzerComponent::updateCurves()
                 perBandCurveDb[static_cast<size_t>(band)][static_cast<size_t>(x)] = minDb;
             }
 
-            total += (response - std::complex<double>(1.0, 0.0));
+            total *= response;
         }
 
         total = std::complex<double>(1.0, 0.0)
@@ -1811,14 +1840,15 @@ void AnalyzerComponent::drawGridLines(juce::Graphics& g, const juce::Rectangle<i
     
     // Draw frequency grid lines and labels.
     const float maxFreq = getMaxFreq();
-    const float majorFreqs[] { 5.0f, 10.0f, 20.0f, 50.0f, 100.0f, 200.0f, 500.0f, 1000.0f, 2000.0f, 5000.0f, 10000.0f, 20000.0f };
+    const float majorFreqs[] { 10.0f, 20.0f, 50.0f, 100.0f, 200.0f, 500.0f,
+                               1000.0f, 2000.0f, 5000.0f, 10000.0f, 20000.0f, 30000.0f };
     const float minorFreqs[] { 31.5f, 40.0f, 63.0f, 80.0f, 125.0f, 160.0f, 250.0f, 315.0f, 400.0f,
                                630.0f, 800.0f, 1250.0f, 1600.0f, 2500.0f, 3150.0f, 4000.0f,
-                               6300.0f, 8000.0f, 12500.0f, 16000.0f };
+                               6300.0f, 8000.0f, 12500.0f, 16000.0f, 25000.0f };
     float lastLabelX = -1.0e6f;
-    const float minLabelSpacing = 30.0f * scale;
-    const int labelWidth = static_cast<int>(42 * scale);
-    const int labelHeight = static_cast<int>(14 * scale);
+    const float minLabelSpacing = 42.0f * scale;
+    const int labelWidth = static_cast<int>(52 * scale);
+    const int labelHeight = static_cast<int>(16 * scale);
     
     // Modern frequency grid lines.
     for (float f : minorFreqs)
@@ -1847,8 +1877,10 @@ void AnalyzerComponent::drawGridLines(juce::Graphics& g, const juce::Rectangle<i
                                                          static_cast<int>(area.getBottom() - bottomGutter),
                                                          labelWidth,
                                                          labelHeight);
-            g.setColour(theme.textMuted.withAlpha(0.9f));
-            g.setFont(juce::Font(10.0f * scale, juce::Font::plain));
+            g.setColour(theme.panel.withAlpha(0.7f));
+            g.fillRoundedRectangle(labelRect.toFloat(), 3.0f * scale);
+            g.setColour(theme.textMuted.withAlpha(0.95f));
+            g.setFont(juce::Font(11.5f * scale, juce::Font::plain));
             const juce::String text = f >= 1000.0f
                 ? juce::String(f / 1000.0f, (f >= 10000.0f ? 1 : 2)) + "k"
                 : juce::String(f, f < 100.0f ? 1 : 0);
@@ -1878,6 +1910,7 @@ void AnalyzerComponent::drawGridLines(juce::Graphics& g, const juce::Rectangle<i
                          juce::Justification::left, 1);
     };
     drawHighLabel(20000.0f);
+    drawHighLabel(30000.0f);
 
     // 0 dB reference line (without label - label removed per user request).
     const float db = 0.0f;
@@ -2002,7 +2035,7 @@ float AnalyzerComponent::gainToY(float gainDb) const
 float AnalyzerComponent::getMaxFreq() const
 {
     const float nyquist = lastSampleRate * 0.5f;
-    const float preferredMax = 20000.0f;
+    const float preferredMax = 30000.0f;
     const float maxFreq = std::min(preferredMax, nyquist);
     return std::max(kMinFreq * 1.1f, maxFreq);
 }

@@ -413,12 +413,41 @@ void EQProAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         meterTap.setCorrelationPair(pair.first, pair.second);
     }
 
-    // Pull the active snapshot and run DSP.
-    const int snapshotIndex = activeSnapshot.load();
-    const auto& snapshot = snapshots[snapshotIndex];
-    eqEngine.process(buffer, snapshot, detectorBuffer, analyzerPreTap, analyzerPostTap, analyzerHarmonicTap, meterTap);
+    auto updateProcessDebug = [this](const eqdsp::ParamSnapshot& snapshot)
+    {
+        lastProcessPhaseMode.store(snapshot.phaseMode, std::memory_order_relaxed);
+        lastProcessNumChannels.store(snapshot.numChannels, std::memory_order_relaxed);
+        lastProcessGlobalMix.store(snapshot.globalMix, std::memory_order_relaxed);
+        if (snapshot.numChannels > 0)
+        {
+            const auto& band0 = snapshot.bands[0][0];
+            lastProcessBand0GainDb.store(band0.gainDb, std::memory_order_relaxed);
+            lastProcessBand0FreqHz.store(band0.frequencyHz, std::memory_order_relaxed);
+            lastProcessBand0Bypassed.store(band0.bypassed ? 1 : 0, std::memory_order_relaxed);
+        }
+    };
 
-    if (snapshot.phaseMode != 0 && lastSampleRate > 0.0)
+    // Pull the active snapshot and run DSP.
+    const int livePhaseMode = phaseModeParam != nullptr ? static_cast<int>(phaseModeParam->load()) : 0;
+    if (livePhaseMode == 0)
+    {
+        // Realtime mode: build a fresh snapshot so DSP always responds to UI edits.
+        eqdsp::ParamSnapshot realtimeSnapshot {};
+        buildSnapshot(realtimeSnapshot);
+        updateProcessDebug(realtimeSnapshot);
+        eqEngine.process(buffer, realtimeSnapshot, detectorBuffer, analyzerPreTap, analyzerPostTap,
+                         analyzerHarmonicTap, meterTap);
+    }
+    else
+    {
+        const int snapshotIndex = activeSnapshot.load();
+        const auto& snapshot = snapshots[snapshotIndex];
+        updateProcessDebug(snapshot);
+        eqEngine.process(buffer, snapshot, detectorBuffer, analyzerPreTap, analyzerPostTap,
+                         analyzerHarmonicTap, meterTap);
+    }
+
+    if (livePhaseMode != 0 && lastSampleRate > 0.0)
     {
         // Adaptive quality: reduce linear FIR load during CPU pressure, recover when stable.
         const auto endTicks = juce::Time::getHighResolutionTicks();
@@ -697,6 +726,51 @@ int EQProAudioProcessor::getLastRmsPhaseMode() const
     return eqEngine.getLastRmsPhaseMode();
 }
 
+float EQProAudioProcessor::getLastPreRmsDb() const
+{
+    return eqEngine.getLastPreRmsDb();
+}
+
+float EQProAudioProcessor::getLastPostRmsDb() const
+{
+    return eqEngine.getLastPostRmsDb();
+}
+
+int EQProAudioProcessor::getLastRmsQuality() const
+{
+    return eqEngine.getLastRmsQuality();
+}
+
+int EQProAudioProcessor::getLastProcessPhaseMode() const
+{
+    return lastProcessPhaseMode.load(std::memory_order_relaxed);
+}
+
+int EQProAudioProcessor::getLastProcessNumChannels() const
+{
+    return lastProcessNumChannels.load(std::memory_order_relaxed);
+}
+
+float EQProAudioProcessor::getLastProcessGlobalMix() const
+{
+    return lastProcessGlobalMix.load(std::memory_order_relaxed);
+}
+
+float EQProAudioProcessor::getLastProcessBand0GainDb() const
+{
+    return lastProcessBand0GainDb.load(std::memory_order_relaxed);
+}
+
+float EQProAudioProcessor::getLastProcessBand0FreqHz() const
+{
+    return lastProcessBand0FreqHz.load(std::memory_order_relaxed);
+}
+
+bool EQProAudioProcessor::getLastProcessBand0Bypassed() const
+{
+    return lastProcessBand0Bypassed.load(std::memory_order_relaxed) != 0;
+}
+
 juce::UndoManager* EQProAudioProcessor::getUndoManager()
 {
     return &undoManager;
@@ -844,6 +918,7 @@ void EQProAudioProcessor::setDebugToneEnabled(bool enabled)
 {
     eqEngine.setDebugToneEnabled(enabled);
 }
+
 
 void EQProAudioProcessor::setSelectedBandIndex(int index)
 {
@@ -1051,7 +1126,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
         
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         ParamIDs::outputTrim, "Output Trim",
-        juce::NormalisableRange<float>(-100.0f, 24.0f, 0.01f),
+        juce::NormalisableRange<float>(-120.0f, 36.0f, 0.01f),
         0.0f));
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         ParamIDs::spectralEnable, "Spectral Enable",
@@ -1127,9 +1202,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout EQProAudioProcessor::createP
         ParamIDs::smartSolo, "Smart Solo",
         false));
 
-    const juce::NormalisableRange<float> freqRange(20.0f, 20000.0f, 0.01f, 0.5f);
-    const juce::NormalisableRange<float> gainRange(-48.0f, 48.0f, 0.01f);
-    const juce::NormalisableRange<float> qRange(0.1f, 18.0f, 0.01f, 0.5f);
+    const juce::NormalisableRange<float> freqRange(10.0f, 30000.0f, 0.01f, 0.5f);
+    const juce::NormalisableRange<float> gainRange(-30.0f, 30.0f, 0.01f);
+    const juce::NormalisableRange<float> qRange(0.025f, 40.0f, 0.01f, 0.5f);
 
     for (int ch = 0; ch < ParamIDs::kMaxChannels; ++ch)
     {

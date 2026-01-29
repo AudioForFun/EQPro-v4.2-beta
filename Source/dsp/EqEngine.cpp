@@ -56,8 +56,9 @@ void EqEngine::prepare(double sampleRate, int maxBlockSize, int numChannels)
     else if (sampleRateHz >= 192000.0)
         meterSkipFactor = 2;
     meterSkipCounter = 0;
-    linearFadeSamplesRemaining = 0;
-    linearFadeTotalSamples = 0;
+    linearSwapSamplesRemaining = 0;
+    linearSwapTotalSamples = 0;
+    linearPrevBuffer.setSize(0, 0);
     pendingLinearFadeSamples.store(0);
     modeFadeSamplesRemaining = 0;
     modeFadeTotalSamples = 0;
@@ -77,8 +78,9 @@ void EqEngine::reset()
     minPhaseDelayWritePos = 0;
     minPhaseDelaySamples = 0;
     autoGainSmoothed.setCurrentAndTargetValue(0.0f);
-    linearFadeSamplesRemaining = 0;
-    linearFadeTotalSamples = 0;
+    linearSwapSamplesRemaining = 0;
+    linearSwapTotalSamples = 0;
+    linearPrevBuffer.setSize(0, 0);
     pendingLinearFadeSamples.store(0);
     modeFadeSamplesRemaining = 0;
     modeFadeTotalSamples = 0;
@@ -102,7 +104,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
     lastPhaseMode = snapshot.phaseMode;
     if (previousPhaseMode != snapshot.phaseMode)
     {
-        modeFadeSamplesRemaining = juce::jmin(maxPreparedBlockSize, 1024);
+        modeFadeSamplesRemaining = juce::jmin(maxPreparedBlockSize, 8192);
         modeFadeTotalSamples = modeFadeSamplesRemaining;
     }
     auto computeRms = [](const juce::AudioBuffer<float>& buf, int channels) -> double
@@ -254,15 +256,18 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
         auto block = juce::dsp::AudioBlock<float>(buffer);
         auto upBlock = oversampler->processSamplesUp(block);
         const int upSamples = static_cast<int>(upBlock.getNumSamples());
-        const int channels = juce::jmin(buffer.getNumChannels(), oversampledBuffer.getNumChannels());
+        const int channels = juce::jmin(numChannels, static_cast<int>(upBlock.getNumChannels()));
 
+        std::vector<float*> upPtrs;
+        upPtrs.resize(static_cast<size_t>(channels));
         for (int ch = 0; ch < channels; ++ch)
-            juce::FloatVectorOperations::copy(oversampledBuffer.getWritePointer(ch),
-                                              upBlock.getChannelPointer(ch), upSamples);
+            upPtrs[static_cast<size_t>(ch)] = upBlock.getChannelPointer(ch);
+        juce::AudioBuffer<float> upBuffer;
+        upBuffer.setDataToReferTo(upPtrs.data(), channels, upSamples);
 
         harmonicTapOversampledBuffer.setSize(channels, upSamples, false, false, true);
         harmonicTapOversampledBuffer.clear();
-        eqDspOversampled.process(oversampledBuffer, detectorBuffer, &harmonicTapOversampledBuffer);
+        eqDspOversampled.process(upBuffer, detectorBuffer, &harmonicTapOversampledBuffer);
 
         if (snapshot.characterMode > 0)
         {
@@ -271,7 +276,7 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             const float norm = std::tanh(drive);
             for (int ch = 0; ch < channels; ++ch)
             {
-                auto* data = oversampledBuffer.getWritePointer(ch);
+                auto* data = upBuffer.getWritePointer(ch);
                 for (int i = 0; i < upSamples; ++i)
                 {
                     const float x = data[i] * drive;
@@ -468,20 +473,8 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
             const int pendingFade = pendingLinearFadeSamples.exchange(0);
             if (pendingFade > 0)
             {
-                linearFadeSamplesRemaining = pendingFade;
-                linearFadeTotalSamples = pendingFade;
-            }
-            const bool applyLinearFade = linearFadeSamplesRemaining > 0;
-            if (applyLinearFade)
-            {
-                if (linearFadeBuffer.getNumChannels() != numChannels
-                    || linearFadeBuffer.getNumSamples() < samples)
-                {
-                    linearFadeBuffer.setSize(numChannels, samples);
-                }
-                for (int ch = 0; ch < numChannels; ++ch)
-                    juce::FloatVectorOperations::copy(linearFadeBuffer.getWritePointer(ch),
-                                                      buffer.getReadPointer(ch), samples);
+                linearSwapSamplesRemaining = pendingFade;
+                linearSwapTotalSamples = pendingFade;
             }
 
             // Avoid audio-thread stalls: if FIR update is in progress, fall back to realtime.
@@ -555,22 +548,24 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                 }
             }
 
-            if (applyLinearFade)
+            if (linearSwapSamplesRemaining > 0
+                && linearPrevBuffer.getNumChannels() == numChannels
+                && linearPrevBuffer.getNumSamples() >= samples)
             {
-                const int total = juce::jmax(1, linearFadeTotalSamples);
+                const int total = juce::jmax(1, linearSwapTotalSamples);
                 for (int i = 0; i < samples; ++i)
                 {
-                    if (linearFadeSamplesRemaining <= 0)
+                    if (linearSwapSamplesRemaining <= 0)
                         break;
-                    const float t = 1.0f - static_cast<float>(linearFadeSamplesRemaining)
+                    const float t = 1.0f - static_cast<float>(linearSwapSamplesRemaining)
                         / static_cast<float>(total);
                     for (int ch = 0; ch < numChannels; ++ch)
                     {
                         auto* wet = buffer.getWritePointer(ch);
-                        const auto* dry = linearFadeBuffer.getReadPointer(ch);
-                        wet[i] = wet[i] * t + dry[i] * (1.0f - t);
+                        const auto* prev = linearPrevBuffer.getReadPointer(ch);
+                        wet[i] = wet[i] * t + prev[i] * (1.0f - t);
                     }
-                    --linearFadeSamplesRemaining;
+                    --linearSwapSamplesRemaining;
                 }
             }
             }
@@ -843,6 +838,19 @@ void EqEngine::process(juce::AudioBuffer<float>& buffer,
                                               buffer.getNumSamples());
     }
 
+    if (snapshot.phaseMode != 0)
+    {
+        if (linearPrevBuffer.getNumChannels() != buffer.getNumChannels()
+            || linearPrevBuffer.getNumSamples() < buffer.getNumSamples())
+        {
+            linearPrevBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples());
+        }
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            juce::FloatVectorOperations::copy(linearPrevBuffer.getWritePointer(ch),
+                                              buffer.getReadPointer(ch),
+                                              buffer.getNumSamples());
+    }
+
     const int postSamples = buffer.getNumSamples();
     const int postChannels = juce::jmax(1, buffer.getNumChannels());
     double postSum = 0.0;
@@ -1018,7 +1026,7 @@ void EqEngine::updateLinearPhase(const ParamSnapshot& snapshot, double sampleRat
     const int headSize = 0;
 
     rebuildLinearPhase(snapshot, taps, headSize, sampleRate, quality);
-    pendingLinearFadeSamples.store(juce::jmin(1024, maxPreparedBlockSize));
+    pendingLinearFadeSamples.store(juce::jmin(8192, maxPreparedBlockSize));
     juce::Logger::writeToLog("LinearPhase rebuild: mode=" + juce::String(snapshot.phaseMode)
                              + " quality=" + juce::String(quality)
                              + " offset=" + juce::String(adaptiveQualityOffset.load())

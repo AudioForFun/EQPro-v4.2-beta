@@ -44,6 +44,8 @@ private:
     juce::ToggleButton peakToggle;
     juce::Label headerLabel;
     juce::Label versionLabel;
+    juce::TextButton debugButton;
+    juce::TextButton debugCopyButton;
     juce::ComboBox channelSelector;
     juce::Label channelLabel;
     juce::Label phaseLabel;
@@ -140,8 +142,10 @@ private:
     juce::Rectangle<int> topBarBounds;
     juce::Rectangle<int> analyzerBounds;
     juce::Rectangle<int> bandBounds;
+    juce::Rectangle<int> debugPanelBounds;
 
     bool debugVisible = false;
+    juce::String getDebugText() const;
     bool pendingWindowRescue = true;
     int windowRescueTicks = 0;
 

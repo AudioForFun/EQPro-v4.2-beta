@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(EQPro VERSION 5.0.0)
+project(EQPro VERSION 5.3.0)
+
+string(TIMESTAMP EQPRO_BUILD_STAMP "%Y-%m-%d %H:%M:%S")
 
 # Generate a Windows version resource with the project version.
 set(EQPRO_VERSION_RC "${CMAKE_CURRENT_BINARY_DIR}/EQProVersion.rc")
@@ -117,7 +119,8 @@ target_compile_definitions(EQPro PUBLIC
     JUCE_USE_CURL=0
     JUCE_IGNORE_VST3_MISMATCHED_PARAMETER_ID_WARNING=1
     EQPRO_VERSION="${PROJECT_VERSION}"
-    EQPRO_ITERATION="5.0 beta"
+    EQPRO_ITERATION="5.3 beta"
+    EQPRO_BUILD_STAMP="${EQPRO_BUILD_STAMP}"
     JUCE_USER_DEFINED_RC_FILE="${EQPRO_VERSION_RC}"
 )
 

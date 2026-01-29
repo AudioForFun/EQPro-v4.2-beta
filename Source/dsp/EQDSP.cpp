@@ -208,7 +208,7 @@ float EQDSP::applyQMode(const BandParams& params) const
 
     const float amountNorm = juce::jlimit(0.0f, 1.0f, qModeAmount / 100.0f);
     const float factor = 1.0f + (std::abs(params.gainDb) / 18.0f) * amountNorm;
-    return juce::jlimit(0.1f, 18.0f, params.q * factor);
+    return juce::jlimit(0.025f, 40.0f, params.q * factor);
 }
 
 void EQDSP::setQMode(int mode)
@@ -747,6 +747,11 @@ void EQDSP::process(juce::AudioBuffer<float>& buffer,
                 params.gainDb = smoothGain[paramSource][band].getCurrentValue();
                 params.q = smoothQ[paramSource][band].getCurrentValue();
             }
+            params.frequencyHz = juce::jlimit(10.0f,
+                                              static_cast<float>(sampleRateHz * 0.49),
+                                              params.frequencyHz);
+            params.q = juce::jlimit(0.025f, 40.0f, params.q);
+            params.gainDb = juce::jlimit(-30.0f, 30.0f, params.gainDb);
             params.q = applyQMode(params);
             const float mix = juce::jlimit(0.0f, 1.0f, params.mix);
             const float staticGainDb = params.gainDb;

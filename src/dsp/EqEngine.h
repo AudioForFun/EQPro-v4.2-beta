@@ -34,6 +34,7 @@ public:
     void setDebugToneEnabled(bool enabled);
     void setDebugToneFrequency(float frequencyHz);
     void setAdaptiveQualityOffset(int offset);
+    void setForceTestEnabled(bool enabled);
 
     EQDSP& getEqDsp();
     const EQDSP& getEqDsp() const;
@@ -110,9 +111,9 @@ private:
     std::atomic<int> pendingLinearFadeSamples { 0 };
     std::atomic<int> linearPhaseDropoutCounter { 0 };
     juce::SpinLock linearPhaseLock;
-    juce::AudioBuffer<float> linearFadeBuffer;
-    int linearFadeSamplesRemaining = 0;
-    int linearFadeTotalSamples = 0;
+    juce::AudioBuffer<float> linearPrevBuffer;
+    int linearSwapSamplesRemaining = 0;
+    int linearSwapTotalSamples = 0;
     juce::AudioBuffer<float> modeFadeBuffer;
     int modeFadeSamplesRemaining = 0;
     int modeFadeTotalSamples = 0;

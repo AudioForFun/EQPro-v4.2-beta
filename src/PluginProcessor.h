@@ -73,6 +73,17 @@ public:
     bool getShowPhasePreference() const;
     // Last RMS-calculated phase mode (for analyzer throttling).
     int getLastRmsPhaseMode() const;
+    // Last measured RMS levels for debug/diagnostics.
+    float getLastPreRmsDb() const;
+    float getLastPostRmsDb() const;
+    int getLastRmsQuality() const;
+    // Last snapshot seen by processBlock (debug).
+    int getLastProcessPhaseMode() const;
+    int getLastProcessNumChannels() const;
+    float getLastProcessGlobalMix() const;
+    float getLastProcessBand0GainDb() const;
+    float getLastProcessBand0FreqHz() const;
+    bool getLastProcessBand0Bypassed() const;
     // Undo/redo manager for UI actions.
     juce::UndoManager* getUndoManager();
     // Preset browser helpers.
@@ -235,6 +246,12 @@ private:
     std::atomic<int> pendingAdaptiveQualityLog { 999 };
     int cpuOverloadCounter = 0;
     int cpuRecoverCounter = 0;
+    std::atomic<int> lastProcessPhaseMode { 0 };
+    std::atomic<int> lastProcessNumChannels { 0 };
+    std::atomic<float> lastProcessGlobalMix { 1.0f };
+    std::atomic<float> lastProcessBand0GainDb { 0.0f };
+    std::atomic<float> lastProcessBand0FreqHz { 1000.0f };
+    std::atomic<int> lastProcessBand0Bypassed { 0 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EQProAudioProcessor)
 };

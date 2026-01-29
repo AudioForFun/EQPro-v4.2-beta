@@ -345,6 +345,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     freqSlider.setTextBoxIsEditable(true);
     freqSlider.setSkewFactorFromMidPoint(1000.0);
     freqSlider.setTextValueSuffix(" Hz");
+    freqSlider.setRange(10.0, 30000.0, 0.01);
     freqSlider.setTooltip("Band frequency");
     freqSlider.onDoubleClick = [this]
     {
@@ -365,6 +366,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     gainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     gainSlider.setTextBoxIsEditable(true);
     gainSlider.setTextValueSuffix(" dB");
+    gainSlider.setRange(-30.0, 30.0, 0.01);
     gainSlider.setTooltip("Band gain");
     gainSlider.onDoubleClick = [this]
     {
@@ -384,6 +386,7 @@ BandControlsPanel::BandControlsPanel(EQProAudioProcessor& processorIn)
     qSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     qSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobTextW, knobTextH);
     qSlider.setTextBoxIsEditable(true);
+    qSlider.setRange(0.025, 40.0, 0.001);
     qSlider.setTooltip("Band Q");
     qSlider.onDoubleClick = [this]
     {

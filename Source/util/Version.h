@@ -27,6 +27,10 @@ inline juce::String iterationString()
 // Display string shown in the UI.
 inline juce::String displayString()
 {
-    return "v" + versionString() + " - " + iterationString();
+    juce::String stamp;
+#if defined(EQPRO_BUILD_STAMP)
+    stamp = " (" + juce::String(EQPRO_BUILD_STAMP) + ")";
+#endif
+    return "v" + versionString() + " - " + iterationString() + stamp;
 }
 } // namespace Version
